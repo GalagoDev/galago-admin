@@ -64,7 +64,13 @@ export function OrderListPage({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2.5">
+          <OrderListClient orders={orders} />
+        </section>
+      </div>
+    </main>
+  );
+}
+flex-col gap-2.5">
             {orders.length === 0 ? (
               <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
                 Nema narudžbi za ovaj prikaz.

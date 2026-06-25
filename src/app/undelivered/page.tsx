@@ -95,7 +95,13 @@ export default async function UndeliveredPage({
             </form>
           </div>
 
-          <div className="flex flex-col gap-2.5">
+          <OrderListClient orders={sortedOrders} />
+        </section>
+      </div>
+    </main>
+  );
+}
+ol gap-2.5">
             {sortedOrders.length === 0 ? (
               <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
                 Nema aktivnih undelivered narudžbi.
