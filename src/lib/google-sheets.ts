@@ -34,6 +34,38 @@ const HEADER = [
   "Zamjena",
 ];
 
+const SHEET_CACHE_TTL_MS = 60_000;
+const sheetRowsCache = new Map<string, { expiresAt: number; data: SheetOrderRow[] }>();
+const sheetRowsInFlight = new Map<string, Promise<SheetOrderRow[]>>();
+
+function invalidateSheetCache(sheetName?: string) {
+  if (sheetName) {
+    sheetRowsCache.delete(sheetName);
+    sheetRowsInFlight.delete(sheetName);
+    return;
+  }
+
+  sheetRowsCache.clear();
+  sheetRowsInFlight.clear();
+}
+
+function getCachedSheetRows(sheetName: string) {
+  const cached = sheetRowsCache.get(sheetName);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    sheetRowsCache.delete(sheetName);
+    return null;
+  }
+  return cached.data;
+}
+
+function setCachedSheetRows(sheetName: string, data: SheetOrderRow[]) {
+  sheetRowsCache.set(sheetName, {
+    expiresAt: Date.now() + SHEET_CACHE_TTL_MS,
+    data,
+  });
+}
+
 function getTodayLabel() {
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -154,6 +186,7 @@ async function styleDateRow(sheets: sheets_v4.Sheets, spreadsheetId: string, she
 }
 
 export async function ensureTodayBlockAtTop() {
+  invalidateSheetCache("Undelivered orders");
   const { sheets, spreadsheetId } = getSheetsClient();
   const today = getTodayLabel();
   const response = await sheets.spreadsheets.values.get({
@@ -228,6 +261,7 @@ export async function ensureTodayBlockAtTop() {
 }
 
 export async function rebuildUndeliveredSheetDemoLayoutDirect() {
+  invalidateSheetCache("Undelivered orders");
   const { sheets, spreadsheetId } = getSheetsClient();
   const sheetId = await getSheetId(sheets, spreadsheetId);
   const demo = [
@@ -247,45 +281,62 @@ export async function rebuildUndeliveredSheetDemoLayoutDirect() {
 }
 
 async function getSheetRowsByName(sheetName: string) {
-  const { sheets, spreadsheetId } = getSheetsClient();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `'${sheetName}'!A:Z`,
-  });
+  const cached = getCachedSheetRows(sheetName);
+  if (cached) return cached;
 
-  const rows = response.data.values ?? [];
-  const result: SheetOrderRow[] = [];
-  let currentDate = "";
-  let rowNumber = 0;
+  const existingRequest = sheetRowsInFlight.get(sheetName);
+  if (existingRequest) return existingRequest;
 
-  for (const row of rows.slice(1)) {
-    const cells = row.map((cell) => (cell ?? "").toString().trim());
-    const filled = cells.filter(Boolean);
-    if (filled.length === 0) continue;
+  const request = (async () => {
+    const { sheets, spreadsheetId } = getSheetsClient();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${sheetName}'!A:Z`,
+    });
 
-    if (filled.length === 1 && /^\d{2}\/\d{2}\/\d{4}$/.test(cells[0] ?? "")) {
-      currentDate = cells[0] ?? "";
-      continue;
+    const rows = response.data.values ?? [];
+    const result: SheetOrderRow[] = [];
+    let currentDate = "";
+    let rowNumber = 0;
+
+    for (const row of rows.slice(1)) {
+      const cells = row.map((cell) => (cell ?? "").toString().trim());
+      const filled = cells.filter(Boolean);
+      if (filled.length === 0) continue;
+
+      if (filled.length === 1 && /^\d{2}\/\d{2}\/\d{4}$/.test(cells[0] ?? "")) {
+        currentDate = cells[0] ?? "";
+        continue;
+      }
+
+      rowNumber += 1;
+      result.push({
+        rowNumber,
+        dateLabel: currentDate,
+        primalac: cells[0] ?? "",
+        brojTelefona: cells[1] ?? "",
+        grad: cells[2] ?? "",
+        adresa: cells[3] ?? "",
+        artikal: cells[4] ?? "",
+        brojPaketa: cells[5] ?? "",
+        otkupnina: cells[6] ?? "",
+        vrijednostPosiljke: cells[7] ?? "",
+        dop: cells[8] ?? "",
+        zamjena: cells[9] ?? "",
+      });
     }
 
-    rowNumber += 1;
-    result.push({
-      rowNumber,
-      dateLabel: currentDate,
-      primalac: cells[0] ?? "",
-      brojTelefona: cells[1] ?? "",
-      grad: cells[2] ?? "",
-      adresa: cells[3] ?? "",
-      artikal: cells[4] ?? "",
-      brojPaketa: cells[5] ?? "",
-      otkupnina: cells[6] ?? "",
-      vrijednostPosiljke: cells[7] ?? "",
-      dop: cells[8] ?? "",
-      zamjena: cells[9] ?? "",
-    });
-  }
+    setCachedSheetRows(sheetName, result);
+    return result;
+  })();
 
-  return result;
+  sheetRowsInFlight.set(sheetName, request);
+
+  try {
+    return await request;
+  } finally {
+    sheetRowsInFlight.delete(sheetName);
+  }
 }
 
 export async function getUndeliveredSheetRows() {
