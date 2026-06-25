@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ensureTodayBlockAtTop, getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getUndeliveredSheetRows } from "@/lib/google-sheets";
 
 function parseAmount(value: string) {
   const amount = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", "."));
@@ -28,7 +28,6 @@ export default async function UndeliveredPage({
   searchParams: Promise<{ success?: string }>;
 }) {
   const params = await searchParams;
-  await ensureTodayBlockAtTop();
   const orders = await getUndeliveredSheetRows();
 
   const sortedOrders = [...orders].sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel));

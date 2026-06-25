@@ -34,7 +34,7 @@ const HEADER = [
   "Zamjena",
 ];
 
-const SHEET_CACHE_TTL_MS = 60_000;
+const SHEET_CACHE_TTL_MS = 300_000;
 const sheetRowsCache = new Map<string, { expiresAt: number; data: SheetOrderRow[] }>();
 const sheetRowsInFlight = new Map<string, Promise<SheetOrderRow[]>>();
 
@@ -291,7 +291,7 @@ async function getSheetRowsByName(sheetName: string) {
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:Z`,
+      range: `'${sheetName}'!A:J`,
     });
 
     const rows = response.data.values ?? [];
