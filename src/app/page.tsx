@@ -127,6 +127,7 @@ export default async function Home({
       title: "Nove narudžbe",
       value: String(todayStats.incoming),
       meta: todayLabel,
+      href: "/orders",
       tone: "bg-[linear-gradient(135deg,rgba(250,204,21,0.28),rgba(250,204,21,0.1))] border-yellow-300/20",
       glow: "shadow-[0_20px_50px_rgba(250,204,21,0.08)]",
     },
@@ -134,6 +135,7 @@ export default async function Home({
       title: "Nedostavljene",
       value: String(totalUndelivered),
       meta: "Aktivne",
+      href: "/undelivered",
       tone: "bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] border-sky-300/20",
       glow: "shadow-[0_20px_50px_rgba(56,189,248,0.08)]",
     },
@@ -141,6 +143,7 @@ export default async function Home({
       title: "Na dostavi",
       value: `${totalUndeliveredKm} KM`,
       meta: "Ukupno undelivered",
+      href: "/in-transit",
       tone: "bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.08))] border-emerald-300/20",
       glow: "shadow-[0_20px_50px_rgba(16,185,129,0.08)]",
     },
@@ -148,6 +151,7 @@ export default async function Home({
       title: "Povrati",
       value: "0 KM",
       meta: "Ovaj mjesec",
+      href: "/returns",
       tone: "bg-[linear-gradient(135deg,rgba(192,132,252,0.22),rgba(192,132,252,0.08))] border-fuchsia-300/20",
       glow: "shadow-[0_20px_50px_rgba(192,132,252,0.08)]",
     },
@@ -178,14 +182,15 @@ export default async function Home({
 
         <section className="mt-5 grid grid-cols-2 gap-3">
           {cards.map((card) => (
-            <article
+            <Link
               key={card.title}
-              className={`rounded-[1.5rem] border px-4 py-4 ${card.tone} ${card.glow}`}
+              href={card.href}
+              className={`rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 ${card.tone} ${card.glow}`}
             >
               <p className="text-[12px] font-medium leading-4 text-neutral-200">{card.title}</p>
               <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{card.value}</p>
               <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-neutral-500">{card.meta}</p>
-            </article>
+            </Link>
           ))}
         </section>
 
