@@ -1,7 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
-
 import { google } from "googleapis";
+
+import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 
 const SHEET_NAME = "Orders";
 const HEADER = [
@@ -39,15 +38,13 @@ function getTodayLabel() {
 }
 
 function getSheetsClient() {
-  const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_PATH;
   const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
 
-  if (!keyPath || !spreadsheetId) {
+  if (!spreadsheetId) {
     throw new Error("Google Sheets is not configured.");
   }
 
-  const resolvedPath = path.resolve(process.cwd(), keyPath);
-  const credentials = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+  const credentials = getGoogleServiceAccountCredentials();
 
   const auth = new google.auth.GoogleAuth({
     credentials,
