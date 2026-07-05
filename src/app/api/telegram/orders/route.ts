@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { appendOrderToOrdersSheet } from "@/lib/google-orders";
+import { extractTelegramOrderFromImage } from "@/lib/telegram-image-orders";
 import {
   cleanupOldTelegramOrderDrafts,
   deleteTelegramOrderDraft,
@@ -18,6 +19,16 @@ export const runtime = "nodejs";
 type TelegramMessage = {
   message_id: number;
   text?: string;
+  caption?: string;
+  photo?: Array<{
+    file_id: string;
+    file_size?: number;
+  }>;
+  document?: {
+    file_id: string;
+    mime_type?: string;
+    file_name?: string;
+  };
   chat: {
     id: number;
   };
@@ -38,6 +49,12 @@ type TelegramApiResponse<T> = {
   ok: boolean;
   result?: T;
   description?: string;
+};
+
+type TelegramFile = {
+  file_id: string;
+  file_path?: string;
+  file_size?: number;
 };
 
 function getBotToken() {
@@ -91,35 +108,128 @@ async function answerCallbackQuery(payload: Record<string, unknown>) {
   return telegramRequest<boolean>("answerCallbackQuery", payload);
 }
 
-async function handleMessage(message: TelegramMessage) {
-  if (!message.text || message.text.startsWith("/")) return;
-  if (!isAllowedChat(message.chat.id)) return;
-
-  cleanupOldTelegramOrderDrafts();
-
-  const order = parseTelegramOrderText(message.text);
+async function saveDraftAndSendPreview(message: TelegramMessage, order: ReturnType<typeof parseTelegramOrderText>, previewMessageId?: number) {
   const key = makeTelegramDraftKey(message.chat.id, message.message_id);
-  const preview = await sendMessage({
-    chat_id: message.chat.id,
-    text: formatTelegramOrderPreview(order),
-    reply_to_message_id: message.message_id,
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "Confirm", callback_data: `confirm:${key}` },
-          { text: "Cancel", callback_data: `cancel:${key}` },
-        ],
+  const replyMarkup = {
+    inline_keyboard: [
+      [
+        { text: "Confirm", callback_data: `confirm:${key}` },
+        { text: "Cancel", callback_data: `cancel:${key}` },
       ],
-    },
-  });
+    ],
+  };
+
+  const text = formatTelegramOrderPreview(order);
+  const preview = previewMessageId
+    ? await editMessageText({
+        chat_id: message.chat.id,
+        message_id: previewMessageId,
+        text,
+        reply_markup: replyMarkup,
+      })
+    : await sendMessage({
+        chat_id: message.chat.id,
+        text,
+        reply_to_message_id: message.message_id,
+        reply_markup: replyMarkup,
+      });
 
   saveTelegramOrderDraft({
     key,
     chatId: message.chat.id,
     messageId: message.message_id,
-    previewMessageId: preview.message_id,
+    previewMessageId: previewMessageId || preview.message_id,
     order,
   });
+}
+
+function getMessageImageFileId(message: TelegramMessage) {
+  const documentMime = message.document?.mime_type || "";
+  if (message.document?.file_id && documentMime.startsWith("image/")) {
+    return {
+      fileId: message.document.file_id,
+      mimeType: documentMime,
+    };
+  }
+
+  const photo = [...(message.photo || [])].sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
+  if (!photo?.file_id) return null;
+
+  return {
+    fileId: photo.file_id,
+    mimeType: "image/jpeg",
+  };
+}
+
+function mimeTypeFromPath(filePath: string, fallback: string) {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  return fallback || "image/jpeg";
+}
+
+async function downloadTelegramImage(fileId: string, fallbackMimeType: string) {
+  const file = await telegramRequest<TelegramFile>("getFile", { file_id: fileId });
+  if (!file.file_path) {
+    throw new Error("Telegram image file path was not returned.");
+  }
+
+  if (file.file_size && file.file_size > 12 * 1024 * 1024) {
+    throw new Error("Telegram image is too large for order extraction.");
+  }
+
+  const response = await fetch(`https://api.telegram.org/file/bot${getBotToken()}/${file.file_path}`);
+  if (!response.ok) {
+    throw new Error("Telegram image download failed.");
+  }
+
+  return {
+    imageBytes: await response.arrayBuffer(),
+    mimeType: mimeTypeFromPath(file.file_path, fallbackMimeType),
+  };
+}
+
+async function handleImageMessage(message: TelegramMessage) {
+  const image = getMessageImageFileId(message);
+  if (!image) return false;
+
+  const processing = await sendMessage({
+    chat_id: message.chat.id,
+    text: "Čitam sliku i pripremam narudžbu...",
+    reply_to_message_id: message.message_id,
+  });
+
+  try {
+    const downloaded = await downloadTelegramImage(image.fileId, image.mimeType);
+    const order = await extractTelegramOrderFromImage({
+      ...downloaded,
+      caption: message.caption,
+    });
+
+    await saveDraftAndSendPreview(message, order, processing.message_id);
+  } catch (error) {
+    await editMessageText({
+      chat_id: message.chat.id,
+      message_id: processing.message_id,
+      text: `Ne mogu pročitati sliku: ${error instanceof Error ? error.message : "Unknown error"}`,
+    });
+  }
+
+  return true;
+}
+
+async function handleMessage(message: TelegramMessage) {
+  if (!isAllowedChat(message.chat.id)) return;
+
+  cleanupOldTelegramOrderDrafts();
+
+  if (await handleImageMessage(message)) return;
+
+  if (!message.text || message.text.startsWith("/")) return;
+
+  const order = parseTelegramOrderText(message.text);
+  await saveDraftAndSendPreview(message, order);
 }
 
 async function handleCallbackQuery(query: TelegramCallbackQuery) {

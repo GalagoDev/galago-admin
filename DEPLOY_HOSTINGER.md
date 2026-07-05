@@ -114,6 +114,16 @@ Use `TELEGRAM_ORDERS_ALLOWED_CHAT_ID` to restrict which chat can submit orders.
 If `TELEGRAM_ORDERS_WEBHOOK_SECRET` is set, pass it as `secret_token` when registering
 the webhook.
 
+Telegram image/photo order extraction also needs:
+
+```bash
+OPENAI_API_KEY=...
+OPENAI_IMAGE_ORDER_MODEL=gpt-5.4-mini
+```
+
+If the OpenAI key is missing, text orders still work and image orders return a clear
+configuration error in Telegram.
+
 ## 10. PM2 useful commands
 ```bash
 pm2 status
