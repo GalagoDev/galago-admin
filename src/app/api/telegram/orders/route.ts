@@ -185,13 +185,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const update = (await request.json()) as TelegramUpdate;
+  try {
+    const update = (await request.json()) as TelegramUpdate;
 
-  if (update.message) {
-    await handleMessage(update.message);
-  } else if (update.callback_query) {
-    await handleCallbackQuery(update.callback_query);
+    if (update.message) {
+      await handleMessage(update.message);
+    } else if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Telegram webhook error";
+    console.error("Telegram orders webhook failed:", message);
+    return NextResponse.json({ ok: false, error: message });
   }
-
-  return NextResponse.json({ ok: true });
 }
