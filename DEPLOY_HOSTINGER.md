@@ -94,7 +94,27 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
-## 9. PM2 useful commands
+## 9. Telegram order webhook
+
+Telegram intake is handled by the Next.js route:
+
+```text
+/api/telegram/orders
+```
+
+Register it with Telegram after deployment:
+
+```bash
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_ORDERS_BOT_TOKEN/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://magenta-tarsier-949777.hostingersite.com/api/telegram/orders"}'
+```
+
+Use `TELEGRAM_ORDERS_ALLOWED_CHAT_ID` to restrict which chat can submit orders.
+If `TELEGRAM_ORDERS_WEBHOOK_SECRET` is set, pass it as `secret_token` when registering
+the webhook.
+
+## 10. PM2 useful commands
 ```bash
 pm2 status
 pm2 logs store-admin
@@ -105,5 +125,5 @@ pm2 restart store-admin-orders-bot
 
 ## Notes
 - The admin app does not need to be running for Shopify -> Apps Script -> Google Sheets to work.
-- The Telegram bot does need the VPS process if you want it always on.
-- If you deploy both app and bot, keep `.env.local` configured with `GOOGLE_SERVICE_ACCOUNT_JSON`.
+- Telegram orders use the app webhook route; no separate polling bot process is required.
+- Keep Google auth configured with `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` on Hostinger.

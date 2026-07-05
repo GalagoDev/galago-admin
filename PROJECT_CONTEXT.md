@@ -150,11 +150,13 @@ Connected / active:
 - mobile-friendly undelivered flow
 - clickable dashboard pages
 - Shopify import path
+- Telegram webhook intake route (`/api/telegram/orders`)
 
 Not fully mature yet:
 - true stats page logic
 - returns (`Povrati`) operational logic
 - stronger Shopify dedupe stability
+- Telegram allowed chat restriction needs production env hardening
 - deeper performance optimization
 
 ## Performance notes

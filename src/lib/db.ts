@@ -21,7 +21,7 @@ export function getDb() {
 
   const storage = ensureStorage();
   const dbPath = process.env.DATABASE_PATH
-    ? path.resolve(process.cwd(), process.env.DATABASE_PATH)
+    ? path.resolve(/* turbopackIgnore: true */ process.cwd(), process.env.DATABASE_PATH)
     : path.join(storage.data, "store.db");
 
   database = new Database(dbPath);

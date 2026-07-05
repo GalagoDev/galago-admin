@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
+import { parseSheetDateLabel } from "@/lib/sheet-dates";
 
 const SHEET_NAME = "Orders";
 const HEADER = [
@@ -35,6 +36,10 @@ function getTodayLabel() {
     month: "2-digit",
     year: "numeric",
   }).format(new Date());
+}
+
+function indexIsSheetDateRow(index: number, value: string) {
+  return index > 0 && /^\d{2}\/\d{2}\/\d{4}$/.test(value);
 }
 
 function getSheetsClient() {
@@ -77,9 +82,18 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
     throw new Error("Orders sheet header does not match expected layout.");
   }
 
-  const dateRowIndex = rows.findIndex((row, index) => index > 0 && (row[0] ?? "").toString().trim() === today);
+  let dateRowIndex = rows.findIndex((row, index) => index > 0 && (row[0] ?? "").toString().trim() === today);
   if (dateRowIndex === -1) {
-    throw new Error(`Today's block (${today}) was not found in Orders sheet.`);
+    const latestDateRow = rows
+      .map((row, index) => ({ index, dateLabel: (row[0] ?? "").toString().trim() }))
+      .filter((row) => indexIsSheetDateRow(row.index, row.dateLabel))
+      .sort((a, b) => parseSheetDateLabel(b.dateLabel) - parseSheetDateLabel(a.dateLabel))[0];
+
+    if (!latestDateRow) {
+      throw new Error(`Today's block (${today}) was not found in Orders sheet.`);
+    }
+
+    dateRowIndex = latestDateRow.index;
   }
 
   let targetRow = dateRowIndex + 2; // first row under date, spreadsheet 1-indexed

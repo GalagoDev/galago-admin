@@ -3,7 +3,7 @@ import path from "node:path";
 
 const projectRoot = process.cwd();
 const configuredStorageDir = process.env.STORAGE_DIR ?? "storage";
-const storageRoot = path.resolve(projectRoot, configuredStorageDir);
+const storageRoot = path.resolve(/* turbopackIgnore: true */ projectRoot, configuredStorageDir);
 
 const folders = [
   storageRoot,
