@@ -87,6 +87,9 @@ Current repo:
 
 ### Hostinger deployment
 The app was deployed to Hostinger business hosting / Node app hosting.
+Current live URL:
+- `https://magenta-tarsier-949777.hostingersite.com/`
+
 Known issue discovered during deployment:
 - redeploys wiped the `secrets/` folder
 - this broke Google Sheets auth when app relied on `GOOGLE_SERVICE_ACCOUNT_PATH`

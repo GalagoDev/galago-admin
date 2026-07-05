@@ -54,13 +54,13 @@ export function BottomNav() {
           <span className="mt-1 text-[11px] font-medium">Nedostavljene</span>
         </Link>
 
-        <button
-          type="button"
+        <Link
+          href="/stats"
           className="flex flex-col items-center justify-center rounded-[1.2rem] px-3 py-2.5 text-neutral-400 transition hover:bg-white/[0.04] hover:text-neutral-200"
         >
           <ChartIcon />
           <span className="mt-1 text-[11px] font-medium">Statistika</span>
-        </button>
+        </Link>
       </div>
     </nav>
   );

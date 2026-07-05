@@ -34,15 +34,10 @@ Create:
 ```
 with values from `.env.production.example`.
 
-Create secrets dir:
-```bash
-mkdir -p /var/www/store-admin/secrets
-```
+Use `GOOGLE_SERVICE_ACCOUNT_JSON` for Google auth on Hostinger. Do not rely on
+runtime files under `secrets/`; Hostinger redeploys can wipe them.
 
-Put Google service account JSON at:
-```bash
-/var/www/store-admin/secrets/google-service-account.json
-```
+Keep `GOOGLE_SERVICE_ACCOUNT_PATH` only as a local/fallback option.
 
 ## 5. Install and build
 ```bash
@@ -111,4 +106,4 @@ pm2 restart store-admin-orders-bot
 ## Notes
 - The admin app does not need to be running for Shopify -> Apps Script -> Google Sheets to work.
 - The Telegram bot does need the VPS process if you want it always on.
-- If you deploy both app and bot, keep `.env.local` and service account JSON on server.
+- If you deploy both app and bot, keep `.env.local` configured with `GOOGLE_SERVICE_ACCOUNT_JSON`.

@@ -1,9 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
-import { getTodayIncomingStats } from "@/lib/db";
 import { getOrdersSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
-import { ensureStorage } from "@/lib/storage";
 
 function getBannerMessage(params: {
   error?: string;
@@ -79,9 +77,7 @@ export default async function Home({
     success?: string;
   }>;
 }) {
-  ensureStorage();
   const params = await searchParams;
-  const todayStats = getTodayIncomingStats();
   const [undeliveredRows, ordersRows] = await Promise.all([
     getUndeliveredSheetRows().catch(() => []),
     getOrdersSheetRows().catch(() => []),
@@ -115,8 +111,8 @@ export default async function Home({
     .slice(-7)
     .map(([date, count]) => ({ date, count }));
 
+  const todayOrders = ordersRows.filter((row) => row.dateLabel === todayLabel);
   const chartCounts = monthlyChartPoints.map((point) => point.count);
-  const chartMax = Math.max(...chartCounts, 1);
   const chartLabels = monthlyChartPoints.map((point) => point.date.slice(0, 5));
   const monthlyTotalOrders = currentMonthOrders.length;
 
@@ -125,7 +121,7 @@ export default async function Home({
   const cards = [
     {
       title: "Nove narudžbe",
-      value: String(todayStats.incoming),
+      value: String(todayOrders.length),
       meta: todayLabel,
       href: "/orders",
       tone: "bg-[linear-gradient(135deg,rgba(250,204,21,0.28),rgba(250,204,21,0.1))] border-yellow-300/20",

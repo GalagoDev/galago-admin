@@ -257,26 +257,6 @@ export async function ensureTodayBlockAtTop() {
   await styleDateRow(sheets, spreadsheetId, sheetId, 2);
 }
 
-export async function rebuildUndeliveredSheetDemoLayoutDirect() {
-  invalidateSheetCache("Undelivered orders");
-  const { sheets, spreadsheetId } = getSheetsClient();
-  const sheetId = await getSheetId(sheets, spreadsheetId);
-  const demo = [
-    ["21/03/2026", "", "", "", "", "", "", "", "", ""],
-    ["Melisa Paratusic", "38765041633", "KOZARAC", "Trnopolje Kararic bb", "simple", "92418467", "169 KM", "169 KM", "1", "0"],
-    ["Aida Samardzic", "38763641775", "CAZIN", "ul.zrtava domovinskog rata E-B kod Binga,25/4", "ladičar malmo", "92418468", "99 KM", "99 KM", "1", "0"],
-    ["", "", "", "", "", "", "", "", "", ""],
-    ["20/03/2026", "", "", "", "", "", "", "", "", ""],
-    ["Popara Danisa", "38762468073", "SARAJEVO", "Grlicica brdo 46", "manji sto za sminkanje", "92418480", "89 KM", "89 KM", "1", "0"],
-    ["Natasa Milakovic", "38766458025", "BANJA LUKA", "Ul. Milana Karanovica 51", "kontrast oba bijela crne nogare", "92418469", "85 KM", "85 KM", "1", "0"],
-  ];
-  await sheets.spreadsheets.values.clear({ spreadsheetId, range: `'${SHEET_NAME}'!A:Z` });
-  await sheets.spreadsheets.values.update({ spreadsheetId, range: `'${SHEET_NAME}'!A1:J${demo.length + 1}`, valueInputOption: "RAW", requestBody: { values: [HEADER, ...demo] } });
-  await styleSheetHeader(sheets, spreadsheetId, sheetId);
-  await styleDateRow(sheets, spreadsheetId, sheetId, 2);
-  await styleDateRow(sheets, spreadsheetId, sheetId, 6);
-}
-
 async function getSheetRowsByName(sheetName: string) {
   const cached = getCachedSheetRows(sheetName);
   if (cached) return cached;

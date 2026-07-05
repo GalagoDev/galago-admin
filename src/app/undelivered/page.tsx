@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { OrderListClient } from "@/components/order-list-client";
 import { getUndeliveredSheetRows } from "@/lib/google-sheets";
 
 function parseAmount(value: string) {
@@ -85,59 +86,9 @@ export default async function UndeliveredPage({
               <p className="text-lg font-semibold text-white">Lista za dostavu</p>
               <p className="mt-1 text-sm text-neutral-500">Kompaktan mobilni prikaz</p>
             </div>
-            <form action="/api/rebuild-sheet-demo" method="post">
-              <button
-                type="submit"
-                className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-2 text-[11px] font-medium text-sky-200 transition hover:bg-sky-400/20"
-              >
-                Rebuild
-              </button>
-            </form>
           </div>
 
           <OrderListClient orders={sortedOrders} />
-        </section>
-      </div>
-    </main>
-  );
-}
-ol gap-2.5">
-            {sortedOrders.length === 0 ? (
-              <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
-                Nema aktivnih undelivered narudžbi.
-              </div>
-            ) : (
-              sortedOrders.map((order, index) => (
-                <article
-                  key={`${order.rowNumber}-${order.brojTelefona}-${order.primalac}`}
-                  className="rounded-[1.25rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-4 py-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">{order.primalac || "Bez imena"}</p>
-                      <p className="mt-1 truncate text-sm text-neutral-400">{order.artikal || "Bez artikla"}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="rounded-full border border-sky-300/10 bg-sky-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-sky-200">
-                        #{index + 1}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">{order.dateLabel || "-"}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid gap-1.5 text-[13px] text-neutral-300">
-                    <p><span className="text-neutral-500">Grad:</span> {order.grad || "-"}</p>
-                    <p><span className="text-neutral-500">Adresa:</span> {order.adresa || "-"}</p>
-                    <p><span className="text-neutral-500">Telefon:</span> {order.brojTelefona || "-"}</p>
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[12px]">
-                      <span className="text-neutral-500">Otkupnina</span>
-                      <span className="font-medium text-white">{order.otkupnina || "-"}</span>
-                    </div>
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
         </section>
       </div>
     </main>

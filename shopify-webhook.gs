@@ -18,6 +18,9 @@ const INTERNAL_ID_COLUMN = 11; // K
 const SPREADSHEET_ID = '1P99qsJa4HzruxVCB3BHLTpZ5Jvb1jiTVvjf6IuRho9s';
 
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+
   try {
     const body = e && e.postData && e.postData.contents
       ? JSON.parse(e.postData.contents)
@@ -30,6 +33,15 @@ function doPost(e) {
     const shopifyOrderId = String(body.id || '').trim();
     if (!shopifyOrderId) {
       return jsonResponse_({ ok: false, error: 'Missing Shopify order id' });
+    }
+
+    locked = lock.tryLock(30000);
+    if (!locked) {
+      return jsonResponse_({
+        ok: false,
+        error: 'Could not acquire Shopify import lock',
+        shopifyOrderId,
+      });
     }
 
     ensureOrdersSheetLayout();
@@ -58,6 +70,8 @@ function doPost(e) {
       ok: false,
       error: String(error && error.message ? error.message : error),
     });
+  } finally {
+    if (locked) lock.releaseLock();
   }
 }
 
@@ -291,6 +305,7 @@ function mapShopifyOrder_(order) {
     .filter(Boolean);
 
   const combinedProducts = productNames.join(' + ');
+  const subtotal = getShopifySubtotal_(order, lineItems);
 
   const brojPaketa = String(
     lineItems.reduce((sum, item) => {
@@ -306,11 +321,46 @@ function mapShopifyOrder_(order) {
     adresa,
     artikal: combinedProducts,
     brojPaketa: brojPaketa === '0' ? '' : brojPaketa,
-    otkupnina: combinedProducts,
-    vrijednostPosiljke: combinedProducts,
+    otkupnina: subtotal,
+    vrijednostPosiljke: subtotal,
     dop: '1',
     zamjena: '0',
   };
+}
+
+function getShopifySubtotal_(order, lineItems) {
+  const directValue = firstMoneyValue_([
+    order.current_subtotal_price,
+    order.subtotal_price,
+    order.total_line_items_price,
+    order.current_total_price,
+    order.total_price,
+  ]);
+
+  if (directValue) return directValue;
+
+  const calculated = lineItems.reduce((sum, item) => {
+    const quantity = Number(item && item.quantity ? item.quantity : 0);
+    const price = Number(String(item && item.price ? item.price : '').replace(',', '.'));
+    if (!Number.isFinite(quantity) || !Number.isFinite(price)) return sum;
+    return sum + quantity * price;
+  }, 0);
+
+  return calculated > 0 ? formatMoney_(calculated) : '';
+}
+
+function firstMoneyValue_(values) {
+  for (const value of values) {
+    const formatted = formatMoney_(value);
+    if (formatted) return formatted;
+  }
+  return '';
+}
+
+function formatMoney_(value) {
+  const amount = Number(String(value || '').replace(/[^\d.,-]/g, '').replace(',', '.'));
+  if (!Number.isFinite(amount) || amount <= 0) return '';
+  return String(Math.round(amount * 100) / 100);
 }
 
 function buildCustomerName_(shipping, billing, customer, order) {

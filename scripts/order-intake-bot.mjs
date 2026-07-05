@@ -5,14 +5,23 @@ import { google } from 'googleapis';
 
 const BOT_TOKEN = process.env.TELEGRAM_ORDERS_BOT_TOKEN;
 const SHEET_ID = process.env.GOOGLE_SHEETS_ID;
+const SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 const KEY_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_PATH;
 
-if (!BOT_TOKEN || !SHEET_ID || !KEY_PATH) {
-  console.error('Missing TELEGRAM_ORDERS_BOT_TOKEN / GOOGLE_SHEETS_ID / GOOGLE_SERVICE_ACCOUNT_PATH');
+if (!BOT_TOKEN || !SHEET_ID || (!SERVICE_ACCOUNT_JSON && !KEY_PATH)) {
+  console.error('Missing TELEGRAM_ORDERS_BOT_TOKEN / GOOGLE_SHEETS_ID / GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_PATH');
   process.exit(1);
 }
 
-const creds = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), KEY_PATH), 'utf8'));
+function getGoogleServiceAccountCredentials() {
+  if (SERVICE_ACCOUNT_JSON) {
+    return JSON.parse(SERVICE_ACCOUNT_JSON);
+  }
+
+  return JSON.parse(fs.readFileSync(path.resolve(process.cwd(), KEY_PATH), 'utf8'));
+}
+
+const creds = getGoogleServiceAccountCredentials();
 const auth = new google.auth.GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
 const sheets = google.sheets({ version: 'v4', auth });
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
@@ -73,6 +82,7 @@ function parseOrderText(rawText) {
 
   if (hasLabels) {
     let primalac='', brojTelefona='', grad='', adresa='';
+    const amount = findAmount(rawText);
     for (const line of lines) {
       if (/^ime(?:\s+i\s+prezime)?\s*[:\-]/i.test(line)) primalac = cleanup(line.replace(/^ime(?:\s+i\s+prezime)?\s*[:\-]\s*/i, ''));
       else if (/^(mob|br tel|br\. tel|telefon)\s*[:\-]/i.test(line)) brojTelefona = findPhone(line);
@@ -89,7 +99,7 @@ function parseOrderText(rawText) {
         } else adresa = value;
       }
     }
-    return { primalac, brojTelefona, grad, adresa, artikal: lines[lines.length-1] || '', brojPaketa:'', otkupnina: '', vrijednostPosiljke: '', dop:'', zamjena:'' };
+    return { primalac, brojTelefona, grad, adresa, artikal: lines[lines.length-1] || '', brojPaketa:'', otkupnina: amount, vrijednostPosiljke: amount, dop:'', zamjena:'' };
   }
 
   const articleLine = lines.length > 1 ? lines[lines.length-1] : '';
@@ -152,7 +162,7 @@ function parseOrderText(rawText) {
     }
   }
 
-  return { primalac, brojTelefona, grad, adresa, artikal, brojPaketa:'', otkupnina: '', vrijednostPosiljke: '', dop:'', zamjena:'' };
+  return { primalac, brojTelefona, grad, adresa, artikal, brojPaketa:'', otkupnina: amount, vrijednostPosiljke: amount, dop:'', zamjena:'' };
 }
 
 function formatPreview(order) {

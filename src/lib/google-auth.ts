@@ -10,7 +10,7 @@ export function getGoogleServiceAccountCredentials() {
   }
 
   if (keyPath) {
-    const resolvedPath = path.resolve(process.cwd(), keyPath);
+    const resolvedPath = path.resolve(/* turbopackIgnore: true */ process.cwd(), keyPath);
     return JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
   }
 
