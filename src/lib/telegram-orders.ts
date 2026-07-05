@@ -38,6 +38,7 @@ const cities: Record<string, string> = {
   kalesija: "75260",
   lukavac: "75300",
   kakanj: "72240",
+  maglaj: "74250",
   rogatica: "73220",
   grude: "88340",
   vitez: "72250",

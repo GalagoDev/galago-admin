@@ -152,13 +152,14 @@ Connected / active:
 - Shopify import path
 - Telegram webhook intake route (`/api/telegram/orders`)
 - Telegram text/image order drafts with Confirm/Cancel before saving
+- Telegram image extraction uses local OCR (`tesseract.js`), not paid OpenAI vision
 
 Not fully mature yet:
 - true stats page logic
 - returns (`Povrati`) operational logic
 - stronger Shopify dedupe stability
 - Telegram allowed chat restriction needs production env hardening
-- Telegram image extraction needs `OPENAI_API_KEY` in production env
+- Telegram OCR quality depends on clear screenshots/photos and may need parser tuning
 - deeper performance optimization
 
 ## Performance notes
