@@ -3,6 +3,10 @@ import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
 import { getOrdersSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 function getBannerMessage(params: {
   error?: string;
   success?: string;

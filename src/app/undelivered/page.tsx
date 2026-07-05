@@ -3,6 +3,10 @@ import Link from "next/link";
 import { OrderListClient } from "@/components/order-list-client";
 import { getUndeliveredSheetRows } from "@/lib/google-sheets";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 function parseAmount(value: string) {
   const amount = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", "."));
   return Number.isFinite(amount) ? amount : 0;
@@ -23,13 +27,8 @@ function ArrowIcon() {
   );
 }
 
-export default async function UndeliveredPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ success?: string }>;
-}) {
-  const params = await searchParams;
-  const orders = await getUndeliveredSheetRows();
+export default async function UndeliveredPage() {
+  const orders = await getUndeliveredSheetRows().catch(() => []);
 
   const sortedOrders = [...orders].sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel));
   const totalOrders = sortedOrders.length;
@@ -75,9 +74,7 @@ export default async function UndeliveredPage({
         </section>
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-neutral-300">
-          {params.success === "sheet-demo-rebuilt"
-            ? "Google Sheet demo layout rebuilt successfully."
-            : "Mobile pregled aktivnih undelivered narudžbi iz Google Sheeta."}
+          Mobile pregled aktivnih undelivered narudžbi iz Google Sheeta.
         </div>
 
         <section className="mt-5 rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
