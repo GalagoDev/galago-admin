@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
 import { getOrdersSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -89,12 +90,6 @@ export default async function Home({
 
   const totalUndelivered = undeliveredRows.length;
   const totalUndeliveredKm = undeliveredRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
-  const todayLabel = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date());
-
   const oldestUndelivered = [...undeliveredRows]
     .sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel))
     .slice(0, 5);
@@ -115,7 +110,8 @@ export default async function Home({
     .slice(-7)
     .map(([date, count]) => ({ date, count }));
 
-  const todayOrders = ordersRows.filter((row) => row.dateLabel === todayLabel);
+  const latestOrdersDate = getLatestSheetDateLabel(ordersRows);
+  const latestOrders = latestOrdersDate ? ordersRows.filter((row) => row.dateLabel === latestOrdersDate) : [];
   const chartCounts = monthlyChartPoints.map((point) => point.count);
   const chartLabels = monthlyChartPoints.map((point) => point.date.slice(0, 5));
   const monthlyTotalOrders = currentMonthOrders.length;
@@ -125,8 +121,8 @@ export default async function Home({
   const cards = [
     {
       title: "Nove narudžbe",
-      value: String(todayOrders.length),
-      meta: todayLabel,
+      value: String(latestOrders.length),
+      meta: latestOrdersDate || "-",
       href: "/orders",
       tone: "bg-[linear-gradient(135deg,rgba(250,204,21,0.28),rgba(250,204,21,0.1))] border-yellow-300/20",
       glow: "shadow-[0_20px_50px_rgba(250,204,21,0.08)]",
