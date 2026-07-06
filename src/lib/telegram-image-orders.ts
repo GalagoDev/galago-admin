@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -8,7 +7,6 @@ import { createWorker, PSM } from "tesseract.js";
 
 import { parseTelegramOrderText, type TelegramOrderDraft } from "@/lib/telegram-orders";
 
-const require = createRequire(import.meta.url);
 const OCR_TIMEOUT_MS = 25_000;
 
 function normalizeOcrText(value: string) {
@@ -32,8 +30,9 @@ function fillDefaults(order: TelegramOrderDraft): TelegramOrderDraft {
 }
 
 function getTesseractPaths() {
-  const tesseractDir = path.dirname(require.resolve("tesseract.js/package.json"));
-  const coreDir = path.dirname(require.resolve("tesseract.js-core/package.json"));
+  const nodeModulesDir = path.join(process.cwd(), "node_modules");
+  const tesseractDir = path.join(nodeModulesDir, "tesseract.js");
+  const coreDir = path.join(nodeModulesDir, "tesseract.js-core");
 
   return {
     workerPath: path.join(tesseractDir, "src", "worker-script", "node", "index.js"),
