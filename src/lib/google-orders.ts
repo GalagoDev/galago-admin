@@ -16,6 +16,7 @@ const HEADER = [
   "DOP",
   "Zamjena",
 ];
+const TRAILING_EMPTY_ROWS = 5;
 
 type OrderSheetInput = {
   primalac: string;
@@ -42,6 +43,42 @@ function indexIsSheetDateRow(index: number, value: string) {
   return index > 0 && /^\d{2}\/\d{2}\/\d{4}$/.test(value);
 }
 
+function rowHasValue(row: unknown[]) {
+  return row.some((cell) => (cell ?? "").toString().trim() !== "");
+}
+
+function findNextDateRowIndex(rows: unknown[][], dateRowIndex: number) {
+  return rows.findIndex((row, index) => index > dateRowIndex && indexIsSheetDateRow(index, (row[0] ?? "").toString().trim()));
+}
+
+function analyzeDateBlock(rows: unknown[][], dateRowIndex: number) {
+  const nextDateRowIndex = findNextDateRowIndex(rows, dateRowIndex);
+  const blockEndIndex = nextDateRowIndex === -1 ? Math.max(rows.length - 1, dateRowIndex) : nextDateRowIndex - 1;
+  let lastFilledIndex = dateRowIndex;
+
+  for (let index = dateRowIndex + 1; index <= blockEndIndex; index += 1) {
+    const row = rows[index] ?? [];
+    if (rowHasValue(row)) lastFilledIndex = index;
+  }
+
+  let trailingEmptyRows = 0;
+  for (let index = blockEndIndex; index > lastFilledIndex; index -= 1) {
+    const row = rows[index] ?? [];
+    if (!rowHasValue(row)) {
+      trailingEmptyRows += 1;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    nextDateRowIndex,
+    blockEndIndex,
+    lastFilledIndex,
+    trailingEmptyRows,
+  };
+}
+
 function getSheetsClient() {
   const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
 
@@ -60,6 +97,44 @@ function getSheetsClient() {
     spreadsheetId,
     sheets: google.sheets({ version: "v4", auth }),
   };
+}
+
+async function getOrdersSheetId(sheets: ReturnType<typeof google.sheets>, spreadsheetId: string) {
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties.sheetId,sheets.properties.title",
+  });
+
+  const sheet = spreadsheet.data.sheets?.find((entry) => entry.properties?.title === SHEET_NAME);
+  const sheetId = sheet?.properties?.sheetId;
+  if (sheetId === undefined || sheetId === null) {
+    throw new Error(`Sheet not found: ${SHEET_NAME}`);
+  }
+
+  return sheetId;
+}
+
+async function insertRows(sheets: ReturnType<typeof google.sheets>, spreadsheetId: string, sheetId: number, rowIndex: number, count: number) {
+  if (count <= 0) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndex,
+              endIndex: rowIndex + count,
+            },
+            inheritFromBefore: rowIndex > 0,
+          },
+        },
+      ],
+    },
+  });
 }
 
 export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
@@ -96,12 +171,26 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
     dateRowIndex = latestDateRow.index;
   }
 
-  let targetRow = dateRowIndex + 2; // first row under date, spreadsheet 1-indexed
-  while (true) {
-    const row = rows[targetRow - 1] ?? [];
-    const filled = row.some((cell) => (cell ?? "").toString().trim() !== "");
-    if (!filled) break;
-    targetRow += 1;
+  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
+  const block = analyzeDateBlock(rows, dateRowIndex);
+  let targetRowIndex = block.lastFilledIndex + 1;
+  let insertedTargetRow = false;
+
+  if (block.nextDateRowIndex !== -1 && targetRowIndex >= block.nextDateRowIndex) {
+    await insertRows(sheets, spreadsheetId, sheetId, block.nextDateRowIndex, 1);
+    targetRowIndex = block.nextDateRowIndex;
+    insertedTargetRow = true;
+  }
+
+  const targetInsideCurrentBlock = targetRowIndex <= block.blockEndIndex;
+  const blankRowsAfterTarget = targetInsideCurrentBlock ? block.blockEndIndex - targetRowIndex : 0;
+  const missingEmptyRows = TRAILING_EMPTY_ROWS - blankRowsAfterTarget;
+
+  if (targetInsideCurrentBlock || insertedTargetRow) {
+    const insertAt = targetInsideCurrentBlock ? block.blockEndIndex + 1 : targetRowIndex + 1;
+    await insertRows(sheets, spreadsheetId, sheetId, insertAt, missingEmptyRows);
+  } else {
+    await insertRows(sheets, spreadsheetId, sheetId, targetRowIndex, TRAILING_EMPTY_ROWS + 1);
   }
 
   const values = [[
@@ -119,7 +208,7 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${targetRow}:J${targetRow}`,
+    range: `'${SHEET_NAME}'!A${targetRowIndex + 1}:J${targetRowIndex + 1}`,
     valueInputOption: "RAW",
     requestBody: { values },
   });
