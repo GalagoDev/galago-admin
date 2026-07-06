@@ -154,6 +154,8 @@ Connected / active:
 - Telegram text/image order drafts with Confirm/Cancel before saving
 - Telegram text/image order extraction uses OpenAI vision/text (`gpt-4.1-mini` by default)
 - Telegram order extraction requires `OPENAI_API_KEY` on Hostinger
+- Telegram order extraction only populates Primalac, Broj telefona, Grad, Adresa, Artikal
+- Telegram Artikal comes from the image caption/text below the image when present; otherwise the last meaningful text line
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
 
 Not fully mature yet:

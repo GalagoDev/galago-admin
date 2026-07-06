@@ -255,6 +255,5 @@ export function formatTelegramOrderPreview(order: TelegramOrderDraft) {
     `Grad: ${order.grad || "-"}`,
     `Adresa: ${order.adresa || "-"}`,
     `Artikal: ${order.artikal || "-"}`,
-    `Otkupnina: ${order.otkupnina || "-"}`,
   ].join("\n");
 }

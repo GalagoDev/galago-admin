@@ -112,9 +112,9 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
     input.artikal || "",
     input.brojPaketa || "",
     input.otkupnina || "",
-    input.vrijednostPosiljke || input.otkupnina || "",
-    input.dop || "0",
-    input.zamjena || "0",
+    input.vrijednostPosiljke || "",
+    input.dop || "",
+    input.zamjena || "",
   ]];
 
   await sheets.spreadsheets.values.update({

@@ -18,12 +18,7 @@ const telegramOrderSchema = z
     brojTelefona: z.string().describe("Customer phone number, preferably normalized to Bosnia format 387..."),
     grad: z.string().describe("Bosnia ZIP/postal code only when known; otherwise the visible city/place."),
     adresa: z.string().describe("Shipping street/address, without city/ZIP when separable."),
-    artikal: z.string().describe("Ordered product names or visible offer text."),
-    brojPaketa: z.string().describe("Total package/item quantity. Default to 1 when not visible."),
-    otkupnina: z.string().describe("Final cash-on-delivery amount, without currency text."),
-    vrijednostPosiljke: z.string().describe("Same final amount as otkupnina unless a different shipment value is explicit."),
-    dop: z.string().describe("Always 1 unless explicitly different."),
-    zamjena: z.string().describe("Always 0 unless explicitly marked as exchange/replacement."),
+    artikal: z.string().describe("The last user-provided item text, or the image caption/text below the image."),
   })
   .strict();
 
@@ -44,16 +39,6 @@ function imageDataUrl(imageBytes: ArrayBuffer, mimeType: string) {
   return `data:${mimeType};base64,${Buffer.from(imageBytes).toString("base64")}`;
 }
 
-function normalizeAmount(value: string) {
-  const match = cleanup(value)
-    .replace(/\//g, " ")
-    .match(/\d+(?:[.,]\d+)?/);
-  if (!match) return "";
-
-  const amount = Number((match[0] || "").replace(",", "."));
-  return Number.isFinite(amount) ? String(amount) : "";
-}
-
 function normalizePostalCode(value: string) {
   const cleaned = cleanup(value);
   const postal = detectPostal(cleaned);
@@ -63,20 +48,18 @@ function normalizePostalCode(value: string) {
   return zip || cleaned;
 }
 
-function normalizeDraft(order: z.infer<typeof telegramOrderSchema>): TelegramOrderDraft {
-  const amount = normalizeAmount(order.otkupnina) || normalizeAmount(order.vrijednostPosiljke);
-
+function normalizeDraft(order: z.infer<typeof telegramOrderSchema>, artikalOverride: string): TelegramOrderDraft {
   return {
     primalac: cleanup(order.primalac),
     brojTelefona: normalizePhone(order.brojTelefona),
     grad: normalizePostalCode(order.grad),
     adresa: cleanup(order.adresa),
-    artikal: cleanup(order.artikal),
-    brojPaketa: cleanup(order.brojPaketa) || "1",
-    otkupnina: amount,
-    vrijednostPosiljke: amount,
-    dop: cleanup(order.dop) || "1",
-    zamjena: cleanup(order.zamjena) || "0",
+    artikal: cleanup(artikalOverride) || cleanup(order.artikal),
+    brojPaketa: "",
+    otkupnina: "",
+    vrijednostPosiljke: "",
+    dop: "",
+    zamjena: "",
   };
 }
 
@@ -100,6 +83,18 @@ function postalHints() {
     .join(", ");
 }
 
+function lastMeaningfulLine(value: string) {
+  return String(value || "")
+    .split(/\n+/)
+    .map(cleanup)
+    .filter(Boolean)
+    .at(-1) || "";
+}
+
+function getArtikalOverride(input: { text?: string; caption?: string }) {
+  return cleanup(input.caption) || (input.text ? lastMeaningfulLine(input.text) : "");
+}
+
 function systemPrompt() {
   return `You extract one Galago delivery order for Google Sheets.
 
@@ -111,14 +106,10 @@ Rules:
 - Broj telefona must be normalized to digits only. Bosnia mobile examples: 061417206 -> 38761417206, +387 61 417 206 -> 38761417206.
 - Grad must be ZIP/postal code when known. Common mappings: ${postalHints()}.
 - Adresa is the street/place/address only, without ZIP/city when separable.
-- Artikal is the ordered product name(s). If the exact product is not visible, use the visible offer text such as "1 kupis 2 gratis".
-- Broj paketa defaults to 1 unless quantity is explicit.
-- Otkupnina and Vrijednost posiljke are the final total collection amount without currency text.
-- Prefer explicit final totals like "ukupno", "sve ukupno", "otkupnina", or seller-confirmed total.
-- Do not use delivery-only text like "Dostava je 10 km" as the final amount when another total is visible.
-- If product price and delivery are visible but no final total is visible, add them.
-- DOP defaults to 1.
-- Zamjena defaults to 0 unless the order is explicitly an exchange/replacement.`;
+- Artikal must be the final user-provided item text. If an image caption or text below the image is provided separately, use that exact text as Artikal.
+- Do not infer Artikal from older price/offer discussion when a later item caption/text exists.
+- Only extract these sheet fields: Primalac, Broj telefona, Grad, Adresa, Artikal.
+- Do not extract prices, otkupnina, delivery fees, package count, DOP, or zamjena.`;
 }
 
 async function extractWithOpenAI(input: {
@@ -129,11 +120,13 @@ async function extractWithOpenAI(input: {
 }) {
   const client = getOpenAIClient();
   const model = process.env.OPENAI_ORDER_MODEL || DEFAULT_MODEL;
+  const artikalOverride = getArtikalOverride(input);
   const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
     {
       type: "text",
       text: [
         "Extract the order from this Telegram/Facebook intake message.",
+        artikalOverride ? `Authoritative Artikal text:\n${artikalOverride}` : "",
         input.text ? `Message text:\n${input.text}` : "",
         input.caption ? `Image caption:\n${input.caption}` : "",
       ]
@@ -170,7 +163,7 @@ async function extractWithOpenAI(input: {
     if (!raw) throw new Error("OpenAI nije vratio narudžbu.");
 
     const parsed = telegramOrderSchema.parse(JSON.parse(raw));
-    const order = normalizeDraft(parsed);
+    const order = normalizeDraft(parsed, artikalOverride);
     assertUsableOrder(order);
     return order;
   } catch (error) {
