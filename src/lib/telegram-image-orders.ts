@@ -1,4 +1,7 @@
 import { createRequire } from "node:module";
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { createWorker, PSM } from "tesseract.js";
@@ -38,6 +41,18 @@ function getTesseractPaths() {
   };
 }
 
+function extensionFromMimeType(mimeType: string) {
+  if (mimeType === "image/png") return ".png";
+  if (mimeType === "image/webp") return ".webp";
+  return ".jpg";
+}
+
+async function writeTempImageFile(imageBytes: ArrayBuffer, mimeType: string) {
+  const imagePath = path.join(os.tmpdir(), `galago-telegram-order-${randomUUID()}${extensionFromMimeType(mimeType)}`);
+  await fs.writeFile(imagePath, Buffer.from(imageBytes));
+  return imagePath;
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
   let timeout: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -51,8 +66,9 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
   }
 }
 
-async function recognizeImageText(imageBytes: ArrayBuffer) {
+async function recognizeImageText(imageBytes: ArrayBuffer, mimeType: string) {
   const tesseractPaths = getTesseractPaths();
+  const imagePath = await writeTempImageFile(imageBytes, mimeType);
   const worker = await createWorker("eng", 1, {
     cachePath: "/tmp/tesseract-cache",
     ...tesseractPaths,
@@ -65,10 +81,10 @@ async function recognizeImageText(imageBytes: ArrayBuffer) {
       user_defined_dpi: "300",
     });
 
-    const result = await worker.recognize(Buffer.from(imageBytes));
+    const result = await worker.recognize(imagePath);
     return normalizeOcrText(result.data.text || "");
   } finally {
-    await worker.terminate();
+    await Promise.allSettled([worker.terminate(), fs.unlink(imagePath)]);
   }
 }
 
@@ -78,7 +94,7 @@ export async function extractTelegramOrderFromImage(input: {
   caption?: string;
 }) {
   const ocrText = await withTimeout(
-    recognizeImageText(input.imageBytes),
+    recognizeImageText(input.imageBytes, input.mimeType),
     OCR_TIMEOUT_MS,
     "OCR je prespor na Hostingeru. Pošalji jasniju/manju sliku ili prepiši tekst."
   );
