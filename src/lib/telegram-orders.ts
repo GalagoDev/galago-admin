@@ -11,7 +11,7 @@ export type TelegramOrderDraft = {
   zamjena: string;
 };
 
-const cities: Record<string, string> = {
+export const bosniaPostalCodes: Record<string, string> = {
   sarajevo: "71000",
   "banja luka": "78000",
   tuzla: "75000",
@@ -76,7 +76,7 @@ function splitSegments(rawText: string) {
     .filter(Boolean);
 }
 
-function normalizePhone(text: string) {
+export function normalizePhone(text: string) {
   const digits = String(text || "").replace(/\D/g, "");
   if (!digits) return "";
   if (digits.startsWith("387")) return digits;
@@ -94,7 +94,7 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function detectPostal(text: string) {
+export function detectPostal(text: string) {
   const cleaned = cleanup(text);
   const lowered = cleaned.toLowerCase();
 
@@ -102,20 +102,20 @@ function detectPostal(text: string) {
   if (exactZipCity) {
     const zip = exactZipCity[1] || "";
     const cityName = (exactZipCity[2] || "").toLowerCase();
-    if (cities[cityName] === zip) return { city: titleCase(cityName), postalCode: zip };
+    if (bosniaPostalCodes[cityName] === zip) return { city: titleCase(cityName), postalCode: zip };
   }
 
   const exactCityZip = cleaned.match(/^([A-Za-zČĆŽŠĐčćžšđ]+(?:\s+[A-Za-zČĆŽŠĐčćžšđ]+)*)\s+(\d{5})$/);
   if (exactCityZip) {
     const cityName = (exactCityZip[1] || "").toLowerCase();
     const zip = exactCityZip[2] || "";
-    if (cities[cityName] === zip) return { city: titleCase(cityName), postalCode: zip };
+    if (bosniaPostalCodes[cityName] === zip) return { city: titleCase(cityName), postalCode: zip };
   }
 
-  for (const city of Object.keys(cities).sort((a, b) => b.length - a.length)) {
-    if (lowered === city) return { city: titleCase(city), postalCode: cities[city] };
-    if (lowered === `${city} ${cities[city]}`) return { city: titleCase(city), postalCode: cities[city] };
-    if (lowered === `${cities[city]} ${city}`) return { city: titleCase(city), postalCode: cities[city] };
+  for (const city of Object.keys(bosniaPostalCodes).sort((a, b) => b.length - a.length)) {
+    if (lowered === city) return { city: titleCase(city), postalCode: bosniaPostalCodes[city] };
+    if (lowered === `${city} ${bosniaPostalCodes[city]}`) return { city: titleCase(city), postalCode: bosniaPostalCodes[city] };
+    if (lowered === `${bosniaPostalCodes[city]} ${city}`) return { city: titleCase(city), postalCode: bosniaPostalCodes[city] };
   }
 
   return null;

@@ -152,7 +152,8 @@ Connected / active:
 - Shopify import path
 - Telegram webhook intake route (`/api/telegram/orders`)
 - Telegram text/image order drafts with Confirm/Cancel before saving
-- Telegram image extraction uses local OCR (`tesseract.js`), not paid OpenAI vision
+- Telegram text/image order extraction uses OpenAI vision/text (`gpt-4.1-mini` by default)
+- Telegram order extraction requires `OPENAI_API_KEY` on Hostinger
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
 
 Not fully mature yet:
@@ -160,7 +161,7 @@ Not fully mature yet:
 - returns (`Povrati`) operational logic
 - stronger Shopify dedupe stability
 - Telegram allowed chat restriction needs production env hardening
-- Telegram OCR quality depends on clear screenshots/photos and may need parser tuning
+- Telegram API extraction quality depends on prompt/schema tuning for messy screenshots
 - deeper performance optimization
 
 ## Performance notes

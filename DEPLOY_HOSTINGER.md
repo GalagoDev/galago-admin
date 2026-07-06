@@ -116,8 +116,14 @@ the webhook. The app logs secret mismatches but does not hard-fail Telegram inta
 because Hostinger env redeploy/restart drift previously caused valid orders to get
 stuck with `401 Unauthorized`.
 
-Telegram image/photo order extraction uses local OCR (`tesseract.js`) and does not
-require OpenAI credits.
+Telegram text/image/photo order extraction uses the OpenAI API. Set:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_ORDER_MODEL=gpt-4.1-mini
+```
+
+`OPENAI_ORDER_MODEL` is optional and defaults to `gpt-4.1-mini`.
 
 ## 10. PM2 useful commands
 ```bash

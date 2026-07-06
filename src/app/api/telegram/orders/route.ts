@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { appendOrderToOrdersSheet } from "@/lib/google-orders";
-import { extractTelegramOrderFromImage } from "@/lib/telegram-image-orders";
+import { extractTelegramOrderFromImage, extractTelegramOrderFromText } from "@/lib/telegram-openai-orders";
 import {
   cleanupOldTelegramOrderDrafts,
   deleteTelegramOrderDraft,
@@ -9,7 +9,7 @@ import {
   makeTelegramDraftKey,
   saveTelegramOrderDraft,
 } from "@/lib/telegram-order-drafts";
-import { formatTelegramOrderPreview, parseTelegramOrderText } from "@/lib/telegram-orders";
+import { formatTelegramOrderPreview, type TelegramOrderDraft } from "@/lib/telegram-orders";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -112,7 +112,7 @@ async function answerCallbackQuery(payload: Record<string, unknown>) {
   return telegramRequest<boolean>("answerCallbackQuery", payload);
 }
 
-async function saveDraftAndSendPreview(message: TelegramMessage, order: ReturnType<typeof parseTelegramOrderText>, previewMessageId?: number) {
+async function saveDraftAndSendPreview(message: TelegramMessage, order: TelegramOrderDraft, previewMessageId?: number) {
   const key = makeTelegramDraftKey(message.chat.id, message.message_id);
   const replyMarkup = {
     inline_keyboard: [
@@ -223,17 +223,36 @@ async function handleImageMessage(message: TelegramMessage) {
   return true;
 }
 
+async function handleTextMessage(message: TelegramMessage) {
+  if (!message.text || message.text.startsWith("/")) return false;
+
+  const processing = await sendMessage({
+    chat_id: message.chat.id,
+    text: "Čitam poruku i pripremam narudžbu...",
+    reply_to_message_id: message.message_id,
+  });
+
+  try {
+    const order = await extractTelegramOrderFromText(message.text);
+    await saveDraftAndSendPreview(message, order, processing.message_id);
+  } catch (error) {
+    await editMessageText({
+      chat_id: message.chat.id,
+      message_id: processing.message_id,
+      text: `Ne mogu obraditi narudžbu: ${error instanceof Error ? error.message : "Unknown error"}`,
+    });
+  }
+
+  return true;
+}
+
 async function handleMessage(message: TelegramMessage) {
   if (!isAllowedChat(message.chat.id)) return;
 
   cleanupOldTelegramOrderDrafts();
 
   if (await handleImageMessage(message)) return;
-
-  if (!message.text || message.text.startsWith("/")) return;
-
-  const order = parseTelegramOrderText(message.text);
-  await saveDraftAndSendPreview(message, order);
+  if (await handleTextMessage(message)) return;
 }
 
 async function handleCallbackQuery(query: TelegramCallbackQuery) {
