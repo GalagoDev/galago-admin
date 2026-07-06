@@ -1,6 +1,12 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+
 import { createWorker, PSM } from "tesseract.js";
 
 import { parseTelegramOrderText, type TelegramOrderDraft } from "@/lib/telegram-orders";
+
+const require = createRequire(import.meta.url);
+const OCR_TIMEOUT_MS = 25_000;
 
 function normalizeOcrText(value: string) {
   return value
@@ -22,9 +28,34 @@ function fillDefaults(order: TelegramOrderDraft): TelegramOrderDraft {
   };
 }
 
+function getTesseractPaths() {
+  const tesseractDir = path.dirname(require.resolve("tesseract.js/package.json"));
+  const coreDir = path.dirname(require.resolve("tesseract.js-core/package.json"));
+
+  return {
+    workerPath: path.join(tesseractDir, "src", "worker-script", "node", "index.js"),
+    corePath: coreDir,
+  };
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeout: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 async function recognizeImageText(imageBytes: ArrayBuffer) {
+  const tesseractPaths = getTesseractPaths();
   const worker = await createWorker("eng", 1, {
     cachePath: "/tmp/tesseract-cache",
+    ...tesseractPaths,
   });
 
   try {
@@ -46,7 +77,11 @@ export async function extractTelegramOrderFromImage(input: {
   mimeType: string;
   caption?: string;
 }) {
-  const ocrText = await recognizeImageText(input.imageBytes);
+  const ocrText = await withTimeout(
+    recognizeImageText(input.imageBytes),
+    OCR_TIMEOUT_MS,
+    "OCR je prespor na Hostingeru. Pošalji jasniju/manju sliku ili prepiši tekst."
+  );
   const combinedText = normalizeOcrText([ocrText, input.caption || ""].filter(Boolean).join("\n"));
 
   if (!hasUsefulOrderSignal(combinedText)) {
