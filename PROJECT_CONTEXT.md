@@ -153,6 +153,7 @@ Connected / active:
 - Telegram webhook intake route (`/api/telegram/orders`)
 - Telegram text/image order drafts with Confirm/Cancel before saving
 - Telegram image extraction uses local OCR (`tesseract.js`), not paid OpenAI vision
+- Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
 
 Not fully mature yet:
 - true stats page logic

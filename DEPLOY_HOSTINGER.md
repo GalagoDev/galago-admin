@@ -112,7 +112,9 @@ curl -X POST "https://api.telegram.org/bot$TELEGRAM_ORDERS_BOT_TOKEN/setWebhook"
 
 Use `TELEGRAM_ORDERS_ALLOWED_CHAT_ID` to restrict which chat can submit orders.
 If `TELEGRAM_ORDERS_WEBHOOK_SECRET` is set, pass it as `secret_token` when registering
-the webhook.
+the webhook. The app logs secret mismatches but does not hard-fail Telegram intake,
+because Hostinger env redeploy/restart drift previously caused valid orders to get
+stuck with `401 Unauthorized`.
 
 Telegram image/photo order extraction uses local OCR (`tesseract.js`) and does not
 require OpenAI credits.
