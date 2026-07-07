@@ -138,3 +138,15 @@ pm2 restart store-admin-orders-bot
 - The admin app does not need to be running for Shopify -> Apps Script -> Google Sheets to work.
 - Telegram orders use the app webhook route; no separate polling bot process is required.
 - Keep Google auth configured with `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` on Hostinger.
+
+## Shopify multi-store webhooks
+Shopify orders are handled by `shopify-webhook.gs` in Google Apps Script, not by the Hostinger Node app.
+
+For each Shopify store, create an `orders/create` webhook that points to the deployed Apps Script web app URL. Add a stable `store` query parameter so duplicate detection stays separate per store:
+
+```text
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?store=galago
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?store=second-store
+```
+
+The script stores the hidden duplicate marker in column `K` as `store:shopifyOrderId`. Existing Galago imports that stored only the raw Shopify order id are still recognized when `store` is omitted or set to `galago`.

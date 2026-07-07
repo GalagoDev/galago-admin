@@ -64,6 +64,8 @@ The user wanted it working without LLM-heavy behavior.
 
 ### Shopify import
 Shopify imports into `Orders` via Apps Script / webhook flow.
+Multiple Shopify stores can post to the same Apps Script webhook when each webhook URL includes a stable `store` query parameter.
+Duplicate detection stores `store:shopifyOrderId` in hidden column `K`; legacy Galago raw ids are still recognized for the default `galago` store.
 Important mapping decisions:
 - `Primalac` = customer full name
 - `Broj telefona` = normalized phone
@@ -77,7 +79,7 @@ Important mapping decisions:
 - `Zamjena` = `0`
 
 ### Known unresolved issue
-- Shopify duplicate-order behavior still needs proper hardening / verification.
+- Shopify duplicate-order behavior was hardened for multi-store ids, but should still be verified with real duplicate webhook retries.
 
 ## Hosting / deployment reality
 

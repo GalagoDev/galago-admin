@@ -16,6 +16,7 @@ const BLOCK_EMPTY_ROWS = 5;
 const TOTAL_COLUMNS = 10;
 const INTERNAL_ID_COLUMN = 11; // K
 const SPREADSHEET_ID = '1P99qsJa4HzruxVCB3BHLTpZ5Jvb1jiTVvjf6IuRho9s';
+const DEFAULT_SHOPIFY_STORE_KEY = 'galago';
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -34,6 +35,8 @@ function doPost(e) {
     if (!shopifyOrderId) {
       return jsonResponse_({ ok: false, error: 'Missing Shopify order id' });
     }
+    const shopifyStoreKey = getShopifyStoreKey_(e, body);
+    const shopifyOrderKey = buildShopifyOrderKey_(shopifyStoreKey, shopifyOrderId);
 
     locked = lock.tryLock(30000);
     if (!locked) {
@@ -41,29 +44,32 @@ function doPost(e) {
         ok: false,
         error: 'Could not acquire Shopify import lock',
         shopifyOrderId,
+        shopifyStoreKey,
       });
     }
 
     ensureOrdersSheetLayout();
     insertOrdersTodayBlock();
 
-    if (orderAlreadyImported_(shopifyOrderId)) {
+    if (orderAlreadyImported_(shopifyOrderKey, shopifyOrderId, shopifyStoreKey)) {
       return jsonResponse_({
         ok: true,
         skipped: true,
         reason: 'duplicate',
         shopifyOrderId,
+        shopifyStoreKey,
       });
     }
 
     const mapped = mapShopifyOrder_(body);
-    appendOrderToOrdersSheet_(mapped, shopifyOrderId);
+    appendOrderToOrdersSheet_(mapped, shopifyOrderKey);
 
     return jsonResponse_({
       ok: true,
       message: 'Order imported',
       order: mapped,
       shopifyOrderId,
+      shopifyStoreKey,
     });
   } catch (error) {
     return jsonResponse_({
@@ -79,6 +85,37 @@ function jsonResponse_(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getShopifyStoreKey_(e, body) {
+  const params = e && e.parameter ? e.parameter : {};
+  const raw =
+    params.store ||
+    params.shop ||
+    params.source ||
+    body.shop_domain ||
+    body.shop ||
+    body.domain ||
+    DEFAULT_SHOPIFY_STORE_KEY;
+
+  return sanitizeShopifyStoreKey_(raw);
+}
+
+function sanitizeShopifyStoreKey_(value) {
+  const cleaned = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.myshopify\.com$/, '')
+    .replace(/[^a-z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return cleaned || DEFAULT_SHOPIFY_STORE_KEY;
+}
+
+function buildShopifyOrderKey_(shopifyStoreKey, shopifyOrderId) {
+  return `${sanitizeShopifyStoreKey_(shopifyStoreKey)}:${String(shopifyOrderId).trim()}`;
 }
 
 function ensureOrdersSheetLayout() {
@@ -169,7 +206,7 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
   const dateRow = colA.findIndex(v => String(v).trim() === today) + 1;
   if (!dateRow) throw new Error(`Today's block not found: ${today}`);
 
-  const insertRow = findFirstEmptyRowInBlock_(sheet, dateRow);
+  const insertRow = findAppendRowInBlock_(sheet, dateRow);
 
   sheet.getRange(insertRow, 1, 1, TOTAL_COLUMNS).setValues([[ 
     order.primalac,
@@ -189,26 +226,25 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
   maintainEmptyRowsForBlock_(sheet, insertRow);
 }
 
-function findFirstEmptyRowInBlock_(sheet, dateRow) {
-  const lastRow = Math.max(sheet.getLastRow(), dateRow);
+function findAppendRowInBlock_(sheet, dateRow) {
+  const blockInfo = analyzeBlock_(sheet, dateRow);
+  if (!blockInfo) throw new Error(`Could not analyze date block at row ${dateRow}`);
 
-  for (let r = dateRow + 1; r <= lastRow; r++) {
-    const firstCell = String(sheet.getRange(r, 1).getDisplayValue()).trim();
+  const targetRow = blockInfo.lastFilledRow + 1;
 
-    if (isDateLabel_(firstCell)) {
-      sheet.insertRowsBefore(r, 1);
-      styleEmptyRows_(sheet, r, 1);
-      return r;
-    }
-
-    if (isRowEmpty_(sheet, r)) {
-      return r;
-    }
+  if (blockInfo.nextDateRow && targetRow >= blockInfo.nextDateRow) {
+    sheet.insertRowsBefore(blockInfo.nextDateRow, 1);
+    styleEmptyRows_(sheet, blockInfo.nextDateRow, 1);
+    return blockInfo.nextDateRow;
   }
 
-  sheet.insertRowsAfter(lastRow, 1);
-  styleEmptyRows_(sheet, lastRow + 1, 1);
-  return lastRow + 1;
+  if (targetRow > blockInfo.lastRowInBlock) {
+    sheet.insertRowsAfter(blockInfo.lastRowInBlock, 1);
+    styleEmptyRows_(sheet, blockInfo.lastRowInBlock + 1, 1);
+    return blockInfo.lastRowInBlock + 1;
+  }
+
+  return targetRow;
 }
 
 function maintainEmptyRowsForBlock_(sheet, editedRow) {
@@ -246,6 +282,11 @@ function analyzeBlock_(sheet, dateRow) {
   }
 
   const blockEnd = nextDateRow ? nextDateRow - 1 : lastRow;
+  let lastFilledRow = dateRow;
+
+  for (let r = dateRow + 1; r <= blockEnd; r++) {
+    if (!isRowEmpty_(sheet, r)) lastFilledRow = r;
+  }
 
   let trailingEmptyRows = 0;
   for (let r = blockEnd; r >= dateRow + 1; r--) {
@@ -257,7 +298,9 @@ function analyzeBlock_(sheet, dateRow) {
   }
 
   return {
+    nextDateRow,
     lastRowInBlock: blockEnd,
+    lastFilledRow,
     trailingEmptyRows,
   };
 }
@@ -403,7 +446,7 @@ function normalizeGrad_(city, zip) {
   return String(city || '').trim();
 }
 
-function orderAlreadyImported_(shopifyOrderId) {
+function orderAlreadyImported_(shopifyOrderKey, legacyShopifyOrderId, shopifyStoreKey) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) throw new Error(`Sheet not found: ${SHEET_NAME}`);
@@ -414,5 +457,12 @@ function orderAlreadyImported_(shopifyOrderId) {
     .getDisplayValues()
     .flat();
 
-  return values.some(v => String(v).trim() === String(shopifyOrderId).trim());
+  return values.some(v => {
+    const stored = String(v).trim();
+    if (stored === String(shopifyOrderKey).trim()) return true;
+
+    // Older Galago imports stored only the raw Shopify order id before multi-store support.
+    return shopifyStoreKey === DEFAULT_SHOPIFY_STORE_KEY &&
+      stored === String(legacyShopifyOrderId).trim();
+  });
 }
