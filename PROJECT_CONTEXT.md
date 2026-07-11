@@ -66,6 +66,7 @@ The user wanted it working without LLM-heavy behavior.
 Shopify imports into `Orders` via Apps Script / webhook flow.
 Multiple Shopify stores can post to the same Apps Script webhook when each webhook URL includes a stable `store` query parameter.
 Duplicate detection stores `store:shopifyOrderId` in hidden column `K`; legacy Galago raw ids are still recognized for the default `galago` store.
+Shopify weekend orders should not create Saturday/Sunday blocks; the Apps Script targets the current workday label, using Friday for Saturday/Sunday orders.
 Important mapping decisions:
 - `Primalac` = customer full name
 - `Broj telefona` = normalized phone

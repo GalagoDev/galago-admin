@@ -140,11 +140,7 @@ function insertOrdersTodayBlock() {
   if (!sheet) throw new Error(`Sheet not found: ${SHEET_NAME}`);
 
   const tz = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone() || 'Europe/Sarajevo';
-  const now = new Date();
-  const day = now.getDay();
-  if (day === 0 || day === 6) return;
-
-  const dateLabel = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+  const dateLabel = getCurrentWorkdayLabel_(tz);
   const existing = sheet
     .getRange(1, 1, Math.max(sheet.getLastRow(), 1), 1)
     .getDisplayValues()
@@ -176,6 +172,19 @@ function insertOrdersTodayBlock() {
   styleEmptyRows_(sheet, 4, BLOCK_EMPTY_ROWS);
 }
 
+function getCurrentWorkdayLabel_(tz) {
+  const date = new Date();
+  const day = date.getDay();
+
+  if (day === 6) {
+    date.setDate(date.getDate() - 1);
+  } else if (day === 0) {
+    date.setDate(date.getDate() - 2);
+  }
+
+  return Utilities.formatDate(date, tz, 'dd/MM/yyyy');
+}
+
 function styleEmptyRows_(sheet, startRow, numRows) {
   if (numRows <= 0) return;
 
@@ -196,15 +205,15 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
   if (!sheet) throw new Error(`Sheet not found: ${SHEET_NAME}`);
 
   const tz = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone() || 'Europe/Sarajevo';
-  const today = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+  const targetDate = getCurrentWorkdayLabel_(tz);
 
   const colA = sheet
     .getRange(1, 1, Math.max(sheet.getLastRow(), 1), 1)
     .getDisplayValues()
     .flat();
 
-  const dateRow = colA.findIndex(v => String(v).trim() === today) + 1;
-  if (!dateRow) throw new Error(`Today's block not found: ${today}`);
+  const dateRow = colA.findIndex(v => String(v).trim() === targetDate) + 1;
+  if (!dateRow) throw new Error(`Workday block not found: ${targetDate}`);
 
   const insertRow = findAppendRowInBlock_(sheet, dateRow);
 
