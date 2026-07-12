@@ -177,9 +177,9 @@ function getCurrentWorkdayLabel_(tz) {
   const day = date.getDay();
 
   if (day === 6) {
-    date.setDate(date.getDate() - 1);
+    date.setDate(date.getDate() + 2);
   } else if (day === 0) {
-    date.setDate(date.getDate() - 2);
+    date.setDate(date.getDate() + 1);
   }
 
   return Utilities.formatDate(date, tz, 'dd/MM/yyyy');

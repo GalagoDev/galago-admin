@@ -1,7 +1,6 @@
 import { google } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
-import { parseSheetDateLabel } from "@/lib/sheet-dates";
 
 const SHEET_NAME = "Orders";
 const HEADER = [
@@ -17,6 +16,7 @@ const HEADER = [
   "Zamjena",
 ];
 const TRAILING_EMPTY_ROWS = 5;
+const WORKDAY_TIME_ZONE = "Europe/Sarajevo";
 
 type OrderSheetInput = {
   primalac: string;
@@ -31,12 +31,29 @@ type OrderSheetInput = {
   zamjena?: string;
 };
 
-function getTodayLabel() {
+function formatSheetDateLabel(date: Date) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).format(new Date());
+    timeZone: WORKDAY_TIME_ZONE,
+  }).format(date);
+}
+
+function getTargetWorkdayLabel() {
+  const date = new Date();
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: WORKDAY_TIME_ZONE,
+  }).format(date);
+
+  if (weekday === "Sat") {
+    date.setDate(date.getDate() + 2);
+  } else if (weekday === "Sun") {
+    date.setDate(date.getDate() + 1);
+  }
+
+  return formatSheetDateLabel(date);
 }
 
 function indexIsSheetDateRow(index: number, value: string) {
@@ -137,9 +154,115 @@ async function insertRows(sheets: ReturnType<typeof google.sheets>, spreadsheetI
   });
 }
 
+async function createOrdersDateBlock(sheets: ReturnType<typeof google.sheets>, spreadsheetId: string, sheetId: number, dateLabel: string) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: 1,
+              endIndex: 8,
+            },
+            inheritFromBefore: true,
+          },
+        },
+        {
+          updateCells: {
+            range: {
+              sheetId,
+              startRowIndex: 1,
+              endRowIndex: 8,
+              startColumnIndex: 0,
+              endColumnIndex: HEADER.length,
+            },
+            fields: "userEnteredValue",
+          },
+        },
+        {
+          mergeCells: {
+            range: {
+              sheetId,
+              startRowIndex: 2,
+              endRowIndex: 3,
+              startColumnIndex: 0,
+              endColumnIndex: HEADER.length,
+            },
+            mergeType: "MERGE_ALL",
+          },
+        },
+        {
+          repeatCell: {
+            range: {
+              sheetId,
+              startRowIndex: 2,
+              endRowIndex: 3,
+              startColumnIndex: 0,
+              endColumnIndex: HEADER.length,
+            },
+            cell: {
+              userEnteredValue: { stringValue: dateLabel },
+              userEnteredFormat: {
+                backgroundColor: { red: 0.85882354, green: 0.91764706, blue: 0.99607843 },
+                horizontalAlignment: "LEFT",
+                textFormat: {
+                  bold: true,
+                  fontSize: 11,
+                  foregroundColor: { red: 0.2, green: 0.25490198, blue: 0.33333334 },
+                },
+              },
+            },
+            fields: "userEnteredValue,userEnteredFormat(backgroundColor,horizontalAlignment,textFormat)",
+          },
+        },
+        {
+          repeatCell: {
+            range: {
+              sheetId,
+              startRowIndex: 3,
+              endRowIndex: 8,
+              startColumnIndex: 0,
+              endColumnIndex: HEADER.length,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 1, green: 1, blue: 1 },
+                textFormat: {
+                  bold: false,
+                  fontSize: 10,
+                  foregroundColor: { red: 0.06666667, green: 0.09411765, blue: 0.15294118 },
+                },
+              },
+            },
+            fields: "userEnteredFormat(backgroundColor,textFormat)",
+          },
+        },
+        {
+          updateBorders: {
+            range: {
+              sheetId,
+              startRowIndex: 3,
+              endRowIndex: 8,
+              startColumnIndex: 0,
+              endColumnIndex: HEADER.length,
+            },
+            top: { style: "SOLID", color: { red: 0.81960785, green: 0.8352941, blue: 0.85882354 } },
+            bottom: { style: "SOLID", color: { red: 0.81960785, green: 0.8352941, blue: 0.85882354 } },
+            left: { style: "SOLID", color: { red: 0.81960785, green: 0.8352941, blue: 0.85882354 } },
+            right: { style: "SOLID", color: { red: 0.81960785, green: 0.8352941, blue: 0.85882354 } },
+          },
+        },
+      ],
+    },
+  });
+}
+
 export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
   const { sheets, spreadsheetId } = getSheetsClient();
-  const today = getTodayLabel();
+  const targetDate = getTargetWorkdayLabel();
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -157,22 +280,24 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
     throw new Error("Orders sheet header does not match expected layout.");
   }
 
-  let dateRowIndex = rows.findIndex((row, index) => index > 0 && (row[0] ?? "").toString().trim() === today);
+  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
+  let sheetRows = rows;
+  let dateRowIndex = sheetRows.findIndex((row, index) => index > 0 && (row[0] ?? "").toString().trim() === targetDate);
   if (dateRowIndex === -1) {
-    const latestDateRow = rows
-      .map((row, index) => ({ index, dateLabel: (row[0] ?? "").toString().trim() }))
-      .filter((row) => indexIsSheetDateRow(row.index, row.dateLabel))
-      .sort((a, b) => parseSheetDateLabel(b.dateLabel) - parseSheetDateLabel(a.dateLabel))[0];
+    await createOrdersDateBlock(sheets, spreadsheetId, sheetId, targetDate);
 
-    if (!latestDateRow) {
-      throw new Error(`Today's block (${today}) was not found in Orders sheet.`);
+    const refreshed = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${SHEET_NAME}'!A:Z`,
+    });
+    sheetRows = refreshed.data.values ?? [];
+    dateRowIndex = sheetRows.findIndex((row, index) => index > 0 && (row[0] ?? "").toString().trim() === targetDate);
+    if (dateRowIndex === -1) {
+      throw new Error(`Workday block (${targetDate}) was not found in Orders sheet.`);
     }
-
-    dateRowIndex = latestDateRow.index;
   }
 
-  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
-  const block = analyzeDateBlock(rows, dateRowIndex);
+  const block = analyzeDateBlock(sheetRows, dateRowIndex);
   let targetRowIndex = block.lastFilledIndex + 1;
   let insertedTargetRow = false;
 
