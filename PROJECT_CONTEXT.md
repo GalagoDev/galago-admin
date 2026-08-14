@@ -113,6 +113,7 @@ The user strongly prefers:
 - direct execution
 - `MACHINE MODE`
 - mobile-first UI
+- desktop-optimized layouts without cropped order data
 - sleek dark design
 - minimal clutter
 
@@ -143,6 +144,9 @@ When lists grow large (ex: 500 undelivered orders), the intended UX is:
 - expand for details
 
 This was already being implemented for order list pages.
+
+### Desktop layout
+The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to four columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
 
 ## Current app architecture state
 

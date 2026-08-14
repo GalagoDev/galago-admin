@@ -39,7 +39,7 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
 
   return (
     <>
-      <div className="mb-3">
+      <div className="mb-3 xl:flex xl:items-center xl:justify-between xl:gap-6">
         <input
           type="text"
           value={query}
@@ -48,16 +48,20 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
             setVisibleCount(PAGE_SIZE);
           }}
           placeholder="Traži ime, telefon, proizvod, ZIP..."
-          className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-neutral-500 focus:border-sky-400/30"
+          className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-neutral-500 focus:border-sky-400/30 xl:max-w-xl xl:rounded-lg"
         />
+        <div className="mt-3 hidden shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-neutral-500 xl:flex xl:mt-0">
+          <span>Prikazano {visibleOrders.length}</span>
+          <span>Ukupno {filteredOrders.length}</span>
+        </div>
       </div>
 
-      <div className="mb-3 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-neutral-500">
+      <div className="mb-3 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-neutral-500 xl:hidden">
         <span>Prikazano {visibleOrders.length}</span>
         <span>Ukupno {filteredOrders.length}</span>
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:hidden">
         {filteredOrders.length === 0 ? (
           <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
             Nema narudžbi za ovaj prikaz.
@@ -77,8 +81,8 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
                   className="flex w-full items-start justify-between gap-3 text-left"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{order.primalac || "Bez imena"}</p>
-                    <p className="mt-1 truncate text-sm text-neutral-400">{order.artikal || "Bez artikla"}</p>
+                    <p className="break-words text-sm font-semibold text-white">{order.primalac || "Bez imena"}</p>
+                    <p className="mt-1 break-words text-sm text-neutral-400">{order.artikal || "Bez artikla"}</p>
                     <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-neutral-500">
                       <span>{order.dateLabel || "-"}</span>
                       <span>•</span>
@@ -119,6 +123,53 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
           })
         )}
       </div>
+
+      {filteredOrders.length > 0 ? (
+        <div className="hidden overflow-hidden rounded-lg border border-white/10 xl:block" role="table" aria-label="Lista narudžbi">
+          <div
+            className="grid grid-cols-[48px_minmax(130px,1fr)_minmax(120px,0.85fr)_minmax(180px,1.35fr)_minmax(180px,1.5fr)_84px_120px] gap-3 border-b border-white/10 bg-white/[0.04] px-3 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-neutral-500"
+            role="row"
+          >
+            <span>#</span>
+            <span>Primalac</span>
+            <span>Telefon</span>
+            <span>Lokacija</span>
+            <span>Artikal</span>
+            <span>Paketi</span>
+            <span>Otkupnina</span>
+          </div>
+          <div className="divide-y divide-white/[0.06]">
+            {visibleOrders.map((order, index) => (
+              <div
+                key={`${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`}
+                className="grid grid-cols-[48px_minmax(130px,1fr)_minmax(120px,0.85fr)_minmax(180px,1.35fr)_minmax(180px,1.5fr)_84px_120px] items-start gap-3 px-3 py-3 text-sm text-neutral-300 transition hover:bg-white/[0.025]"
+                role="row"
+              >
+                <span className="text-xs text-neutral-600">{index + 1}</span>
+                <div className="min-w-0">
+                  <p className="break-words font-semibold text-white">{order.primalac || "Bez imena"}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{order.dateLabel || "-"}</p>
+                </div>
+                <p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p>
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-white">{order.grad || "-"}</p>
+                  <p className="mt-1 break-words text-xs leading-5 text-neutral-500">{order.adresa || "-"}</p>
+                </div>
+                <p className="min-w-0 break-words leading-5 text-neutral-200">{order.artikal || "Bez artikla"}</p>
+                <div>
+                  <p className="font-medium text-white">{order.brojPaketa || "-"}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-neutral-500">DOP {order.dop || "-"}</p>
+                  <p className="text-[11px] leading-4 text-neutral-500">Zamj. {order.zamjena || "-"}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-emerald-200">{order.otkupnina || "-"}</p>
+                  <p className="mt-1 break-words text-[11px] leading-4 text-neutral-500">Vrijednost {order.vrijednostPosiljke || "-"}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {visibleCount < filteredOrders.length ? (
         <button

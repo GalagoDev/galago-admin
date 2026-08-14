@@ -154,9 +154,9 @@ export default async function Home({
   ];
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-neutral-50">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-24 pt-4 sm:max-w-lg sm:px-5">
-        <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl">
+    <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-24 pt-4 sm:max-w-lg sm:px-5 lg:max-w-[1480px] lg:px-8 lg:pb-8 lg:pt-8 2xl:px-10">
+        <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl lg:rounded-lg lg:px-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
@@ -176,12 +176,12 @@ export default async function Home({
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3">
+        <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {cards.map((card) => (
             <Link
               key={card.title}
               href={card.href}
-              className={`rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 ${card.tone} ${card.glow}`}
+              className={`rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 lg:rounded-lg lg:px-5 lg:py-5 ${card.tone} ${card.glow}`}
             >
               <p className="text-[12px] font-medium leading-4 text-neutral-200">{card.title}</p>
               <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{card.value}</p>
@@ -196,75 +196,78 @@ export default async function Home({
           </div>
         ) : null}
 
-        <section className="mt-5 rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
-          <div className="flex items-center justify-between gap-4 px-1 pb-3">
-            <div>
-              <p className="text-lg font-semibold text-white">Nedostavljene narudžbe</p>
-              <p className="mt-1 text-sm text-neutral-500">Najstarije po datumu slanja</p>
-            </div>
-            <Link
-              href="/undelivered"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]"
-            >
-              <ArrowIcon />
-            </Link>
-          </div>
-
-          <div className="flex flex-col gap-2.5">
-            {oldestUndelivered.length === 0 ? (
-              <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
-                Nema aktivnih undelivered narudžbi.
-              </div>
-            ) : (
-              oldestUndelivered.map((row) => (
-                <div
-                  key={`${row.dateLabel}-${row.rowNumber}`}
-                  className="flex items-center justify-between gap-4 rounded-[1.2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-white">{row.artikal || "Bez artikla"}</p>
-                    <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-neutral-500">{row.dateLabel || "-"}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full border border-sky-300/10 bg-sky-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-sky-200">
-                    Prioritet
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
-          <div className="flex items-center justify-between gap-4 px-1 pb-3">
-            <div>
-              <p className="text-lg font-semibold text-white">Rast narudžbi</p>
-              <p className="mt-1 text-sm text-neutral-500">Sve narudžbe iz Orders sheeta za trenutni mjesec</p>
-            </div>
-          </div>
-
-          <div className="rounded-[1.5rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4">
-            <div className="mb-4 flex items-end justify-between gap-4">
+        <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <section className="rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)] lg:rounded-lg lg:p-5">
+            <div className="flex items-center justify-between gap-4 px-1 pb-3">
               <div>
-                <p className="text-3xl font-semibold tracking-tight text-white">{monthlyTotalOrders}</p>
-                <p className="mt-1 text-sm text-neutral-400">Narudžbe ovaj mjesec</p>
+                <p className="text-lg font-semibold text-white">Nedostavljene narudžbe</p>
+                <p className="mt-1 text-sm text-neutral-500">Najstarije po datumu slanja</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-white">{chartCounts[chartCounts.length - 1] || 0}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.14em] text-neutral-500">Zadnji dan na chartu</p>
+              <Link
+                href="/undelivered"
+                aria-label="Otvori nedostavljene narudžbe"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]"
+              >
+                <ArrowIcon />
+              </Link>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {oldestUndelivered.length === 0 ? (
+                <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
+                  Nema aktivnih undelivered narudžbi.
+                </div>
+              ) : (
+                oldestUndelivered.map((row) => (
+                  <div
+                    key={`${row.dateLabel}-${row.rowNumber}`}
+                    className="flex items-center justify-between gap-4 rounded-[1.2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium text-white">{row.artikal || "Bez artikla"}</p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-neutral-500">{row.dateLabel || "-"}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-sky-300/10 bg-sky-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-sky-200">
+                      Prioritet
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)] lg:rounded-lg lg:p-5">
+            <div className="flex items-center justify-between gap-4 px-1 pb-3">
+              <div>
+                <p className="text-lg font-semibold text-white">Rast narudžbi</p>
+                <p className="mt-1 text-sm text-neutral-500">Sve narudžbe iz Orders sheeta za trenutni mjesec</p>
               </div>
             </div>
 
-            <div className="h-36 w-full overflow-hidden rounded-[1.25rem] border border-white/6 bg-black/20 px-2 py-2">
-              <SparklineChart counts={chartCounts} />
-            </div>
+            <div className="rounded-[1.5rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4">
+              <div className="mb-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-3xl font-semibold tracking-tight text-white">{monthlyTotalOrders}</p>
+                  <p className="mt-1 text-sm text-neutral-400">Narudžbe ovaj mjesec</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{chartCounts[chartCounts.length - 1] || 0}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.14em] text-neutral-500">Zadnji dan na chartu</p>
+                </div>
+              </div>
 
-            <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] uppercase tracking-[0.14em] text-neutral-500">
-              {(chartLabels.length > 0 ? chartLabels : ["--", "--", "--", "--"]).slice(0, 4).map((label, index) => (
-                <span key={`${label}-${index}`}>{label}</span>
-              ))}
+              <div className="h-36 w-full overflow-hidden rounded-[1.25rem] border border-white/6 bg-black/20 px-2 py-2">
+                <SparklineChart counts={chartCounts} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                {(chartLabels.length > 0 ? chartLabels : ["--", "--", "--", "--"]).slice(0, 4).map((label, index) => (
+                  <span key={`${label}-${index}`}>{label}</span>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
       </div>
     </main>

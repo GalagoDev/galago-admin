@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 function OrdersIcon() {
   return (
@@ -35,33 +38,76 @@ function ChartIcon() {
 }
 
 export function BottomNav() {
+  const pathname = usePathname();
+
+  if (pathname === "/login") return null;
+
+  const mobileItems = [
+    { href: "/", label: "Narudzbe", icon: <OrdersIcon />, active: pathname === "/" || pathname === "/orders" },
+    { href: "/undelivered", label: "Nedostavljene", icon: <BoxIcon />, active: pathname === "/undelivered" },
+    { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
+  ];
+
+  const desktopItems = [
+    { href: "/", label: "Pregled", icon: <OrdersIcon />, active: pathname === "/" },
+    { href: "/orders", label: "Nove narudžbe", icon: <OrdersIcon />, active: pathname === "/orders" },
+    { href: "/undelivered", label: "Nedostavljene", icon: <BoxIcon />, active: pathname === "/undelivered" },
+    { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" },
+    { href: "/returns", label: "Povrati", icon: <BoxIcon />, active: pathname === "/returns" },
+    { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
+  ];
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pb-4 sm:max-w-lg sm:px-5">
-      <div className="mx-auto grid grid-cols-3 gap-2 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-        <Link
-          href="/"
-          className="flex flex-col items-center justify-center rounded-[1.2rem] bg-white/[0.06] px-3 py-2.5 text-neutral-100"
-        >
-          <OrdersIcon />
-          <span className="mt-1 text-[11px] font-medium">Narudzbe</span>
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pb-4 sm:max-w-lg sm:px-5 lg:hidden">
+        <div className="mx-auto grid grid-cols-3 gap-2 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+          {mobileItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={item.active ? "page" : undefined}
+              className={`flex flex-col items-center justify-center rounded-[1.2rem] px-3 py-2.5 transition ${
+                item.active
+                  ? "bg-white/[0.06] text-neutral-100"
+                  : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-200"
+              }`}
+            >
+              {item.icon}
+              <span className="mt-1 text-[11px] font-medium">{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </nav>
+
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 border-r border-white/10 bg-[#0d0e10]/95 px-4 py-5 backdrop-blur-xl lg:flex lg:flex-col">
+        <Link href="/" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white">Galago Admin</p>
+          <span className="mt-3 flex items-center gap-2 text-xs text-emerald-200">
+            <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.85)]" />
+            Live and listening
+          </span>
         </Link>
 
-        <Link
-          href="/undelivered"
-          className="flex flex-col items-center justify-center rounded-[1.2rem] px-3 py-2.5 text-neutral-400 transition hover:bg-white/[0.04] hover:text-neutral-200"
-        >
-          <BoxIcon />
-          <span className="mt-1 text-[11px] font-medium">Nedostavljene</span>
-        </Link>
+        <nav className="mt-6 flex flex-col gap-1.5" aria-label="Glavna navigacija">
+          {desktopItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={item.active ? "page" : undefined}
+              className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                item.active
+                  ? "bg-white/[0.08] text-white"
+                  : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-100"
+              }`}
+            >
+              <span className={item.active ? "text-sky-300" : "text-neutral-500"}>{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
 
-        <Link
-          href="/stats"
-          className="flex flex-col items-center justify-center rounded-[1.2rem] px-3 py-2.5 text-neutral-400 transition hover:bg-white/[0.04] hover:text-neutral-200"
-        >
-          <ChartIcon />
-          <span className="mt-1 text-[11px] font-medium">Statistika</span>
-        </Link>
-      </div>
-    </nav>
+        <p className="mt-auto px-3 text-[10px] uppercase tracking-[0.18em] text-neutral-600">Google Sheets control panel</p>
+      </aside>
+    </>
   );
 }
