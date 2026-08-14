@@ -6,8 +6,13 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-export default async function OrdersPage() {
-  const rows = await getOrdersSheetRows().catch(() => []);
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ refresh?: string }>;
+}) {
+  const params = await searchParams;
+  const rows = await getOrdersSheetRows({ fresh: Boolean(params.refresh) }).catch(() => []);
   const latestDate = getLatestSheetDateLabel(rows);
   const orders = latestDate ? rows.filter((row) => row.dateLabel === latestDate) : [];
 
@@ -16,6 +21,7 @@ export default async function OrdersPage() {
       title="Nove narudžbe"
       subtitle={latestDate ? `Zadnji radni dan iz Orders sheeta: ${latestDate}` : "Orders sheet nema narudžbi"}
       orders={orders}
+      refreshPath="/orders"
     />
   );
 }

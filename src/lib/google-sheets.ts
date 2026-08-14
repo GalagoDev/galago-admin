@@ -340,8 +340,8 @@ export async function getUndeliveredSheetRows(options: { fresh?: boolean } = {})
   return getSheetRowsByName("Undelivered orders", options);
 }
 
-export async function getOrdersSheetRows() {
-  return getSheetRowsByName("Orders");
+export async function getOrdersSheetRows(options: { fresh?: boolean } = {}) {
+  return getSheetRowsByName("Orders", options);
 }
 
 export async function getReturnedSheetRows(options: { fresh?: boolean } = {}) {

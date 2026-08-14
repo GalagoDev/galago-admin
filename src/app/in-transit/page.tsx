@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-function getNotice(params: { delivered?: string; returned?: string; skipped?: string; error?: string }) {
+function getNotice(params: { delivered?: string; returned?: string; skipped?: string; error?: string; refresh?: string }) {
   if (params.error === "no-delivery-selection") return { tone: "error", text: "Odaberite najmanje jednu dostavljenu narudžbu." };
   if (params.error === "invalid-order-selection") return { tone: "error", text: "Narudžba više nije važeća. Osvježite stranicu." };
   if (params.error === "delivery-update-failed") return { tone: "error", text: "Dostavljene narudžbe nisu sačuvane. Pokušajte ponovo." };
@@ -19,10 +19,10 @@ function getNotice(params: { delivered?: string; returned?: string; skipped?: st
 export default async function InTransitPage({
   searchParams,
 }: {
-  searchParams: Promise<{ delivered?: string; returned?: string; skipped?: string; error?: string }>;
+  searchParams: Promise<{ delivered?: string; returned?: string; skipped?: string; error?: string; refresh?: string }>;
 }) {
   const params = await searchParams;
-  const orders = await getUndeliveredSheetRows({ fresh: Boolean(params.delivered || params.returned) }).catch(() => []);
+  const orders = await getUndeliveredSheetRows({ fresh: Boolean(params.delivered || params.returned || params.refresh) }).catch(() => []);
   const notice = getNotice(params);
 
   return (
@@ -30,6 +30,7 @@ export default async function InTransitPage({
       title="Na dostavi"
       subtitle="Aktivne pošiljke koje čekaju ishod dostave"
       orders={orders}
+      refreshPath="/in-transit"
       allowReturns
       workflow={(
         <>

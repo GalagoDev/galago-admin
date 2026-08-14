@@ -133,6 +133,7 @@ Remembered current direction:
   - `Na dostavi`
   - `Povrati`
 - these blocks were made clickable and open dedicated pages
+- operational list headers include a refresh icon that bypasses the server cache after manual Google Sheets edits
 
 ### Large-list scaling direction
 When lists grow large (ex: 500 undelivered orders), the intended UX is:

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-function getNotice(params: { returned?: string; restored?: string; skipped?: string; error?: string }) {
+function getNotice(params: { returned?: string; restored?: string; skipped?: string; error?: string; refresh?: string }) {
   if (params.error === "invalid-order-selection") return { tone: "error", text: "Narudžba više nije važeća. Osvježite stranicu." };
   if (params.error === "invalid-return-selection") return { tone: "error", text: "Povrat više nije važeći. Osvježite stranicu." };
   if (params.error === "return-update-failed") return { tone: "error", text: "Povrat nije sačuvan. Pokušajte ponovo." };
@@ -27,10 +27,10 @@ function getNotice(params: { returned?: string; restored?: string; skipped?: str
 export default async function ReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returned?: string; restored?: string; skipped?: string; error?: string }>;
+  searchParams: Promise<{ returned?: string; restored?: string; skipped?: string; error?: string; refresh?: string }>;
 }) {
   const params = await searchParams;
-  const fresh = Boolean(params.returned || params.restored);
+  const fresh = Boolean(params.returned || params.restored || params.refresh);
   const [orders, activeOrders] = await Promise.all([
     getReturnedSheetRows({ fresh }).catch(() => []),
     getUndeliveredSheetRows({ fresh }).catch(() => []),
@@ -42,6 +42,7 @@ export default async function ReturnsPage({
       title="Povrati"
       subtitle="Vraćene pošiljke izdvojene iz Na dostavi"
       orders={orders}
+      refreshPath="/returns"
       allowRestoreToTransit
       listTitle="Evidentirani povrati"
       listSubtitle="Pošiljke koje su već premještene u Povrate"

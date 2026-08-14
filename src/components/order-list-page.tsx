@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { OrderListClient } from "@/components/order-list-client";
+import { SheetRefreshButton } from "@/components/sheet-refresh-button";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 
 function parseAmount(value: string) {
@@ -27,6 +28,7 @@ export function OrderListPage({
   listTitle = "Lista narudžbi",
   listSubtitle = "Pretraga i pregled svih detalja narudžbe",
   searchPlaceholder,
+  refreshPath,
 }: {
   title: string;
   subtitle: string;
@@ -37,6 +39,7 @@ export function OrderListPage({
   listTitle?: string;
   listSubtitle?: string;
   searchPlaceholder?: string;
+  refreshPath?: string;
 }) {
   const totalAmount = orders.reduce((sum, order) => sum + parseAmount(order.otkupnina), 0);
 
@@ -50,13 +53,16 @@ export function OrderListPage({
               <p className="mt-2 text-lg font-semibold text-white">{title}</p>
               <p className="mt-1 text-sm text-neutral-400">{subtitle}</p>
             </div>
-            <Link
-              href="/"
-              aria-label="Nazad na pregled"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]"
-            >
-              <ArrowIcon />
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              {refreshPath ? <SheetRefreshButton path={refreshPath} /> : null}
+              <Link
+                href="/"
+                aria-label="Nazad na pregled"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]"
+              >
+                <ArrowIcon />
+              </Link>
+            </div>
           </div>
         </section>
 
