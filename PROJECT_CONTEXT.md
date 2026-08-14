@@ -153,8 +153,8 @@ This was already being implemented for order list pages.
 - Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
 - Confirmed deliveries move from `Undelivered orders` to `Delivered orders`.
 - A searched/selected active order can be moved to `Povrati`.
-- Source rows are cleared rather than deleted so existing Google Sheet date blocks and styling stay intact.
-- Hidden status IDs make delivery/return retries idempotent.
+- Source rows remain permanently in `Undelivered orders`; a hidden `App status` column removes delivered/returned rows only from the app.
+- Destination copies and hidden status IDs make delivery/return retries idempotent.
 
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.

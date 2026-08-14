@@ -23,6 +23,7 @@ const HEADER = [
   "Zamjena",
 ];
 const STATUS_ID_HEADER = "Status ID";
+const SOURCE_STATUS_HEADER = "App status";
 const STATUS_COLUMNS = [...HEADER, STATUS_ID_HEADER];
 const TRAILING_EMPTY_ROWS = 5;
 const WORKDAY_TIME_ZONE = "Europe/Sarajevo";
@@ -213,6 +214,63 @@ async function ensureStatusSheet(
   return sheetId;
 }
 
+async function ensureSourceStatusColumn(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+) {
+  const metadata = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties.sheetId,sheets.properties.title,sheets.properties.gridProperties.columnCount",
+  });
+  const sourceSheet = metadata.data.sheets?.find((sheet) => sheet.properties?.title === SOURCE_SHEET);
+  const sheetId = sourceSheet?.properties?.sheetId;
+  const columnCount = sourceSheet?.properties?.gridProperties?.columnCount ?? 0;
+  if (sheetId === undefined || sheetId === null) throw new Error(`Sheet not found: ${SOURCE_SHEET}`);
+
+  if (columnCount < 11) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          appendDimension: {
+            sheetId,
+            dimension: "COLUMNS",
+            length: 11 - columnCount,
+          },
+        }],
+      },
+    });
+  }
+
+  const headerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${SOURCE_SHEET}'!K1`,
+  });
+  const currentHeader = String(headerResponse.data.values?.[0]?.[0] ?? "").trim();
+  if (currentHeader && currentHeader !== SOURCE_STATUS_HEADER) {
+    throw new Error(`${SOURCE_SHEET} column K is already in use.`);
+  }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${SOURCE_SHEET}'!K1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[SOURCE_STATUS_HEADER]] },
+  });
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        updateDimensionProperties: {
+          range: { sheetId, dimension: "COLUMNS", startIndex: 10, endIndex: 11 },
+          properties: { hiddenByUser: true },
+          fields: "hiddenByUser",
+        },
+      }],
+    },
+  });
+}
+
 async function insertRows(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string,
@@ -340,8 +398,9 @@ async function appendStatusRows(
 async function performMove(references: OrderMoveReference[], destination: StatusDestination) {
   const { sheets, spreadsheetId } = getSheetsClient();
   const sheetId = await ensureStatusSheet(sheets, spreadsheetId, destination);
+  await ensureSourceStatusColumn(sheets, spreadsheetId);
   const [sourceResponse, statusIdsResponse] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:J` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:K` }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: `'${destination}'!K:K` }),
   ]);
   const sourceRows = sourceResponse.data.values ?? [];
@@ -349,22 +408,25 @@ async function performMove(references: OrderMoveReference[], destination: Status
   const uniqueReferences = Array.from(
     new Map(references.map((reference) => [`${reference.sheetRowNumber}:${reference.fingerprint}`, reference])).values(),
   );
-  const valid: Array<{ reference: OrderMoveReference; values: string[]; statusId: string }> = [];
+  const valid: Array<{ reference: OrderMoveReference; values: string[]; statusId: string; sourceStatus: string }> = [];
 
   for (const reference of uniqueReferences) {
     if (!Number.isInteger(reference.sheetRowNumber) || reference.sheetRowNumber < 2) continue;
     const sourceIndex = reference.sheetRowNumber - 1;
     const sourceRow = sourceRows[sourceIndex];
     if (!sourceRow) continue;
+    if (String(sourceRow[10] ?? "").trim()) continue;
     const identity = rawOrderIdentity(sourceRow);
     if (!identity.primalac && !identity.brojTelefona && !identity.artikal) continue;
     if (createOrderFingerprint(identity) !== reference.fingerprint) continue;
     if (dateLabelForRow(sourceRows, sourceIndex) !== reference.dateLabel) continue;
 
+    const statusId = transitionId(destination, reference);
     valid.push({
       reference,
       values: orderIdentityValues(identity),
-      statusId: transitionId(destination, reference),
+      statusId,
+      sourceStatus: `${destination === DELIVERED_SHEET ? "delivered" : "returned"}:${statusId}`,
     });
   }
 
@@ -374,10 +436,14 @@ async function performMove(references: OrderMoveReference[], destination: Status
   await appendStatusRows(sheets, spreadsheetId, destination, sheetId, newRows);
 
   if (valid.length > 0) {
-    await sheets.spreadsheets.values.batchClear({
+    await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
       requestBody: {
-        ranges: valid.map((entry) => `'${SOURCE_SHEET}'!A${entry.reference.sheetRowNumber}:J${entry.reference.sheetRowNumber}`),
+        valueInputOption: "RAW",
+        data: valid.map((entry) => ({
+          range: `'${SOURCE_SHEET}'!K${entry.reference.sheetRowNumber}`,
+          values: [[entry.sourceStatus]],
+        })),
       },
     });
   }

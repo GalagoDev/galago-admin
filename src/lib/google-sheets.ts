@@ -40,6 +40,10 @@ const SHEET_CACHE_TTL_MS = 300_000;
 const sheetRowsCache = new Map<string, { expiresAt: number; data: SheetOrderRow[] }>();
 const sheetRowsInFlight = new Map<string, Promise<SheetOrderRow[]>>();
 
+function isInactiveOrderStatus(value: string) {
+  return value.startsWith("delivered:") || value.startsWith("returned:");
+}
+
 export function invalidateSheetCache(sheetName?: string) {
   if (sheetName) {
     sheetRowsCache.delete(sheetName);
@@ -272,7 +276,7 @@ export async function getSheetRowsByName(sheetName: string, options: { fresh?: b
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:J`,
+      range: `'${sheetName}'!A:K`,
     });
 
     const rows = response.data.values ?? [];
@@ -282,13 +286,15 @@ export async function getSheetRowsByName(sheetName: string, options: { fresh?: b
 
     for (const [sourceIndex, row] of rows.slice(1).entries()) {
       const cells = row.map((cell) => (cell ?? "").toString().trim());
-      const filled = cells.filter(Boolean);
+      const filled = cells.slice(0, 10).filter(Boolean);
       if (filled.length === 0) continue;
 
       if (filled.length === 1 && /^\d{2}\/\d{2}\/\d{4}$/.test(cells[0] ?? "")) {
         currentDate = cells[0] ?? "";
         continue;
       }
+
+      if (sheetName === SHEET_NAME && isInactiveOrderStatus(cells[10] ?? "")) continue;
 
       rowNumber += 1;
       const order = {
