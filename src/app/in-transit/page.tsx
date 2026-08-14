@@ -22,7 +22,7 @@ export default async function InTransitPage({
   searchParams: Promise<{ delivered?: string; returned?: string; skipped?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const orders = await getUndeliveredSheetRows().catch(() => []);
+  const orders = await getUndeliveredSheetRows({ fresh: Boolean(params.delivered || params.returned) }).catch(() => []);
   const notice = getNotice(params);
 
   return (

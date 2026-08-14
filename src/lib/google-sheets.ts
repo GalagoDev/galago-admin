@@ -260,7 +260,8 @@ export async function ensureTodayBlockAtTop() {
   await styleDateRow(sheets, spreadsheetId, sheetId, 2);
 }
 
-export async function getSheetRowsByName(sheetName: string) {
+export async function getSheetRowsByName(sheetName: string, options: { fresh?: boolean } = {}) {
+  if (options.fresh) invalidateSheetCache(sheetName);
   const cached = getCachedSheetRows(sheetName);
   if (cached) return cached;
 
@@ -324,8 +325,8 @@ export async function getSheetRowsByName(sheetName: string) {
   }
 }
 
-export async function getUndeliveredSheetRows() {
-  return getSheetRowsByName("Undelivered orders");
+export async function getUndeliveredSheetRows(options: { fresh?: boolean } = {}) {
+  return getSheetRowsByName("Undelivered orders", options);
 }
 
 export async function getOrdersSheetRows() {
