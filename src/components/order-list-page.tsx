@@ -23,12 +23,18 @@ export function OrderListPage({
   orders,
   workflow,
   allowReturns = false,
+  listTitle = "Lista narudžbi",
+  listSubtitle = "Pretraga i pregled svih detalja narudžbe",
+  searchPlaceholder,
 }: {
   title: string;
   subtitle: string;
   orders: SheetOrderRow[];
   workflow?: ReactNode;
   allowReturns?: boolean;
+  listTitle?: string;
+  listSubtitle?: string;
+  searchPlaceholder?: string;
 }) {
   const totalAmount = orders.reduce((sum, order) => sum + parseAmount(order.otkupnina), 0);
 
@@ -68,12 +74,16 @@ export function OrderListPage({
         <section className="mt-5 rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)] lg:rounded-lg lg:p-5">
           <div className="flex items-center justify-between gap-4 px-1 pb-3">
             <div>
-              <p className="text-lg font-semibold text-white">Lista narudžbi</p>
-              <p className="mt-1 text-sm text-neutral-500">Pretraga i pregled svih detalja narudžbe</p>
+              <p className="text-lg font-semibold text-white">{listTitle}</p>
+              <p className="mt-1 text-sm text-neutral-500">{listSubtitle}</p>
             </div>
           </div>
 
-          <OrderListClient orders={orders} allowReturns={allowReturns} />
+          <OrderListClient
+            orders={orders}
+            allowReturns={allowReturns}
+            searchPlaceholder={searchPlaceholder}
+          />
         </section>
       </div>
     </main>

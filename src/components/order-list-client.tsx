@@ -49,7 +49,15 @@ function ReturnOrderForm({ order, fullWidth = false }: { order: SheetOrderRow; f
   );
 }
 
-export function OrderListClient({ orders, allowReturns = false }: { orders: SheetOrderRow[]; allowReturns?: boolean }) {
+export function OrderListClient({
+  orders,
+  allowReturns = false,
+  searchPlaceholder = "Traži ime, telefon, proizvod, ZIP...",
+}: {
+  orders: SheetOrderRow[];
+  allowReturns?: boolean;
+  searchPlaceholder?: string;
+}) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
@@ -88,7 +96,7 @@ export function OrderListClient({ orders, allowReturns = false }: { orders: Shee
             setQuery(event.target.value);
             setVisibleCount(PAGE_SIZE);
           }}
-          placeholder="Traži ime, telefon, proizvod, ZIP..."
+          placeholder={searchPlaceholder}
           className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-neutral-500 focus:border-sky-400/30 xl:max-w-xl xl:rounded-lg"
         />
         <div className="mt-3 hidden shrink-0 items-center gap-5 text-[11px] uppercase tracking-[0.14em] text-neutral-500 xl:flex xl:mt-0">

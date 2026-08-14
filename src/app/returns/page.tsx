@@ -1,11 +1,52 @@
 import { OrderListPage } from "@/components/order-list-page";
-import { getReturnedSheetRows } from "@/lib/google-sheets";
+import { ReturnOrderPicker } from "@/components/return-order-picker";
+import { getReturnedSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-export default async function ReturnsPage() {
-  const orders = await getReturnedSheetRows().catch(() => []);
-  return <OrderListPage title="Povrati" subtitle="Vraćene pošiljke izdvojene iz Na dostavi" orders={orders} />;
+function getNotice(params: { returned?: string; skipped?: string; error?: string }) {
+  if (params.error === "invalid-order-selection") return { tone: "error", text: "Narudžba više nije važeća. Osvježite stranicu." };
+  if (params.error === "return-update-failed") return { tone: "error", text: "Povrat nije sačuvan. Pokušajte ponovo." };
+  if (params.returned) return {
+    tone: "success",
+    text: `${params.returned} narudžba premještena u Povrate.${params.skipped && params.skipped !== "0" ? ` Preskočeno: ${params.skipped}.` : ""}`,
+  };
+  return null;
+}
+
+export default async function ReturnsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returned?: string; skipped?: string; error?: string }>;
+}) {
+  const params = await searchParams;
+  const fresh = Boolean(params.returned);
+  const [orders, activeOrders] = await Promise.all([
+    getReturnedSheetRows({ fresh }).catch(() => []),
+    getUndeliveredSheetRows({ fresh }).catch(() => []),
+  ]);
+  const notice = getNotice(params);
+
+  return (
+    <OrderListPage
+      title="Povrati"
+      subtitle="Vraćene pošiljke izdvojene iz Na dostavi"
+      orders={orders}
+      listTitle="Evidentirani povrati"
+      listSubtitle="Pošiljke koje su već premještene u Povrate"
+      searchPlaceholder="Traži među evidentiranim povratima..."
+      workflow={(
+        <>
+          {notice ? (
+            <div className={`mt-5 rounded-lg border px-4 py-3 text-sm ${notice.tone === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-red-300/20 bg-red-300/10 text-red-100"}`}>
+              {notice.text}
+            </div>
+          ) : null}
+          <ReturnOrderPicker orders={activeOrders} />
+        </>
+      )}
+    />
+  );
 }

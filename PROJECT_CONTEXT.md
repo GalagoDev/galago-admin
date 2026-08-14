@@ -152,7 +152,7 @@ This was already being implemented for order list pages.
 - Courier `.xlsx` reports are uploaded on `Na dostavi`, previewed, and confirmed before any Sheet mutation.
 - Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
 - Confirmed deliveries move from `Undelivered orders` to `Delivered orders`.
-- A searched/selected active order can be moved to `Povrati`.
+- `Povrati` has an autocomplete over active `Na dostavi` customers; selecting a customer moves that exact order to the return history.
 - Source rows remain permanently in `Undelivered orders`; a hidden `App status` column removes delivered/returned rows only from the app.
 - Destination copies and hidden status IDs make delivery/return retries idempotent.
 

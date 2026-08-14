@@ -115,16 +115,17 @@ export async function applyDeliveredMatchesAction(formData: FormData) {
 }
 
 export async function moveOrderToReturnsAction(formData: FormData) {
+  const returnTo = formData.get("returnTo") === "/returns" ? "/returns" : "/in-transit";
   const reference = parseReference(formData.get("order") ?? "");
-  if (!reference) redirect("/in-transit?error=invalid-order-selection");
+  if (!reference) redirect(`${returnTo}?error=invalid-order-selection`);
 
   let result: Awaited<ReturnType<typeof moveOrderToReturns>>;
   try {
     result = await moveOrderToReturns(reference);
   } catch (error) {
     console.error("Moving order to returns failed", error);
-    redirect("/in-transit?error=return-update-failed");
+    redirect(`${returnTo}?error=return-update-failed`);
   }
   refreshOperationalPages();
-  redirect(`/in-transit?returned=${result.moved}&skipped=${result.skipped}`);
+  redirect(`${returnTo}?returned=${result.moved}&skipped=${result.skipped}`);
 }

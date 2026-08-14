@@ -339,6 +339,6 @@ export async function getOrdersSheetRows() {
   return getSheetRowsByName("Orders");
 }
 
-export async function getReturnedSheetRows() {
-  return getSheetRowsByName("Povrati");
+export async function getReturnedSheetRows(options: { fresh?: boolean } = {}) {
+  return getSheetRowsByName("Povrati", options);
 }
