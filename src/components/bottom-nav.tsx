@@ -37,6 +37,15 @@ function ChartIcon() {
   );
 }
 
+function ReceiptIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M7 3.5h8l3 3V20.5H7V3.5Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 3.5v3h3M10 11h5M10 15h5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
 
@@ -45,6 +54,7 @@ export function BottomNav() {
   const mobileItems = [
     { href: "/", label: "Narudzbe", icon: <OrdersIcon />, active: pathname === "/" || pathname === "/orders" },
     { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" || pathname === "/undelivered" },
+    { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
   ];
 
@@ -53,26 +63,27 @@ export function BottomNav() {
     { href: "/orders", label: "Nove narudžbe", icon: <OrdersIcon />, active: pathname === "/orders" },
     { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" },
     { href: "/returns", label: "Povrati", icon: <BoxIcon />, active: pathname === "/returns" },
+    { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
   ];
 
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pb-4 sm:max-w-lg sm:px-5 lg:hidden">
-        <div className="mx-auto grid grid-cols-3 gap-2 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="mx-auto grid grid-cols-4 gap-1 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           {mobileItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={item.active ? "page" : undefined}
-              className={`flex flex-col items-center justify-center rounded-[1.2rem] px-3 py-2.5 transition ${
+              className={`flex min-w-0 flex-col items-center justify-center rounded-[1.2rem] px-1 py-2.5 transition ${
                 item.active
                   ? "bg-white/[0.06] text-neutral-100"
                   : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-200"
               }`}
             >
               {item.icon}
-              <span className="mt-1 text-[11px] font-medium">{item.label}</span>
+              <span className="mt-1 max-w-full truncate text-[10px] font-medium sm:text-[11px]">{item.label}</span>
             </Link>
           ))}
         </div>

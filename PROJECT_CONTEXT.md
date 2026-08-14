@@ -127,6 +127,7 @@ Remembered current direction:
 - bottom nav labels:
   - `Narudzbe`
   - `Na dostavi`
+  - `Računi`
   - `Statistika`
 - three top dashboard blocks:
   - `Nove narudžbe`
@@ -157,6 +158,17 @@ This was already being implemented for order list pages.
 - Return actions do not use confirmation popups. A recorded return can be restored to `Na dostavi`; the source row is reactivated and the `Povrati` copy is kept in Sheets with a hidden `restored` status.
 - Source rows remain permanently in `Undelivered orders`; a hidden `App status` column removes delivered/returned rows only from the app.
 - Destination copies and hidden status IDs make delivery/return retries idempotent.
+
+### Daily receipt workflow
+- `Računi` is a separate operational panel; it does not replace Google Sheets or reintroduce the old PDF-first order workflow.
+- A courier `.xlsx` creates a batch for the current Sarajevo date, regardless of shipment dates inside the document.
+- Required courier columns are `datum_slanja`, `primaoc`, `primaoc_mjesto`, `iznos_otk`, and `Ref1`.
+- Customers are sorted by `datum_slanja` from oldest to newest, with original Excel row order used as the tie-breaker.
+- Phone numbers are matched from full `Orders` sheet history and can be refreshed after Google Sheets is edited.
+- PDF uploads require exactly one document per customer. Files are naturally sorted by filename (`1.pdf`, `2.pdf`, and so on) and paired with the displayed customer position.
+- Receipt batches and PDF pairing metadata are kept in SQLite; PDF files use the persistent Hostinger `STORAGE_DIR`.
+- Direct Viber delivery by phone number requires Viber Business Messages through an approved provider. A normal Viber bot only reaches subscribed Viber user IDs and must not be used as a fake substitute.
+- Viber sending remains locked until a Business Messages provider, approved sender/template, and credentials are configured.
 
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.

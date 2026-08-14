@@ -12,6 +12,7 @@ const folders = [
   path.join(storageRoot, "pdfs", "incoming"),
   path.join(storageRoot, "pdfs", "sent"),
   path.join(storageRoot, "pdfs", "delivered"),
+  path.join(storageRoot, "receipts"),
 ];
 
 export function ensureStorage() {
@@ -25,5 +26,6 @@ export function ensureStorage() {
     incomingPdfs: path.join(storageRoot, "pdfs", "incoming"),
     sentPdfs: path.join(storageRoot, "pdfs", "sent"),
     deliveredPdfs: path.join(storageRoot, "pdfs", "delivered"),
+    receiptPdfs: path.join(storageRoot, "receipts"),
   };
 }

@@ -26,6 +26,7 @@ export function getDb() {
 
   database = new Database(dbPath);
   database.pragma("journal_mode = WAL");
+  database.pragma("foreign_keys = ON");
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS documents (
@@ -55,6 +56,50 @@ export function getDb() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(document_id) REFERENCES documents(id)
     );
+
+    CREATE TABLE IF NOT EXISTS receipt_batches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      collection_date TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      file_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(collection_date, file_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS receipt_recipients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      batch_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      source_row_number INTEGER NOT NULL,
+      shipment_date_sort INTEGER NOT NULL,
+      shipment_date_label TEXT NOT NULL,
+      recipient TEXT NOT NULL,
+      city TEXT,
+      amount REAL,
+      reference TEXT,
+      phone TEXT,
+      match_status TEXT NOT NULL,
+      match_reason TEXT,
+      matched_order_row INTEGER,
+      pdf_original_name TEXT,
+      pdf_stored_name TEXT,
+      pdf_stored_path TEXT,
+      pdf_hash TEXT,
+      send_status TEXT NOT NULL DEFAULT 'pending_pdf',
+      provider TEXT,
+      provider_message_id TEXT,
+      sent_at TEXT,
+      send_error TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(batch_id) REFERENCES receipt_batches(id) ON DELETE CASCADE,
+      UNIQUE(batch_id, position)
+    );
+
+    CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
+      ON receipt_batches(collection_date, id DESC);
+    CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx
+      ON receipt_recipients(batch_id, position);
   `);
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");

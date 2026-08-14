@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: 1,
     serverActions: {
-      bodySizeLimit: "5mb",
+      bodySizeLimit: "55mb",
     },
   },
 };
