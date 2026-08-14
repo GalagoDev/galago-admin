@@ -1,9 +1,12 @@
 import { google, sheets_v4 } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
+import { createOrderFingerprint } from "@/lib/order-fingerprint";
 
 export type SheetOrderRow = {
   rowNumber: number;
+  sheetRowNumber: number;
+  fingerprint: string;
   dateLabel: string;
   primalac: string;
   brojTelefona: string;
@@ -37,7 +40,7 @@ const SHEET_CACHE_TTL_MS = 300_000;
 const sheetRowsCache = new Map<string, { expiresAt: number; data: SheetOrderRow[] }>();
 const sheetRowsInFlight = new Map<string, Promise<SheetOrderRow[]>>();
 
-function invalidateSheetCache(sheetName?: string) {
+export function invalidateSheetCache(sheetName?: string) {
   if (sheetName) {
     sheetRowsCache.delete(sheetName);
     sheetRowsInFlight.delete(sheetName);
@@ -257,7 +260,7 @@ export async function ensureTodayBlockAtTop() {
   await styleDateRow(sheets, spreadsheetId, sheetId, 2);
 }
 
-async function getSheetRowsByName(sheetName: string) {
+export async function getSheetRowsByName(sheetName: string) {
   const cached = getCachedSheetRows(sheetName);
   if (cached) return cached;
 
@@ -276,7 +279,7 @@ async function getSheetRowsByName(sheetName: string) {
     let currentDate = "";
     let rowNumber = 0;
 
-    for (const row of rows.slice(1)) {
+    for (const [sourceIndex, row] of rows.slice(1).entries()) {
       const cells = row.map((cell) => (cell ?? "").toString().trim());
       const filled = cells.filter(Boolean);
       if (filled.length === 0) continue;
@@ -287,8 +290,9 @@ async function getSheetRowsByName(sheetName: string) {
       }
 
       rowNumber += 1;
-      result.push({
+      const order = {
         rowNumber,
+        sheetRowNumber: sourceIndex + 2,
         dateLabel: currentDate,
         primalac: cells[0] ?? "",
         brojTelefona: cells[1] ?? "",
@@ -300,6 +304,10 @@ async function getSheetRowsByName(sheetName: string) {
         vrijednostPosiljke: cells[7] ?? "",
         dop: cells[8] ?? "",
         zamjena: cells[9] ?? "",
+      };
+      result.push({
+        ...order,
+        fingerprint: createOrderFingerprint(order),
       });
     }
 
@@ -322,4 +330,8 @@ export async function getUndeliveredSheetRows() {
 
 export async function getOrdersSheetRows() {
   return getSheetRowsByName("Orders");
+}
+
+export async function getReturnedSheetRows() {
+  return getSheetRowsByName("Povrati");
 }

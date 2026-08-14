@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 
+import { moveOrderToReturnsAction } from "@/app/actions/delivery";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 
 const PAGE_SIZE = 25;
@@ -11,7 +13,43 @@ function parseAmount(value: string) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
+function ReturnSubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="min-h-10 rounded-lg border border-fuchsia-300/20 bg-fuchsia-300/10 px-3 py-2 text-xs font-semibold text-fuchsia-100 transition hover:bg-fuchsia-300/15 disabled:cursor-wait disabled:opacity-60"
+    >
+      {pending ? "Premještam..." : "Povrat"}
+    </button>
+  );
+}
+
+function ReturnOrderForm({ order, fullWidth = false }: { order: SheetOrderRow; fullWidth?: boolean }) {
+  return (
+    <form
+      action={moveOrderToReturnsAction}
+      onSubmit={(event) => {
+        if (!window.confirm(`Dodati ${order.primalac || "ovu narudžbu"} u Povrate?`)) event.preventDefault();
+      }}
+      className={fullWidth ? "mt-3 grid" : ""}
+    >
+      <input
+        type="hidden"
+        name="order"
+        value={JSON.stringify({
+          sheetRowNumber: order.sheetRowNumber,
+          fingerprint: order.fingerprint,
+          dateLabel: order.dateLabel,
+        })}
+      />
+      <ReturnSubmitButton />
+    </form>
+  );
+}
+
+export function OrderListClient({ orders, allowReturns = false }: { orders: SheetOrderRow[]; allowReturns?: boolean }) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
@@ -29,6 +67,9 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
   }, [orders, query]);
 
   const visibleOrders = filteredOrders.slice(0, visibleCount);
+  const desktopGridClass = allowReturns
+    ? "grid-cols-[42px_minmax(120px,1fr)_minmax(112px,0.8fr)_minmax(165px,1.25fr)_minmax(165px,1.4fr)_74px_105px_86px]"
+    : "grid-cols-[48px_minmax(130px,1fr)_minmax(120px,0.85fr)_minmax(180px,1.35fr)_minmax(180px,1.5fr)_84px_120px]";
 
   function toggleExpanded(key: string) {
     setExpandedKeys((current) => ({
@@ -116,6 +157,7 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
                       <span className="text-neutral-500">Broj paketa</span>
                       <span className="font-medium text-white">{order.brojPaketa || "-"}</span>
                     </div>
+                    {allowReturns ? <ReturnOrderForm order={order} fullWidth /> : null}
                   </div>
                 ) : null}
               </article>
@@ -127,7 +169,7 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
       {filteredOrders.length > 0 ? (
         <div className="hidden overflow-hidden rounded-lg border border-white/10 xl:block" role="table" aria-label="Lista narudžbi">
           <div
-            className="grid grid-cols-[48px_minmax(130px,1fr)_minmax(120px,0.85fr)_minmax(180px,1.35fr)_minmax(180px,1.5fr)_84px_120px] gap-3 border-b border-white/10 bg-white/[0.04] px-3 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-neutral-500"
+            className={`grid ${desktopGridClass} gap-3 border-b border-white/10 bg-white/[0.04] px-3 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-neutral-500`}
             role="row"
           >
             <span>#</span>
@@ -137,12 +179,13 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
             <span>Artikal</span>
             <span>Paketi</span>
             <span>Otkupnina</span>
+            {allowReturns ? <span>Akcija</span> : null}
           </div>
           <div className="divide-y divide-white/[0.06]">
             {visibleOrders.map((order, index) => (
               <div
                 key={`${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`}
-                className="grid grid-cols-[48px_minmax(130px,1fr)_minmax(120px,0.85fr)_minmax(180px,1.35fr)_minmax(180px,1.5fr)_84px_120px] items-start gap-3 px-3 py-3 text-sm text-neutral-300 transition hover:bg-white/[0.025]"
+                className={`grid ${desktopGridClass} items-start gap-3 px-3 py-3 text-sm text-neutral-300 transition hover:bg-white/[0.025]`}
                 role="row"
               >
                 <span className="text-xs text-neutral-600">{index + 1}</span>
@@ -165,6 +208,7 @@ export function OrderListClient({ orders }: { orders: SheetOrderRow[] }) {
                   <p className="font-semibold text-emerald-200">{order.otkupnina || "-"}</p>
                   <p className="mt-1 break-words text-[11px] leading-4 text-neutral-500">Vrijednost {order.vrijednostPosiljke || "-"}</p>
                 </div>
+                {allowReturns ? <ReturnOrderForm order={order} /> : null}
               </div>
             ))}
           </div>

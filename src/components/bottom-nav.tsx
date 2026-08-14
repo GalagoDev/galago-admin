@@ -44,14 +44,13 @@ export function BottomNav() {
 
   const mobileItems = [
     { href: "/", label: "Narudzbe", icon: <OrdersIcon />, active: pathname === "/" || pathname === "/orders" },
-    { href: "/undelivered", label: "Nedostavljene", icon: <BoxIcon />, active: pathname === "/undelivered" },
+    { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" || pathname === "/undelivered" },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
   ];
 
   const desktopItems = [
     { href: "/", label: "Pregled", icon: <OrdersIcon />, active: pathname === "/" },
     { href: "/orders", label: "Nove narudžbe", icon: <OrdersIcon />, active: pathname === "/orders" },
-    { href: "/undelivered", label: "Nedostavljene", icon: <BoxIcon />, active: pathname === "/undelivered" },
     { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" },
     { href: "/returns", label: "Povrati", icon: <BoxIcon />, active: pathname === "/returns" },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },

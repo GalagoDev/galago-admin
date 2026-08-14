@@ -31,6 +31,8 @@ It is **not** intended to be the main place where a human manually types orders.
 Main operational sheets:
 - `Orders`
 - `Undelivered orders`
+- `Delivered orders` (created on first confirmed courier import)
+- `Povrati` (created when the first return is recorded)
 
 Google Apps Script owns the visual/layout structure of those Sheets.
 The app should **not fight the sheet layout**.
@@ -124,11 +126,10 @@ Remembered current direction:
 - bottom nav with custom icons
 - bottom nav labels:
   - `Narudzbe`
-  - `Nedostavljene`
+  - `Na dostavi`
   - `Statistika`
-- four top dashboard blocks:
+- three top dashboard blocks:
   - `Nove narudžbe`
-  - `Nedostavljene`
   - `Na dostavi`
   - `Povrati`
 - these blocks were made clickable and open dedicated pages
@@ -145,8 +146,18 @@ When lists grow large (ex: 500 undelivered orders), the intended UX is:
 
 This was already being implemented for order list pages.
 
+### Delivery outcome workflow
+- The UI has one active-delivery concept: `Na dostavi`; the old `Nedostavljene` route redirects there.
+- `Na dostavi` reads the existing `Undelivered orders` sheet.
+- Courier `.xlsx` reports are uploaded on `Na dostavi`, previewed, and confirmed before any Sheet mutation.
+- Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
+- Confirmed deliveries move from `Undelivered orders` to `Delivered orders`.
+- A searched/selected active order can be moved to `Povrati`.
+- Source rows are cleared rather than deleted so existing Google Sheet date blocks and styling stay intact.
+- Hidden status IDs make delivery/return retries idempotent.
+
 ### Desktop layout
-The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to four columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
+The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
 
 ## Current app architecture state
 
@@ -154,7 +165,7 @@ Connected / active:
 - Google Sheets reads
 - Hostinger deployment
 - homepage dashboard
-- mobile-friendly undelivered flow
+- mobile-friendly `Na dostavi` flow
 - clickable dashboard pages
 - Shopify import path
 - Telegram webhook intake route (`/api/telegram/orders`)
@@ -167,7 +178,6 @@ Connected / active:
 
 Not fully mature yet:
 - true stats page logic
-- returns (`Povrati`) operational logic
 - stronger Shopify dedupe stability
 - Telegram allowed chat restriction needs production env hardening
 - Telegram API extraction quality depends on prompt/schema tuning for messy screenshots

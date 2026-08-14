@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { OrderListClient } from "@/components/order-list-client";
 import type { SheetOrderRow } from "@/lib/google-sheets";
@@ -20,10 +21,14 @@ export function OrderListPage({
   title,
   subtitle,
   orders,
+  workflow,
+  allowReturns = false,
 }: {
   title: string;
   subtitle: string;
   orders: SheetOrderRow[];
+  workflow?: ReactNode;
+  allowReturns?: boolean;
 }) {
   const totalAmount = orders.reduce((sum, order) => sum + parseAmount(order.otkupnina), 0);
 
@@ -58,6 +63,8 @@ export function OrderListPage({
           </article>
         </section>
 
+        {workflow}
+
         <section className="mt-5 rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)] lg:rounded-lg lg:p-5">
           <div className="flex items-center justify-between gap-4 px-1 pb-3">
             <div>
@@ -66,7 +73,7 @@ export function OrderListPage({
             </div>
           </div>
 
-          <OrderListClient orders={orders} />
+          <OrderListClient orders={orders} allowReturns={allowReturns} />
         </section>
       </div>
     </main>

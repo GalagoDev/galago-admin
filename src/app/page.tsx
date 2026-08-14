@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
-import { getOrdersSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getOrdersSheetRows, getReturnedSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -83,13 +83,15 @@ export default async function Home({
   }>;
 }) {
   const params = await searchParams;
-  const [undeliveredRows, ordersRows] = await Promise.all([
+  const [undeliveredRows, ordersRows, returnedRows] = await Promise.all([
     getUndeliveredSheetRows().catch(() => []),
     getOrdersSheetRows().catch(() => []),
+    getReturnedSheetRows().catch(() => []),
   ]);
 
   const totalUndelivered = undeliveredRows.length;
   const totalUndeliveredKm = undeliveredRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
+  const totalReturnedKm = returnedRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
   const oldestUndelivered = [...undeliveredRows]
     .sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel))
     .slice(0, 5);
@@ -128,25 +130,17 @@ export default async function Home({
       glow: "shadow-[0_20px_50px_rgba(250,204,21,0.08)]",
     },
     {
-      title: "Nedostavljene",
-      value: String(totalUndelivered),
-      meta: "Aktivne",
-      href: "/undelivered",
-      tone: "bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] border-sky-300/20",
-      glow: "shadow-[0_20px_50px_rgba(56,189,248,0.08)]",
-    },
-    {
       title: "Na dostavi",
-      value: `${totalUndeliveredKm} KM`,
-      meta: "Ukupno undelivered",
+      value: String(totalUndelivered),
+      meta: `${totalUndeliveredKm} KM aktivno`,
       href: "/in-transit",
       tone: "bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.08))] border-emerald-300/20",
       glow: "shadow-[0_20px_50px_rgba(16,185,129,0.08)]",
     },
     {
       title: "Povrati",
-      value: "0 KM",
-      meta: "Ovaj mjesec",
+      value: String(returnedRows.length),
+      meta: `${totalReturnedKm} KM ukupno`,
       href: "/returns",
       tone: "bg-[linear-gradient(135deg,rgba(192,132,252,0.22),rgba(192,132,252,0.08))] border-fuchsia-300/20",
       glow: "shadow-[0_20px_50px_rgba(192,132,252,0.08)]",
@@ -176,12 +170,12 @@ export default async function Home({
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
           {cards.map((card) => (
             <Link
               key={card.title}
               href={card.href}
-              className={`rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 lg:rounded-lg lg:px-5 lg:py-5 ${card.tone} ${card.glow}`}
+              className={`last:col-span-2 rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 lg:last:col-span-1 lg:rounded-lg lg:px-5 lg:py-5 ${card.tone} ${card.glow}`}
             >
               <p className="text-[12px] font-medium leading-4 text-neutral-200">{card.title}</p>
               <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{card.value}</p>
@@ -200,12 +194,12 @@ export default async function Home({
           <section className="rounded-[2rem] border border-white/10 bg-[#111214] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)] lg:rounded-lg lg:p-5">
             <div className="flex items-center justify-between gap-4 px-1 pb-3">
               <div>
-                <p className="text-lg font-semibold text-white">Nedostavljene narudžbe</p>
-                <p className="mt-1 text-sm text-neutral-500">Najstarije po datumu slanja</p>
+                <p className="text-lg font-semibold text-white">Na dostavi</p>
+                <p className="mt-1 text-sm text-neutral-500">Najstarije aktivne pošiljke</p>
               </div>
               <Link
-                href="/undelivered"
-                aria-label="Otvori nedostavljene narudžbe"
+                href="/in-transit"
+                aria-label="Otvori pošiljke na dostavi"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]"
               >
                 <ArrowIcon />
@@ -215,7 +209,7 @@ export default async function Home({
             <div className="flex flex-col gap-2.5">
               {oldestUndelivered.length === 0 ? (
                 <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
-                  Nema aktivnih undelivered narudžbi.
+                  Nema aktivnih pošiljki na dostavi.
                 </div>
               ) : (
                 oldestUndelivered.map((row) => (
