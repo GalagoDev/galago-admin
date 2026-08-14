@@ -167,6 +167,7 @@ This was already being implemented for order list pages.
 - Phone numbers are matched from full `Orders` sheet history and can be refreshed after Google Sheets is edited.
 - PDF uploads require exactly one document per customer. Files are naturally sorted by filename (`1.pdf`, `2.pdf`, and so on) and paired with the displayed customer position.
 - Receipt batches and PDF pairing metadata are kept in SQLite; PDF files use the persistent Hostinger `STORAGE_DIR`.
+- Relative storage/database paths are anchored outside Hostinger's versioned `hbuilds` release folders so redeploys cannot erase receipt state.
 - Direct Viber delivery by phone number requires Viber Business Messages through an approved provider. A normal Viber bot only reaches subscribed Viber user IDs and must not be used as a fake substitute.
 - Viber sending remains locked until a Business Messages provider, approved sender/template, and credentials are configured.
 

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "node:path";
 
-import { ensureStorage } from "@/lib/storage";
+import { ensureStorage, resolveRuntimePath } from "@/lib/storage";
 
 let database: Database.Database | null = null;
 
@@ -21,7 +21,7 @@ export function getDb() {
 
   const storage = ensureStorage();
   const dbPath = process.env.DATABASE_PATH
-    ? path.resolve(/* turbopackIgnore: true */ process.cwd(), process.env.DATABASE_PATH)
+    ? resolveRuntimePath(process.env.DATABASE_PATH)
     : path.join(storage.data, "store.db");
 
   database = new Database(dbPath);

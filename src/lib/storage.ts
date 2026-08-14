@@ -3,7 +3,19 @@ import path from "node:path";
 
 const projectRoot = process.cwd();
 const configuredStorageDir = process.env.STORAGE_DIR ?? "storage";
-const storageRoot = path.resolve(/* turbopackIgnore: true */ projectRoot, configuredStorageDir);
+
+function getRuntimeBase() {
+  const hostingerBuildMarker = `${path.sep}hbuilds${path.sep}`;
+  const markerIndex = projectRoot.indexOf(hostingerBuildMarker);
+  return markerIndex > 0 ? projectRoot.slice(0, markerIndex) : projectRoot;
+}
+
+export function resolveRuntimePath(configuredPath: string) {
+  if (path.isAbsolute(configuredPath)) return configuredPath;
+  return path.resolve(/* turbopackIgnore: true */ getRuntimeBase(), configuredPath);
+}
+
+const storageRoot = resolveRuntimePath(configuredStorageDir);
 
 const folders = [
   storageRoot,
