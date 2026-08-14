@@ -8,6 +8,7 @@ import { getUndeliveredSheetRows } from "@/lib/google-sheets";
 import {
   markOrdersDelivered,
   moveOrderToReturns,
+  restoreReturnToTransit,
   type OrderMoveReference,
 } from "@/lib/google-order-status";
 import { matchCourierDeliveries, type DeliveryMatch } from "@/lib/order-matching";
@@ -128,4 +129,19 @@ export async function moveOrderToReturnsAction(formData: FormData) {
   }
   refreshOperationalPages();
   redirect(`${returnTo}?returned=${result.moved}&skipped=${result.skipped}`);
+}
+
+export async function restoreReturnToTransitAction(formData: FormData) {
+  const reference = parseReference(formData.get("order") ?? "");
+  if (!reference) redirect("/returns?error=invalid-return-selection");
+
+  let result: Awaited<ReturnType<typeof restoreReturnToTransit>>;
+  try {
+    result = await restoreReturnToTransit(reference);
+  } catch (error) {
+    console.error("Restoring return to in-transit failed", error);
+    redirect("/returns?error=restore-update-failed");
+  }
+  refreshOperationalPages();
+  redirect(`/returns?restored=${result.restored}&skipped=${result.skipped}`);
 }

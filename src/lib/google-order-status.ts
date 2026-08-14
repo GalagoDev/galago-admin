@@ -453,6 +453,53 @@ async function performMove(references: OrderMoveReference[], destination: Status
   return { moved: valid.length, skipped: uniqueReferences.length - valid.length };
 }
 
+async function performRestoreReturn(reference: OrderMoveReference) {
+  const { sheets, spreadsheetId } = getSheetsClient();
+  await ensureSourceStatusColumn(sheets, spreadsheetId);
+  const [sourceResponse, returnsResponse] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:K` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${RETURNS_SHEET}'!A:K` }),
+  ]);
+  const sourceRows = sourceResponse.data.values ?? [];
+  const returnRows = returnsResponse.data.values ?? [];
+  const returnIndex = reference.sheetRowNumber - 1;
+  const returnRow = returnRows[returnIndex];
+
+  if (!returnRow) return { restored: 0, skipped: 1 };
+  const statusId = String(returnRow[10] ?? "").trim();
+  if (!/^[a-f0-9]{32}$/.test(statusId)) return { restored: 0, skipped: 1 };
+  const returnIdentity = rawOrderIdentity(returnRow);
+  if (createOrderFingerprint(returnIdentity) !== reference.fingerprint) return { restored: 0, skipped: 1 };
+  if (dateLabelForRow(returnRows, returnIndex) !== reference.dateLabel) return { restored: 0, skipped: 1 };
+
+  const sourceIndex = sourceRows.findIndex((row) => String(row[10] ?? "").trim() === `returned:${statusId}`);
+  if (sourceIndex === -1) return { restored: 0, skipped: 1 };
+  if (createOrderFingerprint(rawOrderIdentity(sourceRows[sourceIndex])) !== reference.fingerprint) {
+    return { restored: 0, skipped: 1 };
+  }
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: "RAW",
+      data: [
+        {
+          range: `'${SOURCE_SHEET}'!K${sourceIndex + 1}`,
+          values: [[""]],
+        },
+        {
+          range: `'${RETURNS_SHEET}'!K${reference.sheetRowNumber}`,
+          values: [[`restored:${statusId}`]],
+        },
+      ],
+    },
+  });
+
+  invalidateSheetCache(SOURCE_SHEET);
+  invalidateSheetCache(RETURNS_SHEET);
+  return { restored: 1, skipped: 0 };
+}
+
 function queuedMove(references: OrderMoveReference[], destination: StatusDestination) {
   const operation = moveQueue.then(() => performMove(references, destination));
   moveQueue = operation.then(() => undefined, () => undefined);
@@ -465,4 +512,10 @@ export function markOrdersDelivered(references: OrderMoveReference[]) {
 
 export function moveOrderToReturns(reference: OrderMoveReference) {
   return queuedMove([reference], RETURNS_SHEET);
+}
+
+export function restoreReturnToTransit(reference: OrderMoveReference) {
+  const operation = moveQueue.then(() => performRestoreReturn(reference));
+  moveQueue = operation.then(() => undefined, () => undefined);
+  return operation;
 }

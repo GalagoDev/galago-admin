@@ -153,6 +153,7 @@ This was already being implemented for order list pages.
 - Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
 - Confirmed deliveries move from `Undelivered orders` to `Delivered orders`.
 - `Povrati` has an autocomplete over active `Na dostavi` customers; selecting a customer moves that exact order to the return history.
+- Return actions do not use confirmation popups. A recorded return can be restored to `Na dostavi`; the source row is reactivated and the `Povrati` copy is kept in Sheets with a hidden `restored` status.
 - Source rows remain permanently in `Undelivered orders`; a hidden `App status` column removes delivered/returned rows only from the app.
 - Destination copies and hidden status IDs make delivery/return retries idempotent.
 

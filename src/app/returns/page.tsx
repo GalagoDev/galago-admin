@@ -6,9 +6,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-function getNotice(params: { returned?: string; skipped?: string; error?: string }) {
+function getNotice(params: { returned?: string; restored?: string; skipped?: string; error?: string }) {
   if (params.error === "invalid-order-selection") return { tone: "error", text: "Narudžba više nije važeća. Osvježite stranicu." };
+  if (params.error === "invalid-return-selection") return { tone: "error", text: "Povrat više nije važeći. Osvježite stranicu." };
   if (params.error === "return-update-failed") return { tone: "error", text: "Povrat nije sačuvan. Pokušajte ponovo." };
+  if (params.error === "restore-update-failed") return { tone: "error", text: "Narudžba nije vraćena na dostavu. Pokušajte ponovo." };
+  if (params.restored === "0") return { tone: "error", text: "Narudžba nije vraćena. Osvježite stranicu i pokušajte ponovo." };
+  if (params.restored) return {
+    tone: "success",
+    text: `${params.restored} narudžba vraćena u Na dostavi.${params.skipped && params.skipped !== "0" ? ` Preskočeno: ${params.skipped}.` : ""}`,
+  };
+  if (params.returned === "0") return { tone: "error", text: "Narudžba nije premještena. Osvježite stranicu i pokušajte ponovo." };
   if (params.returned) return {
     tone: "success",
     text: `${params.returned} narudžba premještena u Povrate.${params.skipped && params.skipped !== "0" ? ` Preskočeno: ${params.skipped}.` : ""}`,
@@ -19,10 +27,10 @@ function getNotice(params: { returned?: string; skipped?: string; error?: string
 export default async function ReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returned?: string; skipped?: string; error?: string }>;
+  searchParams: Promise<{ returned?: string; restored?: string; skipped?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const fresh = Boolean(params.returned);
+  const fresh = Boolean(params.returned || params.restored);
   const [orders, activeOrders] = await Promise.all([
     getReturnedSheetRows({ fresh }).catch(() => []),
     getUndeliveredSheetRows({ fresh }).catch(() => []),
@@ -34,6 +42,7 @@ export default async function ReturnsPage({
       title="Povrati"
       subtitle="Vraćene pošiljke izdvojene iz Na dostavi"
       orders={orders}
+      allowRestoreToTransit
       listTitle="Evidentirani povrati"
       listSubtitle="Pošiljke koje su već premještene u Povrate"
       searchPlaceholder="Traži među evidentiranim povratima..."

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { moveOrderToReturnsAction } from "@/app/actions/delivery";
+import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 
 const PAGE_SIZE = 25;
@@ -30,9 +30,6 @@ function ReturnOrderForm({ order, fullWidth = false }: { order: SheetOrderRow; f
   return (
     <form
       action={moveOrderToReturnsAction}
-      onSubmit={(event) => {
-        if (!window.confirm(`Dodati ${order.primalac || "ovu narudžbu"} u Povrate?`)) event.preventDefault();
-      }}
       className={fullWidth ? "mt-3 grid" : ""}
     >
       <input
@@ -49,13 +46,45 @@ function ReturnOrderForm({ order, fullWidth = false }: { order: SheetOrderRow; f
   );
 }
 
+function RestoreSubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="min-h-10 rounded-lg border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-xs font-semibold text-sky-100 transition hover:bg-sky-300/15 disabled:cursor-wait disabled:opacity-60"
+    >
+      {pending ? "Vraćam..." : "Vrati na dostavu"}
+    </button>
+  );
+}
+
+function RestoreOrderForm({ order, fullWidth = false }: { order: SheetOrderRow; fullWidth?: boolean }) {
+  return (
+    <form action={restoreReturnToTransitAction} className={fullWidth ? "mt-3 grid" : ""}>
+      <input
+        type="hidden"
+        name="order"
+        value={JSON.stringify({
+          sheetRowNumber: order.sheetRowNumber,
+          fingerprint: order.fingerprint,
+          dateLabel: order.dateLabel,
+        })}
+      />
+      <RestoreSubmitButton />
+    </form>
+  );
+}
+
 export function OrderListClient({
   orders,
   allowReturns = false,
+  allowRestoreToTransit = false,
   searchPlaceholder = "Traži ime, telefon, proizvod, ZIP...",
 }: {
   orders: SheetOrderRow[];
   allowReturns?: boolean;
+  allowRestoreToTransit?: boolean;
   searchPlaceholder?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -75,8 +104,9 @@ export function OrderListClient({
   }, [orders, query]);
 
   const visibleOrders = filteredOrders.slice(0, visibleCount);
-  const desktopGridClass = allowReturns
-    ? "grid-cols-[42px_minmax(120px,1fr)_minmax(112px,0.8fr)_minmax(165px,1.25fr)_minmax(165px,1.4fr)_74px_105px_86px]"
+  const hasAction = allowReturns || allowRestoreToTransit;
+  const desktopGridClass = hasAction
+    ? "grid-cols-[42px_minmax(120px,1fr)_minmax(112px,0.8fr)_minmax(165px,1.25fr)_minmax(165px,1.4fr)_74px_105px_118px]"
     : "grid-cols-[48px_minmax(130px,1fr)_minmax(120px,0.85fr)_minmax(180px,1.35fr)_minmax(180px,1.5fr)_84px_120px]";
 
   function toggleExpanded(key: string) {
@@ -166,6 +196,7 @@ export function OrderListClient({
                       <span className="font-medium text-white">{order.brojPaketa || "-"}</span>
                     </div>
                     {allowReturns ? <ReturnOrderForm order={order} fullWidth /> : null}
+                    {allowRestoreToTransit ? <RestoreOrderForm order={order} fullWidth /> : null}
                   </div>
                 ) : null}
               </article>
@@ -187,7 +218,7 @@ export function OrderListClient({
             <span>Artikal</span>
             <span>Paketi</span>
             <span>Otkupnina</span>
-            {allowReturns ? <span>Akcija</span> : null}
+            {hasAction ? <span>Akcija</span> : null}
           </div>
           <div className="divide-y divide-white/[0.06]">
             {visibleOrders.map((order, index) => (
@@ -217,6 +248,7 @@ export function OrderListClient({
                   <p className="mt-1 break-words text-[11px] leading-4 text-neutral-500">Vrijednost {order.vrijednostPosiljke || "-"}</p>
                 </div>
                 {allowReturns ? <ReturnOrderForm order={order} /> : null}
+                {allowRestoreToTransit ? <RestoreOrderForm order={order} /> : null}
               </div>
             ))}
           </div>

@@ -64,11 +64,6 @@ export function ReturnOrderPicker({ orders }: { orders: SheetOrderRow[] }) {
       <form
         action={moveOrderToReturnsAction}
         className="mt-4"
-        onSubmit={(event) => {
-          if (!selectedOrder || !window.confirm(`Dodati ${selectedOrder.primalac || "ovu narudžbu"} u Povrate?`)) {
-            event.preventDefault();
-          }
-        }}
       >
         <div className="relative max-w-2xl">
           <label htmlFor={`${listboxId}-input`} className="mb-2 block text-sm text-neutral-300">

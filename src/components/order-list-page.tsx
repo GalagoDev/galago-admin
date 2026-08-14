@@ -23,6 +23,7 @@ export function OrderListPage({
   orders,
   workflow,
   allowReturns = false,
+  allowRestoreToTransit = false,
   listTitle = "Lista narudžbi",
   listSubtitle = "Pretraga i pregled svih detalja narudžbe",
   searchPlaceholder,
@@ -32,6 +33,7 @@ export function OrderListPage({
   orders: SheetOrderRow[];
   workflow?: ReactNode;
   allowReturns?: boolean;
+  allowRestoreToTransit?: boolean;
   listTitle?: string;
   listSubtitle?: string;
   searchPlaceholder?: string;
@@ -82,6 +84,7 @@ export function OrderListPage({
           <OrderListClient
             orders={orders}
             allowReturns={allowReturns}
+            allowRestoreToTransit={allowRestoreToTransit}
             searchPlaceholder={searchPlaceholder}
           />
         </section>

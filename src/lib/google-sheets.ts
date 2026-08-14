@@ -44,6 +44,10 @@ function isInactiveOrderStatus(value: string) {
   return value.startsWith("delivered:") || value.startsWith("returned:");
 }
 
+function isRestoredReturnStatus(value: string) {
+  return value.startsWith("restored:");
+}
+
 export function invalidateSheetCache(sheetName?: string) {
   if (sheetName) {
     sheetRowsCache.delete(sheetName);
@@ -295,6 +299,7 @@ export async function getSheetRowsByName(sheetName: string, options: { fresh?: b
       }
 
       if (sheetName === SHEET_NAME && isInactiveOrderStatus(cells[10] ?? "")) continue;
+      if (sheetName === "Povrati" && isRestoredReturnStatus(cells[10] ?? "")) continue;
 
       rowNumber += 1;
       const order = {
