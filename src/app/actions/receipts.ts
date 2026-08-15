@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
 import {
   createReceiptBatch,
+  deleteReceiptBatch,
   ReceiptBatchError,
   refreshReceiptBatchPhones,
   saveReceiptPdfs,
@@ -73,4 +74,20 @@ export async function refreshReceiptPhonesAction(formData: FormData) {
 
   revalidatePath("/receipts");
   redirect(`/receipts?batch=${batchId}&phones=${matched}`);
+}
+
+export async function deleteReceiptBatchAction(formData: FormData) {
+  const batchId = parseBatchId(formData.get("batchId"));
+  if (!batchId) redirect("/receipts?error=batch-not-found");
+
+  try {
+    await deleteReceiptBatch(batchId);
+  } catch (error) {
+    console.error("Receipt batch deletion failed", error);
+    const code = error instanceof ReceiptBatchError ? error.code : "delete-failed";
+    redirect(`/receipts?batch=${batchId}&error=${code}`);
+  }
+
+  revalidatePath("/receipts");
+  redirect("/receipts?removed=1");
 }

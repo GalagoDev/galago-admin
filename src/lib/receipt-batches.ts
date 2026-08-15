@@ -211,6 +211,27 @@ export function getRecentReceiptBatches(limit = 8) {
   return (db.prepare("SELECT * FROM receipt_batches ORDER BY id DESC LIMIT ?").all(limit) as Record<string, unknown>[]).map(mapBatch);
 }
 
+export async function deleteReceiptBatch(batchId: number) {
+  const db = getDb();
+  const batch = db.prepare("SELECT id FROM receipt_batches WHERE id = ?").get(batchId) as { id: number } | undefined;
+  if (!batch) throw new ReceiptBatchError("batch-not-found", "Dnevna lista nije pronađena.");
+
+  const sent = db.prepare(
+    "SELECT COUNT(*) AS count FROM receipt_recipients WHERE batch_id = ? AND send_status = 'sent'",
+  ).get(batchId) as { count: number };
+  if (sent.count > 0) {
+    throw new ReceiptBatchError("delete-locked", "Poslana dnevna lista se ne može obrisati.");
+  }
+
+  db.prepare("DELETE FROM receipt_batches WHERE id = ?").run(batchId);
+
+  const storage = ensureStorage();
+  const batchDir = path.join(storage.receiptPdfs, `batch-${batchId}`);
+  await fs.rm(batchDir, { recursive: true, force: true }).catch((error) => {
+    console.error(`Receipt batch ${batchId} was deleted, but its PDF folder could not be removed`, error);
+  });
+}
+
 export function refreshReceiptBatchPhones(batchId: number, orders: SheetOrderRow[]) {
   const overview = getReceiptBatchOverview(batchId);
   if (!overview) throw new ReceiptBatchError("batch-not-found", "Dnevna lista nije pronađena.");

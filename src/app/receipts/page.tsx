@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { refreshReceiptPhonesAction } from "@/app/actions/receipts";
+import { ReceiptDeleteButton } from "@/components/receipt-delete-button";
 import { ReceiptListClient } from "@/components/receipt-list-client";
 import { ReceiptPdfUpload } from "@/components/receipt-pdf-upload";
 import { ReceiptWorkbookUpload } from "@/components/receipt-workbook-upload";
@@ -17,6 +18,7 @@ type Params = {
   duplicate?: string;
   pdfs?: string;
   phones?: string;
+  removed?: string;
 };
 
 function ArrowIcon() {
@@ -39,10 +41,13 @@ function getNotice(params: Params) {
     "pdf-locked": "PDF dokumenti se ne mogu zamijeniti nakon slanja.",
     "pdf-upload-failed": "PDF dokumenti nisu sačuvani.",
     "phone-refresh-failed": "Telefoni nisu osvježeni iz Google Sheetsa.",
+    "delete-locked": "Lista sa poslanim računima se ne može obrisati.",
+    "delete-failed": "Dnevna lista nije obrisana.",
   };
   if (params.error) return { tone: "error", text: errors[params.error] ?? "Radnja nije završena. Pokušajte ponovo." };
   if (params.pdfs) return { tone: "success", text: `${params.pdfs} PDF dokumenata povezano sa kupcima.` };
   if (params.phones) return { tone: "success", text: `${params.phones} telefona pronađeno u Orders sheetu.` };
+  if (params.removed) return { tone: "success", text: "Dnevna lista je obrisana." };
   if (params.imported) return {
     tone: "success",
     text: params.duplicate ? "Ovaj Excel je već uvezen u današnju listu." : "Današnja lista kupaca je kreirana.",
@@ -97,10 +102,13 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
                 <p className="text-xs uppercase tracking-[0.16em] text-sky-200">Lista za {formatCollectionDate(overview.batch.collectionDate)}</p>
                 <p className="mt-1 truncate text-sm text-neutral-500">{overview.batch.originalName}</p>
               </div>
-              <form action={refreshReceiptPhonesAction}>
-                <input type="hidden" name="batchId" value={overview.batch.id} />
-                <button type="submit" className="min-h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-neutral-200 transition hover:bg-white/[0.08] sm:w-auto">Osvježi telefone</button>
-              </form>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <form action={refreshReceiptPhonesAction}>
+                  <input type="hidden" name="batchId" value={overview.batch.id} />
+                  <button type="submit" className="min-h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-neutral-200 transition hover:bg-white/[0.08] sm:w-auto">Osvježi telefone</button>
+                </form>
+                <ReceiptDeleteButton batchId={overview.batch.id} />
+              </div>
             </section>
 
             <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

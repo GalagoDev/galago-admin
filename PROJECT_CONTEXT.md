@@ -170,6 +170,7 @@ This was already being implemented for order list pages.
 - Relative storage/database paths are anchored outside Hostinger's versioned `hbuilds` release folders so redeploys cannot erase receipt state.
 - Direct Viber delivery by phone number requires Viber Business Messages through an approved provider. A normal Viber bot only reaches subscribed Viber user IDs and must not be used as a fake substitute.
 - Viber sending remains locked until a Business Messages provider, approved sender/template, and credentials are configured.
+- An unsent receipt list can be removed from the app with inline confirmation; deleting it also removes its uploaded PDFs but never changes Google Sheets.
 
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
