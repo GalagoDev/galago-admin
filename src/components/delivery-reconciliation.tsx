@@ -8,6 +8,7 @@ import {
   previewDeliveryWorkbookAction,
   type DeliveryPreviewState,
 } from "@/app/actions/delivery";
+import { EXCEL_FILE_ACCEPT } from "@/lib/excel-file";
 
 const INITIAL_STATE: DeliveryPreviewState = {
   status: "idle",
@@ -71,7 +72,7 @@ export function DeliveryReconciliation() {
           <input
             type="file"
             name="workbook"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept={EXCEL_FILE_ACCEPT}
             required
             className="block min-h-11 w-full cursor-pointer rounded-lg border border-white/10 bg-black/20 text-sm text-neutral-400 file:mr-3 file:min-h-11 file:border-0 file:border-r file:border-white/10 file:bg-white/[0.06] file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-white/[0.1]"
           />

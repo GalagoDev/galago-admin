@@ -151,7 +151,7 @@ This was already being implemented for order list pages.
 ### Delivery outcome workflow
 - The UI has one active-delivery concept: `Na dostavi`; the old `Nedostavljene` route redirects there.
 - `Na dostavi` reads the existing `Undelivered orders` sheet.
-- Courier `.xlsx` reports are uploaded on `Na dostavi`, previewed, and confirmed before any Sheet mutation.
+- Courier `.xls` and `.xlsx` reports are uploaded on `Na dostavi`, previewed, and confirmed before any Sheet mutation.
 - Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
 - Confirmed deliveries move from `Undelivered orders` to `Delivered orders`.
 - `Povrati` has an autocomplete over active `Na dostavi` customers; selecting a customer moves that exact order to the return history.
@@ -161,7 +161,7 @@ This was already being implemented for order list pages.
 
 ### Daily receipt workflow
 - `Računi` is a separate operational panel; it does not replace Google Sheets or reintroduce the old PDF-first order workflow.
-- A courier `.xlsx` creates a batch for the current Sarajevo date, regardless of shipment dates inside the document.
+- A courier `.xls` or `.xlsx` creates a batch for the current Sarajevo date, regardless of shipment dates inside the document.
 - Required courier columns are `datum_slanja`, `primaoc`, `primaoc_mjesto`, `iznos_otk`, and `Ref1`.
 - Customers are sorted by `datum_slanja` from oldest to newest, with original Excel row order used as the tie-breaker.
 - Phone numbers are matched from full `Orders` sheet history and can be refreshed after Google Sheets is edited.

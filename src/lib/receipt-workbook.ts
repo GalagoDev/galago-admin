@@ -1,4 +1,5 @@
-import { readSheet } from "read-excel-file/node";
+import { isExcelWorkbook } from "@/lib/excel-file";
+import { readFirstWorksheet } from "@/lib/excel-workbook";
 
 const MAX_WORKBOOK_BYTES = 5 * 1024 * 1024;
 
@@ -64,13 +65,13 @@ function parseShipmentDate(value: unknown) {
 }
 
 export async function parseReceiptWorkbook(file: File): Promise<ReceiptWorkbookRow[]> {
-  if (!file.name.toLowerCase().endsWith(".xlsx")) {
-    throw new Error("Odaberite Excel .xlsx dokument.");
+  if (!isExcelWorkbook(file.name)) {
+    throw new Error("Odaberite Excel .xls ili .xlsx dokument.");
   }
   if (file.size === 0) throw new Error("Excel dokument je prazan.");
   if (file.size > MAX_WORKBOOK_BYTES) throw new Error("Excel dokument može imati najviše 5 MB.");
 
-  const rows = await readSheet(Buffer.from(await file.arrayBuffer()));
+  const rows = await readFirstWorksheet(file);
   const headerRowIndex = rows.findIndex((row) => row.some((cell) => normalizeHeader(cell) === "primaoc"));
   if (headerRowIndex === -1) throw new Error("Kolona 'primaoc' nije pronađena u dokumentu.");
 
