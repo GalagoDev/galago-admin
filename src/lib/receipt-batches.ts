@@ -35,6 +35,8 @@ export type ReceiptRecipient = {
   matchStatus: string;
   matchReason: string;
   pdfOriginalName: string;
+  pdfHash: string;
+  linkExpiresAt: string;
   sendStatus: string;
   sendError: string;
 };
@@ -126,6 +128,8 @@ function mapRecipient(row: Record<string, unknown>): ReceiptRecipient {
     matchStatus: String(row.match_status),
     matchReason: String(row.match_reason ?? ""),
     pdfOriginalName: String(row.pdf_original_name ?? ""),
+    pdfHash: String(row.pdf_hash ?? ""),
+    linkExpiresAt: String(row.link_expires_at ?? ""),
     sendStatus: String(row.send_status),
     sendError: String(row.send_error ?? ""),
   };
@@ -332,6 +336,7 @@ export async function saveReceiptPdfs(batchId: number, uploadedFiles: File[]) {
   const update = db.prepare(`
     UPDATE receipt_recipients
     SET pdf_original_name = ?, pdf_stored_name = ?, pdf_stored_path = ?, pdf_hash = ?,
+        pdf_uploaded_at = CURRENT_TIMESTAMP, link_expires_at = datetime('now', '+90 days'),
         send_status = CASE WHEN COALESCE(phone, '') != '' THEN 'ready' ELSE 'blocked' END,
         send_error = NULL, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND batch_id = ?

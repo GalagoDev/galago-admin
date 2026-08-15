@@ -85,6 +85,8 @@ export function getDb() {
       pdf_stored_name TEXT,
       pdf_stored_path TEXT,
       pdf_hash TEXT,
+      pdf_uploaded_at TEXT,
+      link_expires_at TEXT,
       send_status TEXT NOT NULL DEFAULT 'pending_pdf',
       provider TEXT,
       provider_message_id TEXT,
@@ -104,6 +106,15 @@ export function getDb() {
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");
   ensureColumn(database, "orders", "document_id", "ALTER TABLE orders ADD COLUMN document_id INTEGER");
+  ensureColumn(database, "receipt_recipients", "pdf_uploaded_at", "ALTER TABLE receipt_recipients ADD COLUMN pdf_uploaded_at TEXT");
+  ensureColumn(database, "receipt_recipients", "link_expires_at", "ALTER TABLE receipt_recipients ADD COLUMN link_expires_at TEXT");
+  database.exec(`
+    UPDATE receipt_recipients
+    SET pdf_uploaded_at = COALESCE(pdf_uploaded_at, updated_at),
+        link_expires_at = COALESCE(link_expires_at, datetime(COALESCE(pdf_uploaded_at, updated_at), '+90 days'))
+    WHERE pdf_stored_path IS NOT NULL
+      AND (pdf_uploaded_at IS NULL OR link_expires_at IS NULL)
+  `);
 
   return database;
 }

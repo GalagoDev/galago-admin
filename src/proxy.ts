@@ -6,7 +6,7 @@ const AUTH_COOKIE = "store-admin-session";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/_next") || pathname === "/login" || pathname.startsWith("/favicon")) {
+  if (pathname.startsWith("/_next") || pathname === "/login" || pathname.startsWith("/favicon") || pathname.startsWith("/r/")) {
     return NextResponse.next();
   }
 

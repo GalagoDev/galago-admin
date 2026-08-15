@@ -6,6 +6,7 @@ import { ReceiptListClient } from "@/components/receipt-list-client";
 import { ReceiptPdfUpload } from "@/components/receipt-pdf-upload";
 import { ReceiptWorkbookUpload } from "@/components/receipt-workbook-upload";
 import { getReceiptBatchOverview, getRecentReceiptBatches } from "@/lib/receipt-batches";
+import { createReceiptDownloadPath } from "@/lib/receipt-links";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -153,7 +154,22 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
                 </div>
                 <p className="shrink-0 text-sm font-medium text-emerald-200">{new Intl.NumberFormat("bs-BA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(overview.totals.amount)} KM</p>
               </div>
-              <ReceiptListClient rows={overview.recipients} />
+              <ReceiptListClient
+                rows={overview.recipients.map((row) => ({
+                  id: row.id,
+                  position: row.position,
+                  recipient: row.recipient,
+                  city: row.city,
+                  amount: row.amount,
+                  reference: row.reference,
+                  phone: row.phone,
+                  matchStatus: row.matchStatus,
+                  matchReason: row.matchReason,
+                  pdfOriginalName: row.pdfOriginalName,
+                  downloadPath: createReceiptDownloadPath(row),
+                  sendStatus: row.sendStatus,
+                }))}
+              />
             </section>
           </>
         ) : (

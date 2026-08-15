@@ -15,6 +15,7 @@ export type ReceiptListRow = {
   matchStatus: string;
   matchReason: string;
   pdfOriginalName: string;
+  downloadPath: string;
   sendStatus: string;
 };
 
@@ -34,6 +35,17 @@ function statusLabel(row: ReceiptListRow) {
 export function ReceiptListClient({ rows }: { rows: ReceiptListRow[] }) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [copyResult, setCopyResult] = useState<{ id: number; success: boolean } | null>(null);
+
+  async function copyDownloadLink(row: ReceiptListRow) {
+    try {
+      await navigator.clipboard.writeText(new URL(row.downloadPath, window.location.origin).toString());
+      setCopyResult({ id: row.id, success: true });
+    } catch {
+      setCopyResult({ id: row.id, success: false });
+    }
+    window.setTimeout(() => setCopyResult((current) => current?.id === row.id ? null : current), 2200);
+  }
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -76,6 +88,25 @@ export function ReceiptListClient({ rows }: { rows: ReceiptListRow[] }) {
                 <dt className="text-neutral-500">Telefon</dt><dd className={row.phone ? "break-all text-neutral-200" : "text-amber-200"}>{row.phone ? `+${row.phone}` : "Nije pronađen"}</dd>
                 <dt className="text-neutral-500">Status</dt><dd className={status.className}>{status.text}</dd>
               </dl>
+              {row.downloadPath ? (
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3">
+                  <button
+                    type="button"
+                    onClick={() => void copyDownloadLink(row)}
+                    className={`min-h-11 rounded-lg border px-3 text-xs font-medium transition ${copyResult?.id === row.id && !copyResult.success ? "border-red-300/25 bg-red-300/10 text-red-100" : "border-white/10 bg-white/[0.04] text-neutral-200 hover:bg-white/[0.08]"}`}
+                  >
+                    {copyResult?.id === row.id ? (copyResult.success ? "Kopirano" : "Greška") : "Kopiraj link"}
+                  </button>
+                  <a
+                    href={row.downloadPath}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-sky-200"
+                  >
+                    Otvori PDF
+                  </a>
+                </div>
+              ) : null}
             </article>
           );
         })}
@@ -83,21 +114,42 @@ export function ReceiptListClient({ rows }: { rows: ReceiptListRow[] }) {
 
       {visible.length > 0 ? (
         <div className="hidden overflow-hidden rounded-lg border border-white/10 xl:block" role="table" aria-label="Lista računa">
-          <div className="grid grid-cols-[52px_minmax(170px,1.25fr)_minmax(140px,1fr)_120px_minmax(150px,1fr)_150px_110px] gap-3 border-b border-white/10 bg-white/[0.04] px-3 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-neutral-500" role="row">
-            <span>#</span><span>Primalac</span><span>Primaoc mjesto</span><span>Iznos otk.</span><span>Ref1</span><span>Telefon</span><span>Status</span>
+          <div className="grid grid-cols-[44px_minmax(150px,1.2fr)_minmax(110px,.85fr)_105px_minmax(130px,1fr)_130px_190px] gap-3 border-b border-white/10 bg-white/[0.04] px-3 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-neutral-500" role="row">
+            <span>#</span><span>Primalac</span><span>Primaoc mjesto</span><span>Iznos otk.</span><span>Ref1</span><span>Telefon</span><span>Status / račun</span>
           </div>
           <div className="divide-y divide-white/[0.06]">
             {visible.map((row) => {
               const status = statusLabel(row);
               return (
-                <div key={row.id} className="grid grid-cols-[52px_minmax(170px,1.25fr)_minmax(140px,1fr)_120px_minmax(150px,1fr)_150px_110px] items-start gap-3 px-3 py-3 text-sm transition hover:bg-white/[0.025]" role="row">
+                <div key={row.id} className="grid grid-cols-[44px_minmax(150px,1.2fr)_minmax(110px,.85fr)_105px_minmax(130px,1fr)_130px_190px] items-start gap-3 px-3 py-3 text-sm transition hover:bg-white/[0.025]" role="row">
                   <span className="text-xs text-neutral-600">{row.position}</span>
                   <span className="break-words font-semibold text-white">{row.recipient}</span>
                   <span className="break-words text-neutral-300">{row.city || "-"}</span>
                   <span className="font-medium text-emerald-200">{formatAmount(row.amount)}</span>
                   <span className="break-words text-neutral-300">{row.reference || "-"}</span>
                   <span className={row.phone ? "break-all text-neutral-200" : "text-amber-200"}>{row.phone ? `+${row.phone}` : "Nije pronađen"}</span>
-                  <span className={status.className} title={row.matchReason}>{status.text}</span>
+                  <span className="min-w-0">
+                    <span className={`block text-xs ${status.className}`} title={row.matchReason}>{status.text}</span>
+                    {row.downloadPath ? (
+                      <span className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyDownloadLink(row)}
+                          className={`min-h-10 rounded-lg border px-3 text-xs font-medium transition ${copyResult?.id === row.id && !copyResult.success ? "border-red-300/25 bg-red-300/10 text-red-100" : "border-white/10 bg-white/[0.04] text-neutral-200 hover:bg-white/[0.08]"}`}
+                        >
+                          {copyResult?.id === row.id ? (copyResult.success ? "Kopirano" : "Greška") : "Kopiraj"}
+                        </button>
+                        <a
+                          href={row.downloadPath}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-sky-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-sky-200"
+                        >
+                          Otvori
+                        </a>
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
               );
             })}
