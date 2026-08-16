@@ -98,10 +98,59 @@ export function getDb() {
       UNIQUE(batch_id, position)
     );
 
+    CREATE TABLE IF NOT EXISTS containers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      container_number TEXT NOT NULL UNIQUE,
+      carrier_code TEXT NOT NULL DEFAULT 'OTHERS',
+      carrier_name TEXT,
+      destination_port TEXT NOT NULL DEFAULT 'Rijeka',
+      destination_unlocode TEXT NOT NULL DEFAULT 'HRRJK',
+      provider TEXT NOT NULL DEFAULT 'shipsgo',
+      provider_request_id TEXT,
+      tracking_status TEXT NOT NULL DEFAULT 'pending',
+      status_label TEXT,
+      vessel_name TEXT,
+      voyage_number TEXT,
+      departure_port TEXT,
+      reported_destination_port TEXT,
+      departure_at TEXT,
+      eta TEXT,
+      actual_arrival_at TEXT,
+      last_location TEXT,
+      latitude REAL,
+      longitude REAL,
+      delay_days INTEGER,
+      provider_updated_at TEXT,
+      last_checked_at TEXT,
+      last_error TEXT,
+      raw_snapshot TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS container_updates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      container_id INTEGER NOT NULL,
+      snapshot_hash TEXT NOT NULL,
+      status_label TEXT,
+      eta TEXT,
+      location TEXT,
+      vessel_name TEXT,
+      voyage_number TEXT,
+      provider_updated_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(container_id) REFERENCES containers(id) ON DELETE CASCADE,
+      UNIQUE(container_id, snapshot_hash)
+    );
+
     CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
       ON receipt_batches(collection_date, id DESC);
     CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx
       ON receipt_recipients(batch_id, position);
+    CREATE INDEX IF NOT EXISTS containers_status_idx
+      ON containers(tracking_status, eta);
+    CREATE INDEX IF NOT EXISTS container_updates_container_idx
+      ON container_updates(container_id, id DESC);
   `);
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");

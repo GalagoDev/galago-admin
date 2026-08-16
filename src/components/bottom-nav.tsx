@@ -46,6 +46,15 @@ function ReceiptIcon() {
   );
 }
 
+function ContainerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M3.5 7.5h17v9h-17v-9Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.5 7.5v9M12 7.5v9M16.5 7.5v9M5.5 19h13" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
 
@@ -54,6 +63,7 @@ export function BottomNav() {
   const mobileItems = [
     { href: "/", label: "Narudzbe", icon: <OrdersIcon />, active: pathname === "/" || pathname === "/orders" },
     { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" || pathname === "/undelivered" },
+    { href: "/containers", label: "Kontejneri", icon: <ContainerIcon />, active: pathname === "/containers" },
     { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
   ];
@@ -63,6 +73,7 @@ export function BottomNav() {
     { href: "/orders", label: "Nove narudžbe", icon: <OrdersIcon />, active: pathname === "/orders" },
     { href: "/in-transit", label: "Na dostavi", icon: <BoxIcon />, active: pathname === "/in-transit" },
     { href: "/returns", label: "Povrati", icon: <BoxIcon />, active: pathname === "/returns" },
+    { href: "/containers", label: "Kontejneri", icon: <ContainerIcon />, active: pathname === "/containers" },
     { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
   ];
@@ -70,7 +81,7 @@ export function BottomNav() {
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pb-4 sm:max-w-lg sm:px-5 lg:hidden">
-        <div className="mx-auto grid grid-cols-4 gap-1 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="mx-auto grid grid-cols-5 gap-1 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           {mobileItems.map((item) => (
             <Link
               key={item.href}
@@ -83,7 +94,7 @@ export function BottomNav() {
               }`}
             >
               {item.icon}
-              <span className="mt-1 max-w-full truncate text-[10px] font-medium sm:text-[11px]">{item.label}</span>
+              <span className="mt-1 whitespace-nowrap text-[9px] font-medium sm:text-[10px]">{item.label}</span>
             </Link>
           ))}
         </div>
