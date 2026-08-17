@@ -127,6 +127,7 @@ Remembered current direction:
 - bottom nav labels:
   - `Narudzbe`
   - `Na dostavi`
+  - `Reklamacije`
   - `Računi`
   - `Statistika`
 - three top dashboard blocks:
@@ -173,6 +174,14 @@ This was already being implemented for order list pages.
 - Direct Viber delivery by phone number requires Viber Business Messages through an approved provider. A normal Viber bot only reaches subscribed Viber user IDs and must not be used as a fake substitute.
 - Viber sending remains locked until a Business Messages provider, approved sender/template, and credentials are configured.
 - An unsent receipt list can be removed from the app with inline confirmation; deleting it also removes its uploaded PDFs but never changes Google Sheets.
+
+### Customer reklamacije workflow
+- `Reklamacije` is an authenticated operational panel backed by persistent SQLite storage.
+- The panel lists customer claim references, request type, order number, contact details, address, description, uploaded evidence, and processing status.
+- Staff can search by customer, phone, email, order number, or claim reference.
+- Supported statuses are `new`, `in_review`, `approved`, `rejected`, and `resolved`.
+- Uploaded evidence remains under the persistent `storage/return-claims` directory and is only served through an authenticated app route.
+- The claims tables and files predate the GitHub implementation; preserving them across deploys is required.
 
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.

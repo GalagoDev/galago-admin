@@ -98,10 +98,50 @@ export function getDb() {
       UNIQUE(batch_id, position)
     );
 
+    CREATE TABLE IF NOT EXISTS customer_return_claims (
+      id TEXT PRIMARY KEY,
+      reference TEXT NOT NULL UNIQUE,
+      request_type TEXT NOT NULL,
+      order_number TEXT NOT NULL,
+      customer_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      address TEXT NOT NULL,
+      city TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_return_files (
+      id TEXT PRIMARY KEY,
+      claim_id TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      stored_name TEXT NOT NULL,
+      stored_path TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(claim_id) REFERENCES customer_return_claims(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_return_rate_limits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ip_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
       ON receipt_batches(collection_date, id DESC);
     CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx
       ON receipt_recipients(batch_id, position);
+    CREATE INDEX IF NOT EXISTS customer_return_claims_created_idx
+      ON customer_return_claims(created_at DESC);
+    CREATE INDEX IF NOT EXISTS customer_return_files_claim_idx
+      ON customer_return_files(claim_id, created_at);
+    CREATE INDEX IF NOT EXISTS customer_return_rate_limits_idx
+      ON customer_return_rate_limits(ip_hash, created_at DESC);
   `);
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");
