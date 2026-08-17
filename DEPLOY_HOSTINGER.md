@@ -125,28 +125,7 @@ OPENAI_ORDER_MODEL=gpt-4.1-mini
 
 `OPENAI_ORDER_MODEL` is optional and defaults to `gpt-4.1-mini`.
 
-## 10. Container tracking
-
-The `/containers` panel stores container numbers locally and uses ShipsGo for live
-voyage data. Add these production environment variables:
-
-```bash
-SHIPSGO_AUTH_CODE=your_shipsgo_api_key
-CONTAINER_CRON_SECRET=replace_with_a_long_random_secret
-```
-
-Schedule this command every six hours in Hostinger Cron Jobs so active containers
-are refreshed without opening the panel:
-
-```bash
-curl -fsS -H "Authorization: Bearer $CONTAINER_CRON_SECRET" \
-  https://magenta-tarsier-949777.hostingersite.com/api/containers/refresh
-```
-
-The refresh endpoint only checks containers whose last provider check is at least
-six hours old. A provider failure preserves the last known ETA and status.
-
-## 11. PM2 useful commands
+## 10. PM2 useful commands
 ```bash
 pm2 status
 pm2 logs store-admin

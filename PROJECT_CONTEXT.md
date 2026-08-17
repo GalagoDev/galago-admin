@@ -127,7 +127,6 @@ Remembered current direction:
 - bottom nav labels:
   - `Narudzbe`
   - `Na dostavi`
-  - `Kontejneri`
   - `Računi`
   - `Statistika`
 - three top dashboard blocks:
@@ -175,16 +174,6 @@ This was already being implemented for order list pages.
 - Viber sending remains locked until a Business Messages provider, approved sender/template, and credentials are configured.
 - An unsent receipt list can be removed from the app with inline confirmation; deleting it also removes its uploaded PDFs but never changes Google Sheets.
 
-### Container tracking workflow
-- `Kontejneri` is a separate operational panel and does not change the Google Sheets order workflow.
-- Container numbers are validated with the ISO 6346 check digit before they are saved.
-- The destination is fixed to Rijeka (`HRRJK`).
-- Container state and update history are stored in the same persistent SQLite database used by receipt batches.
-- ShipsGo is the tracking provider. `SHIPSGO_AUTH_CODE` enables provider registration and ETA/location refreshes.
-- `CONTAINER_CRON_SECRET` protects `/api/containers/refresh`; schedule that endpoint every six hours for automatic updates.
-- A failed provider refresh keeps the last known ETA/status and records the error instead of clearing operational data.
-- The panel works without a provider key for adding/removing containers, but ETA and live voyage details remain pending until ShipsGo is connected.
-
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
 
@@ -204,7 +193,6 @@ Connected / active:
 - Telegram order extraction only populates Primalac, Broj telefona, Grad, Adresa, Artikal
 - Telegram Artikal comes from the image caption/text below the image when present; otherwise the last meaningful text line
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
-- persistent container panel with ShipsGo-ready ETA/history tracking to Rijeka
 
 Not fully mature yet:
 - true stats page logic
