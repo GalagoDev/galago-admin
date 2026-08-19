@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
+
+import { updateReceiptManualSendStatusAction } from "@/app/actions/receipts";
 
 const PAGE_SIZE = 25;
 
@@ -17,34 +20,98 @@ export type ReceiptListRow = {
   pdfOriginalName: string;
   downloadPath: string;
   sendStatus: string;
+  provider: string;
 };
 
 function formatAmount(value: number | null) {
   if (value === null) return "-";
-  return `${new Intl.NumberFormat("bs-BA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} KM`;
+  const [whole, decimals] = value.toFixed(2).split(".");
+  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${decimals} KM`;
 }
 
 function statusLabel(row: ReceiptListRow) {
+  if (row.sendStatus === "sent") {
+    return row.provider === "manual_viber"
+      ? { text: "Poslano ručno", className: "text-emerald-200" }
+      : { text: "Poslano", className: "text-emerald-200" };
+  }
   if (!row.phone) return { text: "Nema telefona", className: "text-amber-200" };
   if (!row.pdfOriginalName) return { text: "Čeka PDF", className: "text-neutral-500" };
-  if (row.sendStatus === "sent") return { text: "Poslano", className: "text-emerald-200" };
+  if (!row.downloadPath) return { text: "Link istekao", className: "text-amber-200" };
   if (row.sendStatus === "failed") return { text: "Greška", className: "text-red-200" };
   return { text: "Spremno", className: "text-sky-200" };
+}
+
+function ManualStatusSubmitButton({ undo = false }: { undo?: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={`min-h-10 w-full rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${undo ? "border-white/10 bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08]" : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/15"}`}
+    >
+      {pending ? "Čuvam..." : undo ? "Vrati u spremno" : "Označi poslano"}
+    </button>
+  );
 }
 
 export function ReceiptListClient({ rows }: { rows: ReceiptListRow[] }) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [copyResult, setCopyResult] = useState<{ id: number; success: boolean } | null>(null);
+  const [copyResult, setCopyResult] = useState<{ id: number; kind: "phone" | "message"; success: boolean } | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
-  async function copyDownloadLink(row: ReceiptListRow) {
+  function toggleViberControls(id: number) {
+    setExpandedRows((current) => ({ ...current, [id]: !current[id] }));
+  }
+
+  function receiptMessage(row: ReceiptListRow) {
+    const link = new URL(row.downloadPath, window.location.origin).toString();
+    return `Dobar dan, ${row.recipient}.\n\nVaš PDF račun je spreman:\n${link}\n\nHvala,\nGalago`;
+  }
+
+  async function copyForViber(row: ReceiptListRow, kind: "phone" | "message") {
     try {
-      await navigator.clipboard.writeText(new URL(row.downloadPath, window.location.origin).toString());
-      setCopyResult({ id: row.id, success: true });
+      const value = kind === "phone" ? `+${row.phone}` : receiptMessage(row);
+      await navigator.clipboard.writeText(value);
+      setCopyResult({ id: row.id, kind, success: true });
+      window.open("viber://", "_self");
     } catch {
-      setCopyResult({ id: row.id, success: false });
+      setCopyResult({ id: row.id, kind, success: false });
     }
     window.setTimeout(() => setCopyResult((current) => current?.id === row.id ? null : current), 2200);
+  }
+
+  function viberControls(row: ReceiptListRow) {
+    const manuallySent = row.sendStatus === "sent" && row.provider === "manual_viber";
+    const phoneResult = copyResult?.id === row.id && copyResult.kind === "phone" ? copyResult : null;
+    const messageResult = copyResult?.id === row.id && copyResult.kind === "message" ? copyResult : null;
+
+    return (
+      <div className="mt-2.5 space-y-2 rounded-lg border border-white/[0.08] bg-black/20 p-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => void copyForViber(row, "phone")}
+            className={`min-h-10 rounded-lg border px-2 py-2 text-xs font-medium transition ${phoneResult && !phoneResult.success ? "border-red-300/25 bg-red-300/10 text-red-100" : "border-violet-300/20 bg-violet-300/10 text-violet-100 hover:bg-violet-300/15"}`}
+          >
+            {phoneResult ? (phoneResult.success ? "Broj kopiran" : "Greška") : "1. Broj + Viber"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void copyForViber(row, "message")}
+            className={`min-h-10 rounded-lg border px-2 py-2 text-xs font-medium transition ${messageResult && !messageResult.success ? "border-red-300/25 bg-red-300/10 text-red-100" : "border-sky-300/20 bg-sky-300/10 text-sky-100 hover:bg-sky-300/15"}`}
+          >
+            {messageResult ? (messageResult.success ? "Poruka kopirana" : "Greška") : "2. Poruka + Viber"}
+          </button>
+        </div>
+        <form action={updateReceiptManualSendStatusAction}>
+          <input type="hidden" name="recipientId" value={row.id} />
+          <input type="hidden" name="status" value={manuallySent ? "ready" : "sent"} />
+          <ManualStatusSubmitButton undo={manuallySent} />
+        </form>
+      </div>
+    );
   }
 
   const filtered = useMemo(() => {
@@ -89,23 +156,29 @@ export function ReceiptListClient({ rows }: { rows: ReceiptListRow[] }) {
                 <dt className="text-neutral-500">Status</dt><dd className={status.className}>{status.text}</dd>
               </dl>
               {row.downloadPath ? (
-                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3">
-                  <button
-                    type="button"
-                    onClick={() => void copyDownloadLink(row)}
-                    className={`min-h-11 rounded-lg border px-3 text-xs font-medium transition ${copyResult?.id === row.id && !copyResult.success ? "border-red-300/25 bg-red-300/10 text-red-100" : "border-white/10 bg-white/[0.04] text-neutral-200 hover:bg-white/[0.08]"}`}
-                  >
-                    {copyResult?.id === row.id ? (copyResult.success ? "Kopirano" : "Greška") : "Kopiraj link"}
-                  </button>
-                  <a
-                    href={row.downloadPath}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-sky-200"
-                  >
-                    Otvori PDF
-                  </a>
-                </div>
+                <>
+                  <div className={`mt-3 grid gap-2 border-t border-white/[0.06] pt-3 ${row.phone ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {row.phone ? (
+                      <button
+                        type="button"
+                        aria-expanded={Boolean(expandedRows[row.id])}
+                        onClick={() => toggleViberControls(row.id)}
+                        className="min-h-11 rounded-lg border border-violet-300/20 bg-violet-300/10 px-3 text-xs font-semibold text-violet-100 transition hover:bg-violet-300/15"
+                      >
+                        {expandedRows[row.id] ? "Zatvori Viber" : "Viber"}
+                      </button>
+                    ) : null}
+                    <a
+                      href={row.downloadPath}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-sky-200"
+                    >
+                      Otvori PDF
+                    </a>
+                  </div>
+                  {row.phone && expandedRows[row.id] ? viberControls(row) : null}
+                </>
               ) : null}
             </article>
           );
@@ -128,28 +201,34 @@ export function ReceiptListClient({ rows }: { rows: ReceiptListRow[] }) {
                   <span className="font-medium text-emerald-200">{formatAmount(row.amount)}</span>
                   <span className="break-words text-neutral-300">{row.reference || "-"}</span>
                   <span className={row.phone ? "break-all text-neutral-200" : "text-amber-200"}>{row.phone ? `+${row.phone}` : "Nije pronađen"}</span>
-                  <span className="min-w-0">
+                  <div className="min-w-0">
                     <span className={`block text-xs ${status.className}`} title={row.matchReason}>{status.text}</span>
                     {row.downloadPath ? (
-                      <span className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void copyDownloadLink(row)}
-                          className={`min-h-10 rounded-lg border px-3 text-xs font-medium transition ${copyResult?.id === row.id && !copyResult.success ? "border-red-300/25 bg-red-300/10 text-red-100" : "border-white/10 bg-white/[0.04] text-neutral-200 hover:bg-white/[0.08]"}`}
-                        >
-                          {copyResult?.id === row.id ? (copyResult.success ? "Kopirano" : "Greška") : "Kopiraj"}
-                        </button>
-                        <a
-                          href={row.downloadPath}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-sky-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-sky-200"
-                        >
-                          Otvori
-                        </a>
-                      </span>
+                      <div className="mt-2">
+                        <div className={`grid gap-2 ${row.phone ? "grid-cols-2" : "grid-cols-1"}`}>
+                          {row.phone ? (
+                            <button
+                              type="button"
+                              aria-expanded={Boolean(expandedRows[row.id])}
+                              onClick={() => toggleViberControls(row.id)}
+                              className="min-h-10 rounded-lg border border-violet-300/20 bg-violet-300/10 px-2 text-xs font-semibold text-violet-100 transition hover:bg-violet-300/15"
+                            >
+                              {expandedRows[row.id] ? "Zatvori" : "Viber"}
+                            </button>
+                          ) : null}
+                          <a
+                            href={row.downloadPath}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-sky-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-sky-200"
+                          >
+                            Otvori
+                          </a>
+                        </div>
+                        {row.phone && expandedRows[row.id] ? viberControls(row) : null}
+                      </div>
                     ) : null}
-                  </span>
+                  </div>
                 </div>
               );
             })}

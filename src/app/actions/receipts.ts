@@ -11,6 +11,7 @@ import {
   ReceiptBatchError,
   refreshReceiptBatchPhones,
   saveReceiptPdfs,
+  updateReceiptManualSendStatus,
 } from "@/lib/receipt-batches";
 import { parseReceiptWorkbook } from "@/lib/receipt-workbook";
 
@@ -90,4 +91,15 @@ export async function deleteReceiptBatchAction(formData: FormData) {
 
   revalidatePath("/receipts");
   redirect("/receipts?removed=1");
+}
+
+export async function updateReceiptManualSendStatusAction(formData: FormData) {
+  const recipientId = Number(formData.get("recipientId"));
+  const status = String(formData.get("status") || "");
+  if (!Number.isInteger(recipientId) || recipientId < 1 || !["sent", "ready"].includes(status)) {
+    throw new Error("Neispravan zahtjev za status računa.");
+  }
+
+  updateReceiptManualSendStatus(recipientId, status === "sent");
+  revalidatePath("/receipts");
 }

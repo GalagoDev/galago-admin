@@ -38,6 +38,7 @@ export type ReceiptRecipient = {
   pdfHash: string;
   linkExpiresAt: string;
   sendStatus: string;
+  provider: string;
   sendError: string;
 };
 
@@ -131,6 +132,7 @@ function mapRecipient(row: Record<string, unknown>): ReceiptRecipient {
     pdfHash: String(row.pdf_hash ?? ""),
     linkExpiresAt: String(row.link_expires_at ?? ""),
     sendStatus: String(row.send_status),
+    provider: String(row.provider ?? ""),
     sendError: String(row.send_error ?? ""),
   };
 }
@@ -213,6 +215,59 @@ export function getReceiptBatchOverview(batchId?: number): ReceiptBatchOverview 
 export function getRecentReceiptBatches(limit = 8) {
   const db = getDb();
   return (db.prepare("SELECT * FROM receipt_batches ORDER BY id DESC LIMIT ?").all(limit) as Record<string, unknown>[]).map(mapBatch);
+}
+
+export function updateReceiptManualSendStatus(recipientId: number, sent: boolean) {
+  const db = getDb();
+  const recipient = db.prepare(`
+    SELECT id, batch_id, phone, pdf_stored_path, link_expires_at, send_status, provider
+    FROM receipt_recipients
+    WHERE id = ?
+  `).get(recipientId) as {
+    id: number;
+    batch_id: number;
+    phone: string | null;
+    pdf_stored_path: string | null;
+    link_expires_at: string | null;
+    send_status: string;
+    provider: string | null;
+  } | undefined;
+
+  if (!recipient) throw new ReceiptBatchError("recipient-not-found", "Kupac nije pronađen.");
+
+  if (sent) {
+    const expiresAt = recipient.link_expires_at
+      ? Date.parse(`${recipient.link_expires_at.replace(" ", "T")}Z`)
+      : Number.NaN;
+    if (!recipient.phone || !recipient.pdf_stored_path || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      throw new ReceiptBatchError("manual-send-blocked", "Telefon ili aktivan PDF link nedostaje.");
+    }
+
+    db.prepare(`
+      UPDATE receipt_recipients
+      SET send_status = 'sent', provider = 'manual_viber', provider_message_id = NULL,
+          sent_at = CURRENT_TIMESTAMP, send_error = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(recipientId);
+  } else {
+    if (recipient.send_status !== "sent" || recipient.provider !== "manual_viber") {
+      throw new ReceiptBatchError("manual-send-locked", "Samo ručno Viber slanje može biti vraćeno.");
+    }
+
+    db.prepare(`
+      UPDATE receipt_recipients
+      SET send_status = CASE
+            WHEN COALESCE(pdf_stored_path, '') = '' THEN 'pending_pdf'
+            WHEN COALESCE(phone, '') = '' THEN 'blocked'
+            ELSE 'ready'
+          END,
+          provider = NULL, provider_message_id = NULL, sent_at = NULL,
+          send_error = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(recipientId);
+  }
+
+  return recipient.batch_id;
 }
 
 export async function deleteReceiptBatch(batchId: number) {

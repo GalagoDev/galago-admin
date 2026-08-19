@@ -136,13 +136,13 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
               />
             </section>
 
-            <section className="mt-5 rounded-[2rem] border border-amber-300/15 bg-amber-300/[0.04] p-4 lg:rounded-lg lg:p-5">
+            <section className="mt-5 rounded-[2rem] border border-emerald-300/15 bg-emerald-300/[0.04] p-4 lg:rounded-lg lg:p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-semibold text-amber-100">Viber Business nije povezan</p>
-                  <p className="mt-1 text-sm text-neutral-400">Slanje će biti dostupno nakon aktivacije poslovnog Viber providera.</p>
+                  <p className="font-semibold text-emerald-100">Ručno Viber slanje</p>
+                  <p className="mt-1 text-sm text-neutral-400">Broj kupca, poruka i privatni PDF link pripremljeni su u listi ispod.</p>
                 </div>
-                <button type="button" disabled className="min-h-11 shrink-0 rounded-lg bg-neutral-700 px-4 py-2.5 text-sm font-semibold text-neutral-400 opacity-70">Pošalji račune</button>
+                <span className="w-fit shrink-0 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-3 py-1.5 text-xs font-medium text-emerald-100">Bez API pretplate</span>
               </div>
             </section>
 
@@ -168,6 +168,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
                   pdfOriginalName: row.pdfOriginalName,
                   downloadPath: createReceiptDownloadPath(row),
                   sendStatus: row.sendStatus,
+                  provider: row.provider,
                 }))}
               />
             </section>

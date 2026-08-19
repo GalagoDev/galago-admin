@@ -69,7 +69,7 @@ function signaturesMatch(actual: string, expected: string) {
 export function createReceiptDownloadPath(source: ReceiptLinkSource) {
   if (!source.id || !source.pdfHash || !source.linkExpiresAt) return "";
   const expires = sqliteTimestampToUnix(source.linkExpiresAt);
-  if (!expires) return "";
+  if (!expires || expires * 1000 <= Date.now()) return "";
 
   const payload = `${source.id}.${expires}.${source.pdfHash}`;
   return `/r/${source.id}.${expires}.${sign(payload)}.pdf`;
