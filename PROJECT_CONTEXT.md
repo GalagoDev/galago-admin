@@ -129,6 +129,7 @@ Remembered current direction:
   - `Na dostavi`
   - `Reklamacije`
   - `Računi`
+  - `Fakture`
   - `Statistika`
 - three top dashboard blocks:
   - `Nove narudžbe`
@@ -183,6 +184,15 @@ This was already being implemented for order list pages.
 - Supported statuses are `new`, `in_review`, `approved`, `rejected`, and `resolved`.
 - Uploaded evidence remains under the persistent `storage/return-claims` directory and is only served through an authenticated app route.
 - The claims tables and files predate the GitHub implementation; preserving them across deploys is required.
+
+### Monthly invoice workflow
+- `Fakture` is a separate authenticated panel for business invoices and monthly payment tracking. It does not change Google Sheets orders and is distinct from customer `Računi`.
+- Invoices are grouped by a selected `YYYY-MM` month; staff can navigate backward or forward, jump directly to a month, and reopen any month with saved invoices.
+- Each entry stores a supplier/title, optional KM amount, protected PDF or image document, paid/unpaid status, and payment timestamp.
+- Paid status is reversible so mistakes can be corrected. Invoice deletion uses inline confirmation and removes both the register entry and its stored document.
+- Duplicate document uploads are blocked within the same month using a file hash.
+- Invoice metadata is stored in SQLite and files remain under persistent `storage/invoices`, outside Hostinger versioned build folders.
+- Invoice documents are served only through the authenticated `/fakture/files/<id>` route.
 
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.

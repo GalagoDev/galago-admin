@@ -25,6 +25,7 @@ const folders = [
   path.join(storageRoot, "pdfs", "sent"),
   path.join(storageRoot, "pdfs", "delivered"),
   path.join(storageRoot, "receipts"),
+  path.join(storageRoot, "invoices"),
   path.join(storageRoot, "return-claims"),
 ];
 
@@ -40,6 +41,7 @@ export function ensureStorage() {
     sentPdfs: path.join(storageRoot, "pdfs", "sent"),
     deliveredPdfs: path.join(storageRoot, "pdfs", "delivered"),
     receiptPdfs: path.join(storageRoot, "receipts"),
+    invoiceFiles: path.join(storageRoot, "invoices"),
     returnClaimFiles: path.join(storageRoot, "return-claims"),
   };
 }
