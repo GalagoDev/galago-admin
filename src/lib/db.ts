@@ -150,6 +150,18 @@ export function getDb() {
       UNIQUE(invoice_month, file_hash)
     );
 
+    CREATE TABLE IF NOT EXISTS telegram_confirmed_orders (
+      chat_id TEXT NOT NULL,
+      preview_message_id INTEGER NOT NULL,
+      source_message_id TEXT NOT NULL,
+      sheet_order_id TEXT NOT NULL UNIQUE,
+      order_json TEXT NOT NULL,
+      deleted_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(chat_id, preview_message_id)
+    );
+
     CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
       ON receipt_batches(collection_date, id DESC);
     CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx
@@ -162,6 +174,8 @@ export function getDb() {
       ON customer_return_rate_limits(ip_hash, created_at DESC);
     CREATE INDEX IF NOT EXISTS invoices_month_idx
       ON invoices(invoice_month DESC, paid, created_at DESC);
+    CREATE INDEX IF NOT EXISTS telegram_confirmed_orders_sheet_idx
+      ON telegram_confirmed_orders(sheet_order_id, deleted_at);
   `);
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");

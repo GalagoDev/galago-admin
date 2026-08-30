@@ -120,10 +120,16 @@ Telegram text/image/photo order extraction uses the OpenAI API. Set:
 
 ```bash
 OPENAI_API_KEY=your_openai_api_key
-OPENAI_ORDER_MODEL=gpt-4.1-mini
+OPENAI_ORDER_MODEL=gpt-5.6-luna
 ```
 
-`OPENAI_ORDER_MODEL` is optional and defaults to `gpt-4.1-mini`.
+`OPENAI_ORDER_MODEL` is optional and defaults to `gpt-5.6-luna` with reasoning
+disabled for low-latency structured order extraction.
+
+Confirmed Telegram orders receive a stable hidden ID in column `K`. Reply with
+`delete`, `obriši`, or `obrisi` directly to the bot's confirmed order message to
+clear that exact order from `Orders` without deleting or shifting the styled row.
+This is supported only for orders confirmed after this feature was deployed.
 
 ## 10. PM2 useful commands
 ```bash

@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
+import { invalidateSheetCache } from "@/lib/google-sheets";
 
 const SHEET_NAME = "Orders";
 const HEADER = [
@@ -29,6 +30,10 @@ type OrderSheetInput = {
   vrijednostPosiljke?: string;
   dop?: string;
   zamjena?: string;
+};
+
+type AppendOrderOptions = {
+  sourceId?: string;
 };
 
 function formatSheetDateLabel(date: Date) {
@@ -260,9 +265,10 @@ async function createOrdersDateBlock(sheets: ReturnType<typeof google.sheets>, s
   });
 }
 
-export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
+export async function appendOrderToOrdersSheet(input: OrderSheetInput, options: AppendOrderOptions = {}) {
   const { sheets, spreadsheetId } = getSheetsClient();
   const targetDate = getTargetWorkdayLabel();
+  const sourceId = String(options.sourceId || "").trim().slice(0, 220);
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -278,6 +284,13 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
   const headerOk = HEADER.every((value, index) => (header[index] ?? "") === value);
   if (!headerOk) {
     throw new Error("Orders sheet header does not match expected layout.");
+  }
+
+  if (sourceId) {
+    const existingRowIndex = rows.findIndex((row, index) => index > 0 && String(row[10] || "").trim() === sourceId);
+    if (existingRowIndex !== -1) {
+      return { created: false, sheetRowNumber: existingRowIndex + 1, sheetOrderId: sourceId };
+    }
   }
 
   const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
@@ -329,12 +342,37 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput) {
     input.vrijednostPosiljke || "",
     input.dop || "",
     input.zamjena || "",
+    sourceId,
   ]];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${targetRowIndex + 1}:J${targetRowIndex + 1}`,
+    range: `'${SHEET_NAME}'!A${targetRowIndex + 1}:K${targetRowIndex + 1}`,
     valueInputOption: "RAW",
     requestBody: { values },
   });
+
+  invalidateSheetCache(SHEET_NAME);
+  return { created: true, sheetRowNumber: targetRowIndex + 1, sheetOrderId: sourceId };
+}
+
+export async function deleteOrderFromOrdersSheet(sheetOrderId: string) {
+  const orderId = String(sheetOrderId || "").trim();
+  if (!orderId) throw new Error("Telegram order ID is missing.");
+
+  const { sheets, spreadsheetId } = getSheetsClient();
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${SHEET_NAME}'!A:K`,
+  });
+  const rows = response.data.values ?? [];
+  const rowIndex = rows.findIndex((row, index) => index > 0 && String(row[10] || "").trim() === orderId);
+  if (rowIndex === -1) return false;
+
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `'${SHEET_NAME}'!A${rowIndex + 1}:K${rowIndex + 1}`,
+  });
+  invalidateSheetCache(SHEET_NAME);
+  return true;
 }

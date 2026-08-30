@@ -9,7 +9,7 @@ import {
   type TelegramOrderDraft,
 } from "@/lib/telegram-orders";
 
-const DEFAULT_MODEL = "gpt-4.1-mini";
+const DEFAULT_MODEL = "gpt-5.6-luna";
 const API_TIMEOUT_MS = 45_000;
 
 const telegramOrderSchema = z
@@ -149,9 +149,10 @@ async function extractWithOpenAI(input: {
     const completion = await client.chat.completions.create(
       {
         model,
-        temperature: 0,
+        reasoning_effort: "none",
+        max_completion_tokens: 500,
         messages: [
-          { role: "system", content: systemPrompt() },
+          { role: "developer", content: systemPrompt() },
           { role: "user", content },
         ],
         response_format: zodResponseFormat(telegramOrderSchema, "telegram_order"),

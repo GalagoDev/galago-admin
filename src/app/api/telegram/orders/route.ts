@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { appendOrderToOrdersSheet } from "@/lib/google-orders";
+import { appendOrderToOrdersSheet, deleteOrderFromOrdersSheet } from "@/lib/google-orders";
+import {
+  getTelegramConfirmedOrder,
+  markTelegramConfirmedOrderDeleted,
+  saveTelegramConfirmedOrder,
+} from "@/lib/telegram-confirmed-orders";
 import { extractTelegramOrderFromImage, extractTelegramOrderFromText } from "@/lib/telegram-openai-orders";
 import {
   cleanupOldTelegramOrderDrafts,
@@ -31,6 +36,13 @@ type TelegramMessage = {
   };
   chat: {
     id: number;
+  };
+  reply_to_message?: {
+    message_id: number;
+    text?: string;
+    chat: {
+      id: number;
+    };
   };
 };
 
@@ -246,11 +258,79 @@ async function handleTextMessage(message: TelegramMessage) {
   return true;
 }
 
+function isDeleteCommand(value: string) {
+  const command = value.trim().toLocaleLowerCase("bs-BA").replace(/[.!]+$/g, "");
+  return ["delete", "/delete", "obriši", "obrisi"].includes(command);
+}
+
+async function handleDeleteReply(message: TelegramMessage) {
+  if (!message.text || !isDeleteCommand(message.text)) return false;
+
+  const repliedMessageId = message.reply_to_message?.message_id;
+  if (!repliedMessageId) {
+    await sendMessage({
+      chat_id: message.chat.id,
+      text: "Za brisanje odgovori sa delete direktno na potvrđenu narudžbu.",
+      reply_to_message_id: message.message_id,
+    });
+    return true;
+  }
+
+  const confirmed = getTelegramConfirmedOrder(message.chat.id, repliedMessageId);
+  if (!confirmed) {
+    await sendMessage({
+      chat_id: message.chat.id,
+      text: "Ne mogu povezati ovu poruku sa potvrđenom narudžbom. Brisanje radi za narudžbe potvrđene nakon ove nadogradnje.",
+      reply_to_message_id: message.message_id,
+    });
+    return true;
+  }
+
+  if (confirmed.deletedAt) {
+    await sendMessage({
+      chat_id: message.chat.id,
+      text: "Ova narudžba je već obrisana iz Orders sheeta.",
+      reply_to_message_id: message.message_id,
+    });
+    return true;
+  }
+
+  try {
+    const removed = await deleteOrderFromOrdersSheet(confirmed.sheetOrderId);
+    markTelegramConfirmedOrderDeleted(message.chat.id, repliedMessageId);
+
+    try {
+      await editMessageText({
+        chat_id: message.chat.id,
+        message_id: repliedMessageId,
+        text: `Narudžba obrisana iz Orders sheeta.\n\n${formatTelegramOrderPreview(confirmed.order)}`,
+      });
+    } catch (error) {
+      console.warn("Telegram order was deleted, but its confirmation message could not be updated:", error);
+    }
+
+    await sendMessage({
+      chat_id: message.chat.id,
+      text: removed ? "Narudžba je obrisana iz Orders sheeta." : "Narudžba više nije bila u Orders sheetu.",
+      reply_to_message_id: message.message_id,
+    });
+  } catch (error) {
+    await sendMessage({
+      chat_id: message.chat.id,
+      text: `Brisanje nije uspjelo: ${error instanceof Error ? error.message : "Unknown error"}`,
+      reply_to_message_id: message.message_id,
+    });
+  }
+
+  return true;
+}
+
 async function handleMessage(message: TelegramMessage) {
   if (!isAllowedChat(message.chat.id)) return;
 
   cleanupOldTelegramOrderDrafts();
 
+  if (await handleDeleteReply(message)) return;
   if (await handleImageMessage(message)) return;
   if (await handleTextMessage(message)) return;
 }
@@ -287,7 +367,15 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
     }
 
     try {
-      await appendOrderToOrdersSheet(draft.order);
+      const sheetOrderId = `telegram:${draft.chatId}:${draft.messageId}`;
+      await appendOrderToOrdersSheet(draft.order, { sourceId: sheetOrderId });
+      saveTelegramConfirmedOrder({
+        chatId: draft.chatId,
+        previewMessageId: draft.previewMessageId,
+        sourceMessageId: draft.messageId,
+        sheetOrderId,
+        order: draft.order,
+      });
       deleteTelegramOrderDraft(key);
       await editMessageText({
         chat_id: Number(draft.chatId),
@@ -309,6 +397,9 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     configured: Boolean(process.env.TELEGRAM_ORDERS_BOT_TOKEN),
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    model: process.env.OPENAI_ORDER_MODEL || "gpt-5.6-luna",
+    allowedChatRestricted: Boolean(process.env.TELEGRAM_ORDERS_ALLOWED_CHAT_ID),
     webhook: "/api/telegram/orders",
   });
 }

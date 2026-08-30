@@ -208,11 +208,14 @@ Connected / active:
 - Shopify import path
 - Telegram webhook intake route (`/api/telegram/orders`)
 - Telegram text/image order drafts with Confirm/Cancel before saving
-- Telegram text/image order extraction uses OpenAI vision/text (`gpt-4.1-mini` by default)
+- Telegram text/image order extraction uses OpenAI vision/text (`gpt-5.6-luna` by default, with reasoning disabled)
 - Telegram order extraction requires `OPENAI_API_KEY` on Hostinger
 - Telegram order extraction only populates Primalac, Broj telefona, Grad, Adresa, Artikal
 - Telegram Artikal comes from the image caption/text below the image when present; otherwise the last meaningful text line
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
+- Confirmed Telegram orders store a stable hidden `telegram:<chat>:<message>` ID in Orders column `K`, making callback retries idempotent.
+- Replying `delete`, `obriši`, or `obrisi` directly to a bot-confirmed order clears only that exact Orders row while preserving sheet layout. Repeated deletion is harmless, and standalone delete messages cannot select arbitrary orders.
+- Reply-to-delete mappings are kept in persistent SQLite and apply to orders confirmed after the feature deployment.
 
 Not fully mature yet:
 - true stats page logic
