@@ -182,6 +182,10 @@ export function getDb() {
   ensureColumn(database, "orders", "document_id", "ALTER TABLE orders ADD COLUMN document_id INTEGER");
   ensureColumn(database, "receipt_recipients", "pdf_uploaded_at", "ALTER TABLE receipt_recipients ADD COLUMN pdf_uploaded_at TEXT");
   ensureColumn(database, "receipt_recipients", "link_expires_at", "ALTER TABLE receipt_recipients ADD COLUMN link_expires_at TEXT");
+  ensureColumn(database, "customer_return_claims", "company_name", "ALTER TABLE customer_return_claims ADD COLUMN company_name TEXT");
+  ensureColumn(database, "customer_return_claims", "company_id_number", "ALTER TABLE customer_return_claims ADD COLUMN company_id_number TEXT");
+  ensureColumn(database, "customer_return_claims", "company_vat_number", "ALTER TABLE customer_return_claims ADD COLUMN company_vat_number TEXT");
+  ensureColumn(database, "customer_return_claims", "company_address", "ALTER TABLE customer_return_claims ADD COLUMN company_address TEXT");
   database.exec(`
     UPDATE receipt_recipients
     SET pdf_uploaded_at = COALESCE(pdf_uploaded_at, updated_at),

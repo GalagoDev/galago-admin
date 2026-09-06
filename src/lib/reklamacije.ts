@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -18,6 +19,10 @@ type ClaimRow = {
   city: string;
   phone: string;
   description: string;
+  company_name: string | null;
+  company_id_number: string | null;
+  company_vat_number: string | null;
+  company_address: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -53,10 +58,39 @@ export type CustomerReturnClaim = {
   city: string;
   phone: string;
   description: string;
+  companyName: string;
+  companyIdNumber: string;
+  companyVatNumber: string;
+  companyAddress: string;
   status: string;
   createdAt: string;
   updatedAt: string;
   files: ClaimFile[];
+};
+
+export type PreparedClaimFile = {
+  id: string;
+  originalName: string;
+  storedName: string;
+  mimeType: string;
+  sizeBytes: number;
+  bytes: Buffer;
+};
+
+export type NewCustomerRequest = {
+  requestType: string;
+  orderNumber: string;
+  customerName: string;
+  email: string;
+  address: string;
+  city: string;
+  phone: string;
+  description: string;
+  companyName: string;
+  companyIdNumber: string;
+  companyVatNumber: string;
+  companyAddress: string;
+  files: PreparedClaimFile[];
 };
 
 function mapClaim(row: ClaimRow, files: ClaimFile[] = []): CustomerReturnClaim {
@@ -71,6 +105,10 @@ function mapClaim(row: ClaimRow, files: ClaimFile[] = []): CustomerReturnClaim {
     city: row.city,
     phone: row.phone,
     description: row.description,
+    companyName: row.company_name || "",
+    companyIdNumber: row.company_id_number || "",
+    companyVatNumber: row.company_vat_number || "",
+    companyAddress: row.company_address || "",
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -100,12 +138,13 @@ export function getCustomerReturnClaims(query = "") {
               OR customer_name LIKE ?
               OR phone LIKE ?
               OR email LIKE ?
+              OR company_name LIKE ?
            ORDER BY
              CASE status WHEN 'new' THEN 1 WHEN 'in_review' THEN 2 ELSE 3 END,
              datetime(created_at) DESC
            LIMIT 500`,
         )
-        .all(...Array(5).fill(`%${search}%`))
+        .all(...Array(6).fill(`%${search}%`))
     : db
         .prepare(
           `SELECT * FROM customer_return_claims
@@ -134,6 +173,103 @@ export function getCustomerReturnClaims(query = "") {
   }
 
   return rows.map((row) => mapClaim(row, filesByClaim.get(row.id) || []));
+}
+
+function makeReference() {
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Sarajevo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .replaceAll("-", "");
+  return `GAL-${date}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+export function createCustomerRequest(input: NewCustomerRequest) {
+  const db = getDb();
+  const storage = ensureStorage();
+  const id = crypto.randomUUID();
+  let reference = makeReference();
+
+  while (db.prepare("SELECT 1 FROM customer_return_claims WHERE reference = ?").get(reference)) {
+    reference = makeReference();
+  }
+
+  const claimDir = path.join(storage.returnClaimFiles, id);
+  fs.mkdirSync(claimDir, { recursive: true });
+
+  const insert = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO customer_return_claims (
+        id, reference, request_type, order_number, customer_name, email,
+        address, city, phone, description, company_name, company_id_number,
+        company_vat_number, company_address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      reference,
+      input.requestType,
+      input.orderNumber,
+      input.customerName,
+      input.email,
+      input.address,
+      input.city,
+      input.phone,
+      input.description,
+      input.companyName,
+      input.companyIdNumber,
+      input.companyVatNumber,
+      input.companyAddress,
+    );
+
+    const insertFile = db.prepare(
+      `INSERT INTO customer_return_files (
+        id, claim_id, original_name, stored_name, stored_path, mime_type, size_bytes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    for (const file of input.files) {
+      const storedPath = path.join(claimDir, file.storedName);
+      fs.writeFileSync(storedPath, file.bytes, { flag: "wx", mode: 0o600 });
+      insertFile.run(
+        file.id,
+        id,
+        file.originalName,
+        file.storedName,
+        storedPath,
+        file.mimeType,
+        file.sizeBytes,
+      );
+    }
+  });
+
+  try {
+    insert();
+  } catch (error) {
+    fs.rmSync(claimDir, { recursive: true, force: true });
+    throw error;
+  }
+
+  return { id, reference };
+}
+
+export function isCustomerRequestRateLimited(ipHash: string) {
+  const db = getDb();
+  db.prepare("DELETE FROM customer_return_rate_limits WHERE created_at < datetime('now', '-24 hours')").run();
+  const result = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM customer_return_rate_limits
+       WHERE ip_hash = ? AND created_at >= datetime('now', '-1 hour')`,
+    )
+    .get(ipHash) as { count: number };
+  return result.count >= 5;
+}
+
+export function recordCustomerRequestAttempt(ipHash: string) {
+  getDb().prepare("INSERT INTO customer_return_rate_limits (ip_hash) VALUES (?)").run(ipHash);
 }
 
 export function getCustomerReturnClaimStats() {

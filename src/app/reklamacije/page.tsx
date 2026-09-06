@@ -126,10 +126,34 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
           <p className="mt-2 break-words text-sm leading-6 text-neutral-200">{[claim.address, claim.city].filter(Boolean).join(", ") || "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500">Opis reklamacije</p>
+          <p className="text-xs text-neutral-500">Opis zahtjeva</p>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-neutral-200">{claim.description || "-"}</p>
         </div>
       </div>
+
+      {claim.companyName || claim.companyIdNumber || claim.companyVatNumber || claim.companyAddress ? (
+        <div className="mt-4 rounded-lg border border-orange-300/15 bg-orange-300/[0.06] p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-orange-200">Podaci pravnog lica</p>
+          <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="text-xs text-neutral-500">Naziv firme</dt>
+              <dd className="mt-1 break-words text-neutral-100">{claim.companyName || "-"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-neutral-500">ID broj / JIB</dt>
+              <dd className="mt-1 break-words text-neutral-100">{claim.companyIdNumber || "-"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-neutral-500">PDV broj</dt>
+              <dd className="mt-1 break-words text-neutral-100">{claim.companyVatNumber || "-"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-neutral-500">Adresa firme</dt>
+              <dd className="mt-1 break-words text-neutral-100">{claim.companyAddress || "-"}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
 
       {claim.files.length > 0 ? (
         <div className="mt-5 border-t border-white/8 pt-4">
@@ -184,7 +208,7 @@ export default async function ReklamacijePage({ searchParams }: { searchParams: 
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <p className="mt-2 text-lg font-semibold text-white">Reklamacije</p>
-              <p className="mt-1 text-sm text-neutral-400">Zahtjevi kupaca, prilozi i status obrade</p>
+              <p className="mt-1 text-sm text-neutral-400">Podrška, reklamacije i zahtjevi za pravna lica</p>
             </div>
             <Link href="/" aria-label="Nazad na pregled" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
               <ArrowIcon />
@@ -215,13 +239,13 @@ export default async function ReklamacijePage({ searchParams }: { searchParams: 
         <section className="mt-5">
           <form method="get" className="flex gap-2 lg:max-w-xl">
             <label className="relative min-w-0 flex-1">
-              <span className="sr-only">Pretraži reklamacije</span>
+              <span className="sr-only">Pretraži zahtjeve</span>
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-neutral-500"><SearchIcon /></span>
               <input
                 name="q"
                 defaultValue={query}
                 type="search"
-                placeholder="Kupac, telefon ili referenca"
+                placeholder="Kupac, firma, telefon ili referenca"
                 className="min-h-11 w-full rounded-lg border border-white/10 bg-[#111214] py-2.5 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-sky-300/35"
               />
             </label>
@@ -235,7 +259,7 @@ export default async function ReklamacijePage({ searchParams }: { searchParams: 
               claims.map((claim) => <ClaimCard key={claim.id} claim={claim} />)
             ) : (
               <div className="rounded-lg border border-dashed border-white/10 py-10 text-center text-sm text-neutral-500">
-                {query ? "Nema reklamacija za ovu pretragu." : "Još nema zaprimljenih reklamacija."}
+                {query ? "Nema zahtjeva za ovu pretragu." : "Još nema zaprimljenih zahtjeva."}
               </div>
             )}
           </div>
