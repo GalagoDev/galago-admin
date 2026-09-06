@@ -357,7 +357,7 @@ function mapShopifyOrder_(order) {
     .filter(Boolean);
 
   const combinedProducts = productNames.join(' + ');
-  const subtotal = getShopifySubtotal_(order, lineItems);
+  const orderTotal = getShopifyOrderTotal_(order, lineItems);
 
   const brojPaketa = String(
     lineItems.reduce((sum, item) => {
@@ -373,32 +373,59 @@ function mapShopifyOrder_(order) {
     adresa,
     artikal: combinedProducts,
     brojPaketa: brojPaketa === '0' ? '' : brojPaketa,
-    otkupnina: subtotal,
-    vrijednostPosiljke: subtotal,
+    otkupnina: orderTotal,
+    vrijednostPosiljke: orderTotal,
     dop: '1',
     zamjena: '0',
   };
 }
 
-function getShopifySubtotal_(order, lineItems) {
+function getShopifyOrderTotal_(order, lineItems) {
   const directValue = firstMoneyValue_([
-    order.current_subtotal_price,
-    order.subtotal_price,
-    order.total_line_items_price,
     order.current_total_price,
     order.total_price,
+    order.current_total_price_set && order.current_total_price_set.shop_money
+      ? order.current_total_price_set.shop_money.amount
+      : '',
+    order.total_price_set && order.total_price_set.shop_money
+      ? order.total_price_set.shop_money.amount
+      : '',
   ]);
 
   if (directValue) return directValue;
 
-  const calculated = lineItems.reduce((sum, item) => {
+  const subtotal = firstMoneyValue_([
+    order.current_subtotal_price,
+    order.subtotal_price,
+    order.total_line_items_price,
+  ]);
+
+  const calculatedSubtotal = lineItems.reduce((sum, item) => {
     const quantity = Number(item && item.quantity ? item.quantity : 0);
     const price = Number(String(item && item.price ? item.price : '').replace(',', '.'));
     if (!Number.isFinite(quantity) || !Number.isFinite(price)) return sum;
     return sum + quantity * price;
   }, 0);
 
-  return calculated > 0 ? formatMoney_(calculated) : '';
+  const shippingLines = Array.isArray(order.shipping_lines) ? order.shipping_lines : [];
+  const shippingTotal = shippingLines.reduce((sum, line) => {
+    const value = firstMoneyValue_([
+      line && line.discounted_price,
+      line && line.price,
+      line && line.discounted_price_set && line.discounted_price_set.shop_money
+        ? line.discounted_price_set.shop_money.amount
+        : '',
+      line && line.price_set && line.price_set.shop_money
+        ? line.price_set.shop_money.amount
+        : '',
+    ]);
+    const amount = Number(value || 0);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+
+  const subtotalAmount = Number(subtotal || calculatedSubtotal || 0);
+  const calculatedTotal = subtotalAmount + shippingTotal;
+  return calculatedTotal > 0 ? formatMoney_(calculatedTotal) : '';
 }
 
 function firstMoneyValue_(values) {
