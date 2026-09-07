@@ -130,6 +130,31 @@ function findAmount(text: string) {
   return Number.isFinite(value) ? String(value) : "";
 }
 
+function normalizeAmount(value: string) {
+  const match = cleanup(value).match(/\d+(?:[.,]\d{1,2})?/);
+  if (!match) return "";
+
+  const amount = Number(match[0].replace(",", "."));
+  return Number.isFinite(amount) ? String(amount) : "";
+}
+
+export function parseTelegramArticleAndAmount(value: string) {
+  const cleaned = cleanup(value);
+  if (!cleaned) return { artikal: "", amount: "" };
+
+  const labelled = cleaned.match(
+    /^(.+?)(?:\s*[-|,:]\s*|\s+)(?:cijena|iznos|ukupno)\s*:?[ ]*(\d+(?:[.,]\d{1,2})?)\s*(?:km)?$/i
+  );
+  const trailing = labelled || cleaned.match(/^(.+?)(?:\s*[-|,:]\s*|\s+)(\d+(?:[.,]\d{1,2})?)\s*(?:km)?$/i);
+
+  if (!trailing) return { artikal: cleaned, amount: "" };
+
+  return {
+    artikal: cleanup(trailing[1]).replace(/\s*[-|,:]\s*$/g, ""),
+    amount: normalizeAmount(trailing[2] || ""),
+  };
+}
+
 function emptyDraft(): TelegramOrderDraft {
   return {
     primalac: "",
@@ -177,7 +202,10 @@ export function parseTelegramOrderText(rawText: string): TelegramOrderDraft {
       }
     }
 
-    order.artikal = lines[lines.length - 1] || "";
+    const article = parseTelegramArticleAndAmount(lines[lines.length - 1] || "");
+    order.artikal = article.artikal;
+    order.otkupnina = article.amount || order.otkupnina;
+    order.vrijednostPosiljke = article.amount || order.vrijednostPosiljke;
     return order;
   }
 
@@ -255,5 +283,9 @@ export function formatTelegramOrderPreview(order: TelegramOrderDraft) {
     `Grad: ${order.grad || "-"}`,
     `Adresa: ${order.adresa || "-"}`,
     `Artikal: ${order.artikal || "-"}`,
+    `Otkupnina: ${order.otkupnina || "-"}`,
+    `Vrijednost posiljke: ${order.vrijednostPosiljke || "-"}`,
+    `DOP: ${order.dop || "1"}`,
+    `Zamjena: ${order.zamjena || "0"}`,
   ].join("\n");
 }

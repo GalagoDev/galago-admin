@@ -6,6 +6,7 @@ import {
   bosniaPostalCodes,
   detectPostal,
   normalizePhone,
+  parseTelegramArticleAndAmount,
   type TelegramOrderDraft,
 } from "@/lib/telegram-orders";
 
@@ -18,7 +19,8 @@ const telegramOrderSchema = z
     brojTelefona: z.string().describe("Customer phone number, preferably normalized to Bosnia format 387..."),
     grad: z.string().describe("Bosnia ZIP/postal code only when known; otherwise the visible city/place."),
     adresa: z.string().describe("Shipping street/address, without city/ZIP when separable."),
-    artikal: z.string().describe("The last user-provided item text, or the image caption/text below the image."),
+    artikal: z.string().describe("Product name from the last user-provided item text, without its trailing price."),
+    ukupanIznos: z.string().describe("Final customer payment amount from the item caption/text, without currency; empty if absent."),
   })
   .strict();
 
@@ -49,17 +51,22 @@ function normalizePostalCode(value: string) {
 }
 
 function normalizeDraft(order: z.infer<typeof telegramOrderSchema>, artikalOverride: string): TelegramOrderDraft {
+  const override = parseTelegramArticleAndAmount(artikalOverride);
+  const extracted = parseTelegramArticleAndAmount(order.artikal);
+  const modelAmount = cleanup(order.ukupanIznos).match(/\d+(?:[.,]\d{1,2})?/)?.[0]?.replace(",", ".") || "";
+  const amount = override.amount || modelAmount || extracted.amount;
+
   return {
     primalac: cleanup(order.primalac),
     brojTelefona: normalizePhone(order.brojTelefona),
     grad: normalizePostalCode(order.grad),
     adresa: cleanup(order.adresa),
-    artikal: cleanup(artikalOverride) || cleanup(order.artikal),
+    artikal: override.artikal || extracted.artikal,
     brojPaketa: "",
-    otkupnina: "",
-    vrijednostPosiljke: "",
-    dop: "",
-    zamjena: "",
+    otkupnina: amount,
+    vrijednostPosiljke: amount,
+    dop: "1",
+    zamjena: "0",
   };
 }
 
@@ -106,10 +113,12 @@ Rules:
 - Broj telefona must be normalized to digits only. Bosnia mobile examples: 061417206 -> 38761417206, +387 61 417 206 -> 38761417206.
 - Grad must be ZIP/postal code when known. Common mappings: ${postalHints()}.
 - Adresa is the street/place/address only, without ZIP/city when separable.
-- Artikal must be the final user-provided item text. If an image caption or text below the image is provided separately, use that exact text as Artikal.
+- Artikal must be the product portion of the final user-provided item text. If an image caption or text below the image is provided separately, treat it as authoritative.
+- The authoritative item text may end with the customer's total payment amount. Examples: "SDS 89", "SDS 89 KM", or "SDS - 89" mean Artikal="SDS" and ukupanIznos="89".
+- ukupanIznos is the final amount the customer pays, not an older offer price or delivery fee. Leave it empty when the final item text has no amount.
 - Do not infer Artikal from older price/offer discussion when a later item caption/text exists.
-- Only extract these sheet fields: Primalac, Broj telefona, Grad, Adresa, Artikal.
-- Do not extract prices, otkupnina, delivery fees, package count, DOP, or zamjena.`;
+- Extract Primalac, Broj telefona, Grad, Adresa, Artikal, and ukupanIznos.
+- Do not extract package count, DOP, or zamjena. The app supplies those defaults.`;
 }
 
 async function extractWithOpenAI(input: {
