@@ -220,6 +220,7 @@ Connected / active:
 - Telegram order extraction populates Primalac, Broj telefona, Grad, Adresa, Artikal, Otkupnina, Vrijednost posiljke, DOP, and Zamjena
 - Telegram Artikal and total can be supplied together in the image caption (for example `Komoda serena` followed by `SDS 139`); `SDS` is an amount marker, the text before it is stored as Artikal, and the trailing price is written to both amount columns
 - Telegram orders always write DOP as `1` and Zamjena as `0`
+- Telegram Grad is accepted only as a five-digit ZIP; known Bosnia city names are normalized locally, and unresolved cities reject the draft instead of writing city text into Sheets
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
 - Confirmed Telegram orders store a stable hidden `telegram:<chat>:<message>` ID in Orders column `K`, making callback retries idempotent.
 - Replying `delete`, `obriši`, or `obrisi` directly to a bot-confirmed order clears only that exact Orders row while preserving sheet layout. Repeated deletion is harmless, and standalone delete messages cannot select arbitrary orders.

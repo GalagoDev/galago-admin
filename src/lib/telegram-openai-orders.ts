@@ -4,8 +4,8 @@ import { z } from "zod";
 
 import {
   bosniaPostalCodes,
-  detectPostal,
   normalizePhone,
+  normalizeTelegramPostalCode,
   parseTelegramArticleAndAmount,
   type TelegramOrderDraft,
 } from "@/lib/telegram-orders";
@@ -41,15 +41,6 @@ function imageDataUrl(imageBytes: ArrayBuffer, mimeType: string) {
   return `data:${mimeType};base64,${Buffer.from(imageBytes).toString("base64")}`;
 }
 
-function normalizePostalCode(value: string) {
-  const cleaned = cleanup(value);
-  const postal = detectPostal(cleaned);
-  if (postal) return postal.postalCode;
-
-  const zip = cleaned.match(/\b\d{5}\b/)?.[0] || "";
-  return zip || cleaned;
-}
-
 function normalizeDraft(order: z.infer<typeof telegramOrderSchema>, artikalOverride: string): TelegramOrderDraft {
   const override = parseTelegramArticleAndAmount(artikalOverride);
   const extracted = parseTelegramArticleAndAmount(order.artikal);
@@ -59,7 +50,7 @@ function normalizeDraft(order: z.infer<typeof telegramOrderSchema>, artikalOverr
   return {
     primalac: cleanup(order.primalac),
     brojTelefona: normalizePhone(order.brojTelefona),
-    grad: normalizePostalCode(order.grad),
+    grad: normalizeTelegramPostalCode(order.grad),
     adresa: cleanup(order.adresa),
     artikal: override.artikal || extracted.artikal,
     brojPaketa: "",
@@ -73,6 +64,9 @@ function normalizeDraft(order: z.infer<typeof telegramOrderSchema>, artikalOverr
 function assertUsableOrder(order: TelegramOrderDraft) {
   if (!order.primalac && !order.brojTelefona && !order.adresa) {
     throw new Error("OpenAI nije pronašao dovoljno podataka za narudžbu.");
+  }
+  if (!/^\d{5}$/.test(order.grad)) {
+    throw new Error("Nisam mogao odrediti ZIP. Dodaj poštanski broj uz grad i pošalji ponovo.");
   }
 }
 
@@ -111,7 +105,8 @@ Rules:
 - Intake language is Bosnian/Croatian/Serbian; preserve names and addresses in Latin script.
 - Primalac is the customer full name, not page/admin labels unless it is also the customer name.
 - Broj telefona must be normalized to digits only. Bosnia mobile examples: 061417206 -> 38761417206, +387 61 417 206 -> 38761417206.
-- Grad must be ZIP/postal code when known. Common mappings: ${postalHints()}.
+- Grad must always be a five-digit ZIP/postal code, never a city name. Common mappings: ${postalHints()}.
+- If the city is visible but its ZIP cannot be determined reliably, return an empty Grad so the app can reject the incomplete draft.
 - Adresa is the street/place/address only, without ZIP/city when separable.
 - Artikal must be the product portion of the final user-provided item text. If an image caption or text below the image is provided separately, treat it as authoritative.
 - "SDS" is an amount marker and must never be included in Artikal. Example: "Komoda serena\nSDS 139" means Artikal="Komoda serena" and ukupanIznos="139".

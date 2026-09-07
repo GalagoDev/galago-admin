@@ -51,6 +51,10 @@ export const bosniaPostalCodes: Record<string, string> = {
   cajnice: "73280",
   "han pijesak": "71360",
   "bosanska krupa": "77240",
+  "donji vakuf": "70220",
+  foca: "73300",
+  "foča": "73300",
+  "sanski most": "79260",
   turbe: "72283",
   laktasi: "78250",
   "laktaši": "78250",
@@ -119,6 +123,14 @@ export function detectPostal(text: string) {
   }
 
   return null;
+}
+
+export function normalizeTelegramPostalCode(value: string) {
+  const cleaned = cleanup(value);
+  const explicitZip = cleaned.match(/\b\d{5}\b/)?.[0] || "";
+  if (explicitZip) return explicitZip;
+
+  return detectPostal(cleaned)?.postalCode || "";
 }
 
 function findAmount(text: string) {

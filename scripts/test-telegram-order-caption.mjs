@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { parseTelegramArticleAndAmount } from "../src/lib/telegram-orders.ts";
+import { normalizeTelegramPostalCode, parseTelegramArticleAndAmount } from "../src/lib/telegram-orders.ts";
 
 const cases = [
   ["Komoda serena\nSds 139", { artikal: "Komoda serena", amount: "139" }],
@@ -15,4 +15,17 @@ for (const [input, expected] of cases) {
   assert.deepEqual(parseTelegramArticleAndAmount(input), expected, input);
 }
 
-console.log(`Telegram caption parsing passed (${cases.length} cases).`);
+const postalCases = [
+  ["Foča", "73300"],
+  ["Foca", "73300"],
+  ["Donji Vakuf", "70220"],
+  ["Sanski Most", "79260"],
+  ["79260 Sanski Most", "79260"],
+  ["Nepoznato mjesto", ""],
+];
+
+for (const [input, expected] of postalCases) {
+  assert.equal(normalizeTelegramPostalCode(input), expected, input);
+}
+
+console.log(`Telegram parsing passed (${cases.length} caption and ${postalCases.length} ZIP cases).`);
