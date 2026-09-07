@@ -7,7 +7,7 @@ import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 import { invalidateSheetCache } from "@/lib/google-sheets";
 import { createOrderFingerprint, type OrderIdentity } from "@/lib/order-fingerprint";
 
-const SOURCE_SHEET = "Undelivered orders";
+const SOURCE_SHEET = "Orders";
 const DELIVERED_SHEET = "Delivered orders";
 const RETURNS_SHEET = "Povrati";
 const HEADER = [
@@ -24,6 +24,8 @@ const HEADER = [
 ];
 const STATUS_ID_HEADER = "Status ID";
 const SOURCE_STATUS_HEADER = "App status";
+const SOURCE_STATUS_COLUMN_NUMBER = 12;
+const SOURCE_STATUS_CELL_INDEX = SOURCE_STATUS_COLUMN_NUMBER - 1;
 const STATUS_COLUMNS = [...HEADER, STATUS_ID_HEADER];
 const TRAILING_EMPTY_ROWS = 5;
 const WORKDAY_TIME_ZONE = "Europe/Sarajevo";
@@ -227,7 +229,7 @@ async function ensureSourceStatusColumn(
   const columnCount = sourceSheet?.properties?.gridProperties?.columnCount ?? 0;
   if (sheetId === undefined || sheetId === null) throw new Error(`Sheet not found: ${SOURCE_SHEET}`);
 
-  if (columnCount < 11) {
+  if (columnCount < SOURCE_STATUS_COLUMN_NUMBER) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
@@ -235,7 +237,7 @@ async function ensureSourceStatusColumn(
           appendDimension: {
             sheetId,
             dimension: "COLUMNS",
-            length: 11 - columnCount,
+            length: SOURCE_STATUS_COLUMN_NUMBER - columnCount,
           },
         }],
       },
@@ -244,16 +246,16 @@ async function ensureSourceStatusColumn(
 
   const headerResponse = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${SOURCE_SHEET}'!K1`,
+    range: `'${SOURCE_SHEET}'!L1`,
   });
   const currentHeader = String(headerResponse.data.values?.[0]?.[0] ?? "").trim();
   if (currentHeader && currentHeader !== SOURCE_STATUS_HEADER) {
-    throw new Error(`${SOURCE_SHEET} column K is already in use.`);
+    throw new Error(`${SOURCE_SHEET} column L is already in use.`);
   }
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${SOURCE_SHEET}'!K1`,
+    range: `'${SOURCE_SHEET}'!L1`,
     valueInputOption: "RAW",
     requestBody: { values: [[SOURCE_STATUS_HEADER]] },
   });
@@ -262,7 +264,7 @@ async function ensureSourceStatusColumn(
     requestBody: {
       requests: [{
         updateDimensionProperties: {
-          range: { sheetId, dimension: "COLUMNS", startIndex: 10, endIndex: 11 },
+          range: { sheetId, dimension: "COLUMNS", startIndex: 10, endIndex: 12 },
           properties: { hiddenByUser: true },
           fields: "hiddenByUser",
         },
@@ -400,7 +402,7 @@ async function performMove(references: OrderMoveReference[], destination: Status
   const sheetId = await ensureStatusSheet(sheets, spreadsheetId, destination);
   await ensureSourceStatusColumn(sheets, spreadsheetId);
   const [sourceResponse, statusIdsResponse] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:K` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:L` }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: `'${destination}'!K:K` }),
   ]);
   const sourceRows = sourceResponse.data.values ?? [];
@@ -415,7 +417,7 @@ async function performMove(references: OrderMoveReference[], destination: Status
     const sourceIndex = reference.sheetRowNumber - 1;
     const sourceRow = sourceRows[sourceIndex];
     if (!sourceRow) continue;
-    if (String(sourceRow[10] ?? "").trim()) continue;
+    if (String(sourceRow[SOURCE_STATUS_CELL_INDEX] ?? "").trim()) continue;
     const identity = rawOrderIdentity(sourceRow);
     if (!identity.primalac && !identity.brojTelefona && !identity.artikal) continue;
     if (createOrderFingerprint(identity) !== reference.fingerprint) continue;
@@ -441,7 +443,7 @@ async function performMove(references: OrderMoveReference[], destination: Status
       requestBody: {
         valueInputOption: "RAW",
         data: valid.map((entry) => ({
-          range: `'${SOURCE_SHEET}'!K${entry.reference.sheetRowNumber}`,
+          range: `'${SOURCE_SHEET}'!L${entry.reference.sheetRowNumber}`,
           values: [[entry.sourceStatus]],
         })),
       },
@@ -457,7 +459,7 @@ async function performRestoreReturn(reference: OrderMoveReference) {
   const { sheets, spreadsheetId } = getSheetsClient();
   await ensureSourceStatusColumn(sheets, spreadsheetId);
   const [sourceResponse, returnsResponse] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:K` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:L` }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: `'${RETURNS_SHEET}'!A:K` }),
   ]);
   const sourceRows = sourceResponse.data.values ?? [];
@@ -472,7 +474,7 @@ async function performRestoreReturn(reference: OrderMoveReference) {
   if (createOrderFingerprint(returnIdentity) !== reference.fingerprint) return { restored: 0, skipped: 1 };
   if (dateLabelForRow(returnRows, returnIndex) !== reference.dateLabel) return { restored: 0, skipped: 1 };
 
-  const sourceIndex = sourceRows.findIndex((row) => String(row[10] ?? "").trim() === `returned:${statusId}`);
+  const sourceIndex = sourceRows.findIndex((row) => String(row[SOURCE_STATUS_CELL_INDEX] ?? "").trim() === `returned:${statusId}`);
   if (sourceIndex === -1) return { restored: 0, skipped: 1 };
   if (createOrderFingerprint(rawOrderIdentity(sourceRows[sourceIndex])) !== reference.fingerprint) {
     return { restored: 0, skipped: 1 };
@@ -484,7 +486,7 @@ async function performRestoreReturn(reference: OrderMoveReference) {
       valueInputOption: "RAW",
       data: [
         {
-          range: `'${SOURCE_SHEET}'!K${sourceIndex + 1}`,
+          range: `'${SOURCE_SHEET}'!L${sourceIndex + 1}`,
           values: [[""]],
         },
         {

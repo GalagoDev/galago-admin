@@ -20,9 +20,7 @@ export type SheetOrderRow = {
   zamjena: string;
 };
 
-export type UndeliveredSheetRow = SheetOrderRow;
-
-const SHEET_NAME = "Undelivered orders";
+const SHEET_NAME = "Orders";
 const HEADER = [
   "Primalac",
   "Broj telefona",
@@ -50,8 +48,12 @@ function isRestoredReturnStatus(value: string) {
 
 export function invalidateSheetCache(sheetName?: string) {
   if (sheetName) {
-    sheetRowsCache.delete(sheetName);
-    sheetRowsInFlight.delete(sheetName);
+    for (const key of sheetRowsCache.keys()) {
+      if (key === sheetName || key.startsWith(`${sheetName}:`)) sheetRowsCache.delete(key);
+    }
+    for (const key of sheetRowsInFlight.keys()) {
+      if (key === sheetName || key.startsWith(`${sheetName}:`)) sheetRowsInFlight.delete(key);
+    }
     return;
   }
 
@@ -194,7 +196,7 @@ async function styleDateRow(sheets: sheets_v4.Sheets, spreadsheetId: string, she
 }
 
 export async function ensureTodayBlockAtTop() {
-  invalidateSheetCache("Undelivered orders");
+  invalidateSheetCache(SHEET_NAME);
   const { sheets, spreadsheetId } = getSheetsClient();
   const today = getTodayLabel();
   const response = await sheets.spreadsheets.values.get({
@@ -268,19 +270,23 @@ export async function ensureTodayBlockAtTop() {
   await styleDateRow(sheets, spreadsheetId, sheetId, 2);
 }
 
-export async function getSheetRowsByName(sheetName: string, options: { fresh?: boolean } = {}) {
+export async function getSheetRowsByName(
+  sheetName: string,
+  options: { fresh?: boolean; activeOnly?: boolean } = {},
+) {
+  const cacheKey = `${sheetName}:${options.activeOnly ? "active" : "all"}`;
   if (options.fresh) invalidateSheetCache(sheetName);
-  const cached = getCachedSheetRows(sheetName);
+  const cached = getCachedSheetRows(cacheKey);
   if (cached) return cached;
 
-  const existingRequest = sheetRowsInFlight.get(sheetName);
+  const existingRequest = sheetRowsInFlight.get(cacheKey);
   if (existingRequest) return existingRequest;
 
   const request = (async () => {
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:K`,
+      range: `'${sheetName}'!A:L`,
     });
 
     const rows = response.data.values ?? [];
@@ -298,7 +304,7 @@ export async function getSheetRowsByName(sheetName: string, options: { fresh?: b
         continue;
       }
 
-      if (sheetName === SHEET_NAME && isInactiveOrderStatus(cells[10] ?? "")) continue;
+      if (sheetName === SHEET_NAME && options.activeOnly && isInactiveOrderStatus(cells[11] ?? "")) continue;
       if (sheetName === "Povrati" && isRestoredReturnStatus(cells[10] ?? "")) continue;
 
       rowNumber += 1;
@@ -323,21 +329,21 @@ export async function getSheetRowsByName(sheetName: string, options: { fresh?: b
       });
     }
 
-    setCachedSheetRows(sheetName, result);
+    setCachedSheetRows(cacheKey, result);
     return result;
   })();
 
-  sheetRowsInFlight.set(sheetName, request);
+  sheetRowsInFlight.set(cacheKey, request);
 
   try {
     return await request;
   } finally {
-    sheetRowsInFlight.delete(sheetName);
+    sheetRowsInFlight.delete(cacheKey);
   }
 }
 
-export async function getUndeliveredSheetRows(options: { fresh?: boolean } = {}) {
-  return getSheetRowsByName("Undelivered orders", options);
+export async function getActiveOrdersSheetRows(options: { fresh?: boolean } = {}) {
+  return getSheetRowsByName("Orders", { ...options, activeOnly: true });
 }
 
 export async function getOrdersSheetRows(options: { fresh?: boolean } = {}) {

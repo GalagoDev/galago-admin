@@ -371,7 +371,7 @@ export async function deleteOrderFromOrdersSheet(sheetOrderId: string) {
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${rowIndex + 1}:K${rowIndex + 1}`,
+    range: `'${SHEET_NAME}'!A${rowIndex + 1}:L${rowIndex + 1}`,
   });
   invalidateSheetCache(SHEET_NAME);
   return true;

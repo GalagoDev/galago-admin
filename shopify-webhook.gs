@@ -15,6 +15,8 @@ const SHEET_NAME = 'Orders';
 const BLOCK_EMPTY_ROWS = 5;
 const TOTAL_COLUMNS = 10;
 const INTERNAL_ID_COLUMN = 11; // K
+const APP_STATUS_COLUMN = 12; // L
+const INTERNAL_HEADERS = ['Source ID', 'App status'];
 const SPREADSHEET_ID = '1P99qsJa4HzruxVCB3BHLTpZ5Jvb1jiTVvjf6IuRho9s';
 const DEFAULT_SHOPIFY_STORE_KEY = 'galago';
 
@@ -124,6 +126,7 @@ function ensureOrdersSheetLayout() {
   if (!sheet) throw new Error(`Sheet not found: ${SHEET_NAME}`);
 
   sheet.getRange(1, 1, 1, HEADER.length).setValues([HEADER]);
+  sheet.getRange(1, INTERNAL_ID_COLUMN, 1, INTERNAL_HEADERS.length).setValues([INTERNAL_HEADERS]);
   sheet.getRange(1, 1, 1, HEADER.length)
     .setFontWeight('bold')
     .setFontSize(10)
@@ -132,6 +135,7 @@ function ensureOrdersSheetLayout() {
     .setHorizontalAlignment('center');
 
   sheet.setFrozenRows(1);
+  sheet.hideColumns(INTERNAL_ID_COLUMN, APP_STATUS_COLUMN - INTERNAL_ID_COLUMN + 1);
 }
 
 function insertOrdersTodayBlock() {

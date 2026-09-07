@@ -1,6 +1,6 @@
 import { OrderListPage } from "@/components/order-list-page";
 import { ReturnOrderPicker } from "@/components/return-order-picker";
-import { getReturnedSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getActiveOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,7 +33,7 @@ export default async function ReturnsPage({
   const fresh = Boolean(params.returned || params.restored || params.refresh);
   const [orders, activeOrders] = await Promise.all([
     getReturnedSheetRows({ fresh }).catch(() => []),
-    getUndeliveredSheetRows({ fresh }).catch(() => []),
+    getActiveOrdersSheetRows({ fresh }).catch(() => []),
   ]);
   const notice = getNotice(params);
 

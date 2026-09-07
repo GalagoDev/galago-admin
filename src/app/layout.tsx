@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Store Admin",
-  description: "Order management app for incoming, sent, delivered, and undelivered orders.",
+  description: "Order management app for incoming, active, delivered, and returned orders.",
 };
 
 export default function RootLayout({

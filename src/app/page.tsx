@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
-import { getOrdersSheetRows, getReturnedSheetRows, getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getActiveOrdersSheetRows, getOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -83,16 +83,16 @@ export default async function Home({
   }>;
 }) {
   const params = await searchParams;
-  const [undeliveredRows, ordersRows, returnedRows] = await Promise.all([
-    getUndeliveredSheetRows().catch(() => []),
+  const [activeRows, ordersRows, returnedRows] = await Promise.all([
+    getActiveOrdersSheetRows().catch(() => []),
     getOrdersSheetRows().catch(() => []),
     getReturnedSheetRows().catch(() => []),
   ]);
 
-  const totalUndelivered = undeliveredRows.length;
-  const totalUndeliveredKm = undeliveredRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
+  const totalUndelivered = activeRows.length;
+  const totalUndeliveredKm = activeRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
   const totalReturnedKm = returnedRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
-  const oldestUndelivered = [...undeliveredRows]
+  const oldestUndelivered = [...activeRows]
     .sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel))
     .slice(0, 5);
 

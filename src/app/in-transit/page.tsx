@@ -1,6 +1,6 @@
 import { OrderListPage } from "@/components/order-list-page";
 import { DeliveryReconciliation } from "@/components/delivery-reconciliation";
-import { getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getActiveOrdersSheetRows } from "@/lib/google-sheets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,7 +22,7 @@ export default async function InTransitPage({
   searchParams: Promise<{ delivered?: string; returned?: string; skipped?: string; error?: string; refresh?: string }>;
 }) {
   const params = await searchParams;
-  const orders = await getUndeliveredSheetRows({ fresh: Boolean(params.delivered || params.returned || params.refresh) }).catch(() => []);
+  const orders = await getActiveOrdersSheetRows({ fresh: Boolean(params.delivered || params.returned || params.refresh) }).catch(() => []);
   const notice = getNotice(params);
 
   return (

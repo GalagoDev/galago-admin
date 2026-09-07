@@ -29,10 +29,11 @@ It is **not** intended to be the main place where a human manually types orders.
 ## Source of truth
 
 Main operational sheets:
-- `Orders`
-- `Undelivered orders`
+- `Orders` (the permanent order ledger and active `Na dostavi` source)
 - `Delivered orders` (created on first confirmed courier import)
 - `Povrati` (created when the first return is recorded)
+
+`Undelivered orders` is no longer used by the app. The live operational history starts on `07/09/2026`; older test data was intentionally discarded rather than migrated.
 
 Google Apps Script owns the visual/layout structure of those Sheets.
 The app should **not fight the sheet layout**.
@@ -152,13 +153,13 @@ This was already being implemented for order list pages.
 
 ### Delivery outcome workflow
 - The UI has one active-delivery concept: `Na dostavi`; the old `Nedostavljene` route redirects there.
-- `Na dostavi` reads the existing `Undelivered orders` sheet.
+- Every Shopify or Telegram order written to `Orders` is active in `Na dostavi` by default.
 - Courier `.xls` and `.xlsx` reports are uploaded on `Na dostavi`, previewed, and confirmed before any Sheet mutation.
 - Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
-- Confirmed deliveries move from `Undelivered orders` to `Delivered orders`.
+- Confirmed deliveries are copied from `Orders` to `Delivered orders` and marked inactive in hidden `Orders` column `L`.
 - `Povrati` has an autocomplete over active `Na dostavi` customers; selecting a customer moves that exact order to the return history.
 - Return actions do not use confirmation popups. A recorded return can be restored to `Na dostavi`; the source row is reactivated and the `Povrati` copy is kept in Sheets with a hidden `restored` status.
-- Source rows remain permanently in `Undelivered orders`; a hidden `App status` column removes delivered/returned rows only from the app.
+- Source rows remain permanently in `Orders`; hidden column `K` stores the intake source ID and hidden column `L` removes delivered/returned rows only from active app views.
 - Destination copies and hidden status IDs make delivery/return retries idempotent.
 
 ### Daily receipt workflow

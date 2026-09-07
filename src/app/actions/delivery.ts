@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { parseCourierDeliveryWorkbook } from "@/lib/delivery-workbook";
-import { getUndeliveredSheetRows } from "@/lib/google-sheets";
+import { getActiveOrdersSheetRows } from "@/lib/google-sheets";
 import {
   markOrdersDelivered,
   moveOrderToReturns,
@@ -67,7 +67,7 @@ export async function previewDeliveryWorkbookAction(
   try {
     const [courierRows, activeOrders] = await Promise.all([
       parseCourierDeliveryWorkbook(file),
-      getUndeliveredSheetRows(),
+      getActiveOrdersSheetRows(),
     ]);
     const result = matchCourierDeliveries(courierRows, activeOrders);
     return {
