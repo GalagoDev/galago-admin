@@ -178,6 +178,12 @@ This was already being implemented for order list pages.
 - Fully automated delivery by phone number would still require Viber Business Messages through an approved provider. A normal Viber bot only reaches subscribed Viber user IDs and must not be used as a fake substitute.
 - An unsent receipt list can be removed from the app with inline confirmation; deleting it also removes its uploaded PDFs but never changes Google Sheets.
 
+### Daily courier export workflow
+- `Nove narudžbe` has an Excel download action for the displayed latest workday.
+- The export reads fresh active rows from `Orders`, so delivered and returned orders are excluded even if the page was opened earlier.
+- Row 1 contains the ten operational Google Sheets headers; customer rows begin immediately on row 2 with no date row or blank spacer rows.
+- Phone and ZIP values remain text, while valid quantity and amount fields are exported as numbers for Brza pošta upload.
+
 ### Customer reklamacije workflow
 - `Reklamacije` is an authenticated operational panel backed by persistent SQLite storage.
 - The panel lists customer claim references, request type, order number, contact details, address, description, uploaded evidence, and processing status.

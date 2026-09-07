@@ -29,6 +29,7 @@ export function OrderListPage({
   listSubtitle = "Pretraga i pregled svih detalja narudžbe",
   searchPlaceholder,
   refreshPath,
+  headerAction,
 }: {
   title: string;
   subtitle: string;
@@ -40,6 +41,7 @@ export function OrderListPage({
   listSubtitle?: string;
   searchPlaceholder?: string;
   refreshPath?: string;
+  headerAction?: ReactNode;
 }) {
   const totalAmount = orders.reduce((sum, order) => sum + parseAmount(order.otkupnina), 0);
 
@@ -54,6 +56,7 @@ export function OrderListPage({
               <p className="mt-1 text-sm text-neutral-400">{subtitle}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {headerAction}
               {refreshPath ? <SheetRefreshButton path={refreshPath} /> : null}
               <Link
                 href="/"
