@@ -218,7 +218,7 @@ Connected / active:
 - Telegram text/image order extraction uses OpenAI vision/text (`gpt-5.6-luna` by default, with reasoning disabled)
 - Telegram order extraction requires `OPENAI_API_KEY` on Hostinger
 - Telegram order extraction populates Primalac, Broj telefona, Grad, Adresa, Artikal, Otkupnina, Vrijednost posiljke, DOP, and Zamjena
-- Telegram Artikal and total can be supplied together in the image caption/final line (for example `SDS 89`); the product is stored as Artikal and the trailing price is written to both amount columns
+- Telegram Artikal and total can be supplied together in the image caption (for example `Komoda serena` followed by `SDS 139`); `SDS` is an amount marker, the text before it is stored as Artikal, and the trailing price is written to both amount columns
 - Telegram orders always write DOP as `1` and Zamjena as `0`
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
 - Confirmed Telegram orders store a stable hidden `telegram:<chat>:<message>` ID in Orders column `K`, making callback retries idempotent.

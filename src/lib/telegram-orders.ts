@@ -142,6 +142,14 @@ export function parseTelegramArticleAndAmount(value: string) {
   const cleaned = cleanup(value);
   if (!cleaned) return { artikal: "", amount: "" };
 
+  const sdsAmount = cleaned.match(/^(.*?)\s*\bsds\b\s*[:=-]?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:km)?$/i);
+  if (sdsAmount) {
+    return {
+      artikal: cleanup(sdsAmount[1]).replace(/\s*[-|,:]\s*$/g, ""),
+      amount: normalizeAmount(sdsAmount[2] || ""),
+    };
+  }
+
   const labelled = cleaned.match(
     /^(.+?)(?:\s*[-|,:]\s*|\s+)(?:cijena|iznos|ukupno)\s*:?[ ]*(\d+(?:[.,]\d{1,2})?)\s*(?:km)?$/i
   );

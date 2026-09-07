@@ -114,7 +114,8 @@ Rules:
 - Grad must be ZIP/postal code when known. Common mappings: ${postalHints()}.
 - Adresa is the street/place/address only, without ZIP/city when separable.
 - Artikal must be the product portion of the final user-provided item text. If an image caption or text below the image is provided separately, treat it as authoritative.
-- The authoritative item text may end with the customer's total payment amount. Examples: "SDS 89", "SDS 89 KM", or "SDS - 89" mean Artikal="SDS" and ukupanIznos="89".
+- "SDS" is an amount marker and must never be included in Artikal. Example: "Komoda serena\nSDS 139" means Artikal="Komoda serena" and ukupanIznos="139".
+- The authoritative item text may also end with a plain total, such as "Komoda serena - 139 KM".
 - ukupanIznos is the final amount the customer pays, not an older offer price or delivery fee. Leave it empty when the final item text has no amount.
 - Do not infer Artikal from older price/offer discussion when a later item caption/text exists.
 - Extract Primalac, Broj telefona, Grad, Adresa, Artikal, and ukupanIznos.
