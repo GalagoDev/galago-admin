@@ -1,22 +1,24 @@
-import { NextRequest } from "next/server";
 import * as XLSX from "xlsx";
 
+import { markLastExportedOrder } from "@/lib/google-orders";
 import { getActiveOrdersSheetRows, type SheetOrderRow } from "@/lib/google-sheets";
+import { getLatestCompletedExportWindow } from "@/lib/order-workday";
+import { normalizeTelegramPostalCode } from "@/lib/telegram-orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const EXPORT_HEADERS = [
-  "Primalac",
-  "Broj telefona",
-  "Grad",
+  "Naziv primaoca",
   "Adresa",
-  "Artikal",
-  "Broj paketa",
+  "Postanski broj",
+  "Broj telefona",
   "Otkupnina",
+  "Broj paketa",
   "Vrijednost posiljke",
-  "DOP",
-  "Zamjena",
+  "Ref br. 1",
+  "Dozvoljeno otvaranje",
+  "zamjenaska posiljka",
 ];
 
 function toNumberOrOriginal(value: string) {
@@ -30,60 +32,81 @@ function toNumberOrOriginal(value: string) {
 function toExportRow(order: SheetOrderRow) {
   return [
     order.primalac,
-    order.brojTelefona,
-    order.grad,
     order.adresa,
-    order.artikal,
-    toNumberOrOriginal(order.brojPaketa),
+    toNumberOrOriginal(normalizeTelegramPostalCode(order.grad)),
+    toNumberOrOriginal(order.brojTelefona),
     toNumberOrOriginal(order.otkupnina),
+    toNumberOrOriginal(order.brojPaketa),
     toNumberOrOriginal(order.vrijednostPosiljke),
+    order.artikal,
     toNumberOrOriginal(order.dop),
-    toNumberOrOriginal(order.zamjena),
+    Number(order.zamjena.trim().replace(",", ".")) === 0 ? "" : toNumberOrOriginal(order.zamjena),
   ];
 }
 
-export async function GET(request: NextRequest) {
-  const dateLabel = request.nextUrl.searchParams.get("date")?.trim() ?? "";
-
-  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateLabel)) {
-    return new Response("Datum za izvoz nije ispravan.", { status: 400 });
-  }
-
+export async function GET() {
+  const window = getLatestCompletedExportWindow();
   const rows = await getActiveOrdersSheetRows({ fresh: true });
-  const orders = rows.filter((row) => row.dateLabel === dateLabel);
+  const orders = rows
+    .filter((row) => {
+      const receivedAt = Date.parse(row.receivedAt);
+      if (Number.isFinite(receivedAt)) return receivedAt >= window.start.getTime() && receivedAt < window.end.getTime();
+      return row.dateLabel === window.endLabel;
+    })
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.receivedAt);
+      const rightTime = Date.parse(right.receivedAt);
+      if (Number.isFinite(leftTime) && Number.isFinite(rightTime)) return leftTime - rightTime;
+      if (Number.isFinite(leftTime)) return 1;
+      if (Number.isFinite(rightTime)) return -1;
+      return left.sheetRowNumber - right.sheetRowNumber;
+    });
 
   if (orders.length === 0) {
-    return new Response("Nema aktivnih narudžbi za izabrani datum.", { status: 404 });
+    return new Response(`Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, { status: 404 });
+  }
+
+  const missingPostalCodes = orders.filter((order) => !normalizeTelegramPostalCode(order.grad));
+  if (missingPostalCodes.length > 0) {
+    const names = missingPostalCodes.slice(0, 8).map((order) => order.primalac).join(", ");
+    return new Response(`Nedostaje ZIP za: ${names}. Ispravi Grad u Orders sheetu pa ponovi export.`, { status: 422 });
   }
 
   const worksheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...orders.map(toExportRow)]);
   worksheet["!cols"] = [
-    { wch: 26 },
-    { wch: 18 },
-    { wch: 12 },
-    { wch: 32 },
-    { wch: 38 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 20 },
-    { wch: 8 },
-    { wch: 10 },
+    { width: 21.85546875 },
+    { width: 27.7109375 },
+    { width: 17.85546875 },
+    { width: 33.28515625 },
+    { width: 12 },
+    { width: 10.7109375 },
+    { width: 17.42578125 },
+    { width: 46.28515625 },
+    { width: 22.140625 },
+    { width: 27 },
   ];
+  worksheet["!rows"] = [{ hpt: 21 }, ...orders.map(() => ({ hpt: 15.75 }))];
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Narudzbe");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
 
   const output = XLSX.write(workbook, {
     bookType: "xlsx",
     type: "buffer",
     compression: true,
   });
-  const filenameDate = dateLabel.split("/").reverse().join("-");
+  await markLastExportedOrder(
+    orders.at(-1)!.sheetRowNumber,
+    window.marker,
+    `${window.startLabel} 08:00 - ${window.endLabel} 08:00`,
+  );
+
+  const filenameDate = window.endLabel.split("/").reverse().join("-");
 
   return new Response(new Uint8Array(output), {
     headers: {
       "Cache-Control": "no-store",
-      "Content-Disposition": `attachment; filename="brza-posta-narudzbe-${filenameDate}.xlsx"`,
+      "Content-Disposition": `attachment; filename="IMPORT-ELKO-${filenameDate}.xlsx"`,
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
   });

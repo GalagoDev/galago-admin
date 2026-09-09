@@ -1,7 +1,8 @@
-import { google } from "googleapis";
+import { google, sheets_v4 } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 import { invalidateSheetCache } from "@/lib/google-sheets";
+import { getTargetWorkdayLabel } from "@/lib/order-workday";
 
 const SHEET_NAME = "Orders";
 const HEADER = [
@@ -17,7 +18,9 @@ const HEADER = [
   "Zamjena",
 ];
 const TRAILING_EMPTY_ROWS = 5;
-const WORKDAY_TIME_ZONE = "Europe/Sarajevo";
+const EXPORT_MARKER_COLUMN = 14;
+const INTERNAL_HEADERS = ["Received at", "Export marker"];
+let trackingColumnsReady = false;
 
 type OrderSheetInput = {
   primalac: string;
@@ -35,31 +38,6 @@ type OrderSheetInput = {
 type AppendOrderOptions = {
   sourceId?: string;
 };
-
-function formatSheetDateLabel(date: Date) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: WORKDAY_TIME_ZONE,
-  }).format(date);
-}
-
-function getTargetWorkdayLabel() {
-  const date = new Date();
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    timeZone: WORKDAY_TIME_ZONE,
-  }).format(date);
-
-  if (weekday === "Sat") {
-    date.setDate(date.getDate() + 2);
-  } else if (weekday === "Sun") {
-    date.setDate(date.getDate() + 1);
-  }
-
-  return formatSheetDateLabel(date);
-}
 
 function indexIsSheetDateRow(index: number, value: string) {
   return index > 0 && /^\d{2}\/\d{2}\/\d{4}$/.test(value);
@@ -134,6 +112,47 @@ async function getOrdersSheetId(sheets: ReturnType<typeof google.sheets>, spread
   }
 
   return sheetId;
+}
+
+async function ensureOrderTrackingColumns(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  sheetId: number,
+) {
+  if (trackingColumnsReady) return;
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${SHEET_NAME}'!M1:N1`,
+  });
+  const current = response.data.values?.[0] ?? [];
+
+  INTERNAL_HEADERS.forEach((header, index) => {
+    const value = String(current[index] ?? "").trim();
+    if (value && value !== header) throw new Error(`${SHEET_NAME} column ${index === 0 ? "M" : "N"} is already in use.`);
+  });
+
+  await Promise.all([
+    sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${SHEET_NAME}'!M1:N1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [INTERNAL_HEADERS] },
+    }),
+    sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          updateDimensionProperties: {
+            range: { sheetId, dimension: "COLUMNS", startIndex: 10, endIndex: EXPORT_MARKER_COLUMN },
+            properties: { hiddenByUser: true },
+            fields: "hiddenByUser",
+          },
+        }],
+      },
+    }),
+  ]);
+  trackingColumnsReady = true;
 }
 
 async function insertRows(sheets: ReturnType<typeof google.sheets>, spreadsheetId: string, sheetId: number, rowIndex: number, count: number) {
@@ -294,6 +313,7 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput, options: 
   }
 
   const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
+  await ensureOrderTrackingColumns(sheets, spreadsheetId, sheetId);
   let sheetRows = rows;
   let dateRowIndex = sheetRows.findIndex((row, index) => index > 0 && (row[0] ?? "").toString().trim() === targetDate);
   if (dateRowIndex === -1) {
@@ -343,11 +363,13 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput, options: 
     input.dop || "",
     input.zamjena || "",
     sourceId,
+    "",
+    new Date().toISOString(),
   ]];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${targetRowIndex + 1}:K${targetRowIndex + 1}`,
+    range: `'${SHEET_NAME}'!A${targetRowIndex + 1}:M${targetRowIndex + 1}`,
     valueInputOption: "RAW",
     requestBody: { values },
   });
@@ -371,8 +393,67 @@ export async function deleteOrderFromOrdersSheet(sheetOrderId: string) {
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${rowIndex + 1}:L${rowIndex + 1}`,
+    range: `'${SHEET_NAME}'!A${rowIndex + 1}:N${rowIndex + 1}`,
   });
   invalidateSheetCache(SHEET_NAME);
   return true;
+}
+
+export async function markLastExportedOrder(sheetRowNumber: number, marker: string, label: string) {
+  if (!Number.isInteger(sheetRowNumber) || sheetRowNumber < 2) throw new Error("Invalid exported order row.");
+
+  const { sheets, spreadsheetId } = getSheetsClient();
+  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
+  await ensureOrderTrackingColumns(sheets, spreadsheetId, sheetId);
+
+  const markerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${SHEET_NAME}'!N:N`,
+  });
+  const previousRows = (markerResponse.data.values ?? [])
+    .map((row, index) => (String(row[0] ?? "").trim() === marker ? index + 1 : 0))
+    .filter((rowNumber) => rowNumber >= 2 && rowNumber !== sheetRowNumber);
+
+  const requests: sheets_v4.Schema$Request[] = previousRows.flatMap((rowNumber) => [
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: rowNumber - 1, endRowIndex: rowNumber, startColumnIndex: 0, endColumnIndex: 10 },
+        cell: { userEnteredFormat: { backgroundColor: { red: 1, green: 1, blue: 1 } } },
+        fields: "userEnteredFormat.backgroundColor",
+      },
+    },
+    {
+      updateCells: {
+        range: { sheetId, startRowIndex: rowNumber - 1, endRowIndex: rowNumber, startColumnIndex: EXPORT_MARKER_COLUMN - 1, endColumnIndex: EXPORT_MARKER_COLUMN },
+        fields: "userEnteredValue",
+      },
+    },
+  ]);
+
+  requests.push(
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: sheetRowNumber - 1, endRowIndex: sheetRowNumber, startColumnIndex: 0, endColumnIndex: 10 },
+        cell: { userEnteredFormat: { backgroundColor: { red: 0.733, green: 0.949, blue: 0.827 } } },
+        fields: "userEnteredFormat.backgroundColor",
+      },
+    },
+    {
+      updateCells: {
+        range: { sheetId, startRowIndex: sheetRowNumber - 1, endRowIndex: sheetRowNumber, startColumnIndex: 0, endColumnIndex: 1 },
+        rows: [{ values: [{ note: `Posljednja narudžba izvezena za ciklus ${label}.` }] }],
+        fields: "note",
+      },
+    },
+    {
+      updateCells: {
+        range: { sheetId, startRowIndex: sheetRowNumber - 1, endRowIndex: sheetRowNumber, startColumnIndex: EXPORT_MARKER_COLUMN - 1, endColumnIndex: EXPORT_MARKER_COLUMN },
+        rows: [{ values: [{ userEnteredValue: { stringValue: marker } }] }],
+        fields: "userEnteredValue",
+      },
+    },
+  );
+
+  await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+  invalidateSheetCache(SHEET_NAME);
 }

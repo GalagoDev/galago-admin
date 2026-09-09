@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { OrderListPage } from "@/components/order-list-page";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
+import { getLatestCompletedExportWindow } from "@/lib/order-workday";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export default async function OrdersPage({
   const rows = await getOrdersSheetRows({ fresh: Boolean(params.refresh) }).catch(() => []);
   const latestDate = getLatestSheetDateLabel(rows);
   const orders = latestDate ? rows.filter((row) => row.dateLabel === latestDate) : [];
+  const exportWindow = getLatestCompletedExportWindow();
 
   return (
     <OrderListPage
@@ -37,14 +39,14 @@ export default async function OrdersPage({
       headerAction={
         latestDate && orders.length > 0 ? (
           <Link
-            href={`/orders/export?date=${encodeURIComponent(latestDate)}`}
+            href="/orders/export"
             prefetch={false}
-            aria-label="Preuzmi Excel za Brzu poštu"
-            title="Preuzmi Excel za Brzu poštu"
+            aria-label={`Preuzmi Excel: ${exportWindow.startLabel} 08:00 - ${exportWindow.endLabel} 08:00`}
+            title={`Preuzmi Excel: ${exportWindow.startLabel} 08:00 - ${exportWindow.endLabel} 08:00`}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-3 text-sm font-medium text-emerald-200 transition hover:bg-emerald-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
           >
             <DownloadIcon />
-            <span className="hidden sm:inline">Excel</span>
+            <span className="hidden sm:inline">Excel do 08:00</span>
           </Link>
         ) : null
       }

@@ -18,6 +18,7 @@ export type SheetOrderRow = {
   vrijednostPosiljke: string;
   dop: string;
   zamjena: string;
+  receivedAt: string;
 };
 
 const SHEET_NAME = "Orders";
@@ -286,7 +287,7 @@ export async function getSheetRowsByName(
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:L`,
+      range: `'${sheetName}'!A:M`,
     });
 
     const rows = response.data.values ?? [];
@@ -322,6 +323,7 @@ export async function getSheetRowsByName(
         vrijednostPosiljke: cells[7] ?? "",
         dop: cells[8] ?? "",
         zamjena: cells[9] ?? "",
+        receivedAt: cells[12] ?? "",
       };
       result.push({
         ...order,

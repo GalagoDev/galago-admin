@@ -16,7 +16,9 @@ const BLOCK_EMPTY_ROWS = 5;
 const TOTAL_COLUMNS = 10;
 const INTERNAL_ID_COLUMN = 11; // K
 const APP_STATUS_COLUMN = 12; // L
-const INTERNAL_HEADERS = ['Source ID', 'App status'];
+const RECEIVED_AT_COLUMN = 13; // M
+const EXPORT_MARKER_COLUMN = 14; // N
+const INTERNAL_HEADERS = ['Source ID', 'App status', 'Received at', 'Export marker'];
 const SPREADSHEET_ID = '1P99qsJa4HzruxVCB3BHLTpZ5Jvb1jiTVvjf6IuRho9s';
 const DEFAULT_SHOPIFY_STORE_KEY = 'galago';
 
@@ -135,7 +137,7 @@ function ensureOrdersSheetLayout() {
     .setHorizontalAlignment('center');
 
   sheet.setFrozenRows(1);
-  sheet.hideColumns(INTERNAL_ID_COLUMN, APP_STATUS_COLUMN - INTERNAL_ID_COLUMN + 1);
+  sheet.hideColumns(INTERNAL_ID_COLUMN, EXPORT_MARKER_COLUMN - INTERNAL_ID_COLUMN + 1);
 }
 
 function insertOrdersTodayBlock() {
@@ -178,12 +180,13 @@ function insertOrdersTodayBlock() {
 
 function getCurrentWorkdayLabel_(tz) {
   const date = new Date();
-  const day = date.getDay();
+  const hour = Number(Utilities.formatDate(date, tz, 'H'));
+  if (hour >= 8) date.setTime(date.getTime() + 24 * 60 * 60 * 1000);
 
-  if (day === 6) {
-    date.setDate(date.getDate() + 2);
-  } else if (day === 0) {
-    date.setDate(date.getDate() + 1);
+  let weekday = Utilities.formatDate(date, tz, 'EEE');
+  while (weekday === 'Sat' || weekday === 'Sun') {
+    date.setTime(date.getTime() + 24 * 60 * 60 * 1000);
+    weekday = Utilities.formatDate(date, tz, 'EEE');
   }
 
   return Utilities.formatDate(date, tz, 'dd/MM/yyyy');
@@ -235,6 +238,7 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
   ]]);
 
   sheet.getRange(insertRow, INTERNAL_ID_COLUMN).setValue(shopifyOrderId);
+  sheet.getRange(insertRow, RECEIVED_AT_COLUMN).setValue(new Date().toISOString());
 
   maintainEmptyRowsForBlock_(sheet, insertRow);
 }
