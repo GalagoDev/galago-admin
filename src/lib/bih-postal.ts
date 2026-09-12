@@ -51,7 +51,9 @@ export const BIH_POSTAL_CODES: Record<string, string> = {
   "velika kladuša": "77230",
   "velika kladusa": "77230",
   "goražde": "73000",
-  "gorazde": "73000"
+  "gorazde": "73000",
+  "ključ": "79280",
+  "kljuc": "79280",
 };
 
 export function normalizeBosnianText(value: string) {

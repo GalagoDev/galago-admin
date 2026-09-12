@@ -5,8 +5,8 @@ import { z } from "zod";
 import {
   bosniaPostalCodes,
   normalizePhone,
-  normalizeTelegramPostalCode,
   parseTelegramArticleAndAmount,
+  resolveTelegramPostalCode,
   type TelegramOrderDraft,
 } from "@/lib/telegram-orders";
 
@@ -41,16 +41,21 @@ function imageDataUrl(imageBytes: ArrayBuffer, mimeType: string) {
   return `data:${mimeType};base64,${Buffer.from(imageBytes).toString("base64")}`;
 }
 
-function normalizeDraft(order: z.infer<typeof telegramOrderSchema>, artikalOverride: string): TelegramOrderDraft {
+function normalizeDraft(
+  order: z.infer<typeof telegramOrderSchema>,
+  artikalOverride: string,
+  sourceText: string,
+): TelegramOrderDraft {
   const override = parseTelegramArticleAndAmount(artikalOverride);
   const extracted = parseTelegramArticleAndAmount(order.artikal);
   const modelAmount = cleanup(order.ukupanIznos).match(/\d+(?:[.,]\d{1,2})?/)?.[0]?.replace(",", ".") || "";
   const amount = override.amount || modelAmount || extracted.amount;
+  const grad = resolveTelegramPostalCode(order.grad, order.adresa, sourceText);
 
   return {
     primalac: cleanup(order.primalac),
     brojTelefona: normalizePhone(order.brojTelefona),
-    grad: normalizeTelegramPostalCode(order.grad),
+    grad,
     adresa: cleanup(order.adresa),
     artikal: override.artikal || extracted.artikal,
     brojPaketa: "",
@@ -126,6 +131,7 @@ async function extractWithOpenAI(input: {
   const client = getOpenAIClient();
   const model = process.env.OPENAI_ORDER_MODEL || DEFAULT_MODEL;
   const artikalOverride = getArtikalOverride(input);
+  const sourceText = [input.text, input.caption].filter(Boolean).join("\n");
   const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
     {
       type: "text",
@@ -169,7 +175,7 @@ async function extractWithOpenAI(input: {
     if (!raw) throw new Error("OpenAI nije vratio narudžbu.");
 
     const parsed = telegramOrderSchema.parse(JSON.parse(raw));
-    const order = normalizeDraft(parsed, artikalOverride);
+    const order = normalizeDraft(parsed, artikalOverride, sourceText);
     assertUsableOrder(order);
     return order;
   } catch (error) {

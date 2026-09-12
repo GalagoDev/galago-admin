@@ -58,6 +58,8 @@ export const bosniaPostalCodes: Record<string, string> = {
   turbe: "72283",
   laktasi: "78250",
   "laktaši": "78250",
+  kljuc: "79280",
+  "ključ": "79280",
 };
 
 function cleanup(value: unknown) {
@@ -131,6 +133,10 @@ export function normalizeTelegramPostalCode(value: string) {
   if (explicitZip) return explicitZip;
 
   return detectPostal(cleaned)?.postalCode || "";
+}
+
+export function resolveTelegramPostalCode(...values: Array<string | undefined>) {
+  return normalizeTelegramPostalCode(values.filter(Boolean).join("\n"));
 }
 
 function findAmount(text: string) {
