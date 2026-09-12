@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import type { MetaMessagingIdentity } from "@/lib/meta-messaging-identities";
 import type { TelegramOrderDraft } from "@/lib/telegram-orders";
 
 type DraftRow = {
@@ -7,6 +8,7 @@ type DraftRow = {
   message_id: string;
   preview_message_id: number;
   order_json: string;
+  meta_identity_json: string | null;
 };
 
 function ensureDraftTable() {
@@ -18,9 +20,15 @@ function ensureDraftTable() {
       message_id TEXT NOT NULL,
       preview_message_id INTEGER NOT NULL,
       order_json TEXT NOT NULL,
+      meta_identity_json TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  const columns = db.prepare("PRAGMA table_info(telegram_order_drafts)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "meta_identity_json")) {
+    db.exec("ALTER TABLE telegram_order_drafts ADD COLUMN meta_identity_json TEXT");
+  }
   return db;
 }
 
@@ -34,14 +42,18 @@ export function saveTelegramOrderDraft(input: {
   messageId: number | string;
   previewMessageId: number;
   order: TelegramOrderDraft;
+  metaIdentity?: MetaMessagingIdentity;
 }) {
   const db = ensureDraftTable();
   db.prepare(
-    `INSERT INTO telegram_order_drafts (draft_key, chat_id, message_id, preview_message_id, order_json)
-     VALUES (@key, @chatId, @messageId, @previewMessageId, @orderJson)
+    `INSERT INTO telegram_order_drafts (
+       draft_key, chat_id, message_id, preview_message_id, order_json, meta_identity_json
+     )
+     VALUES (@key, @chatId, @messageId, @previewMessageId, @orderJson, @metaIdentityJson)
      ON CONFLICT(draft_key) DO UPDATE SET
        preview_message_id = excluded.preview_message_id,
        order_json = excluded.order_json,
+       meta_identity_json = excluded.meta_identity_json,
        created_at = CURRENT_TIMESTAMP`
   ).run({
     key: input.key,
@@ -49,6 +61,7 @@ export function saveTelegramOrderDraft(input: {
     messageId: String(input.messageId),
     previewMessageId: input.previewMessageId,
     orderJson: JSON.stringify(input.order),
+    metaIdentityJson: input.metaIdentity ? JSON.stringify(input.metaIdentity) : null,
   });
 }
 
@@ -63,6 +76,9 @@ export function getTelegramOrderDraft(key: string) {
     messageId: row.message_id,
     previewMessageId: row.preview_message_id,
     order: JSON.parse(row.order_json) as TelegramOrderDraft,
+    metaIdentity: row.meta_identity_json
+      ? (JSON.parse(row.meta_identity_json) as MetaMessagingIdentity)
+      : undefined,
   };
 }
 

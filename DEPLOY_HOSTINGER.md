@@ -126,6 +126,23 @@ OPENAI_ORDER_MODEL=gpt-5.6-luna
 `OPENAI_ORDER_MODEL` is optional and defaults to `gpt-5.6-luna` with reasoning
 disabled for low-latency structured order extraction.
 
+## Meta messaging conversion attribution
+
+Configure the Meta app's Messenger and Instagram Messaging webhooks with:
+
+```text
+Callback URL: https://magenta-tarsier-949777.hostingersite.com/api/meta/messaging
+Verify token: the same random value as META_WEBHOOK_VERIFY_TOKEN
+Fields: messages, message_echoes, messaging_referrals
+```
+
+Set `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `META_CAPI_ACCESS_TOKEN`, and
+`META_INSTAGRAM_BUSINESS_ACCOUNT_ID` in production. The webhook stores the
+Messenger PSID or Instagram IGSID when the customer sends their phone number.
+The Telegram order bot links the draft by phone and sends `Purchase` only when
+that scoped conversation identifier is available. The call is server-side and
+does not create a customer-visible order card.
+
 Confirmed Telegram orders receive a stable hidden ID in column `K`. Reply with
 `delete`, `obriši`, or `obrisi` directly to the bot's confirmed order message to
 clear that exact order from `Orders` without deleting or shifting the styled row.

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { appendOrderToOrdersSheet, deleteOrderFromOrdersSheet } from "@/lib/google-orders";
 import {
+  isMetaConversionsConfigured,
+  retryPendingMetaConversions,
+  trackMetaMessagingPurchase,
+} from "@/lib/meta-conversions";
+import { findMetaMessagingIdentityByPhone } from "@/lib/meta-messaging-identities";
+import {
   getTelegramConfirmedOrder,
   markTelegramConfirmedOrderDeleted,
   saveTelegramConfirmedOrder,
@@ -126,16 +132,27 @@ async function answerCallbackQuery(payload: Record<string, unknown>) {
 
 async function saveDraftAndSendPreview(message: TelegramMessage, order: TelegramOrderDraft, previewMessageId?: number) {
   const key = makeTelegramDraftKey(message.chat.id, message.message_id);
+  const identityMatch = findMetaMessagingIdentityByPhone(order.brojTelefona);
+  const metaIdentity = identityMatch.status === "found" ? identityMatch.identity : undefined;
+  const metaLabel =
+    identityMatch.status === "found"
+      ? `Meta atribucija: povezana sa ${metaIdentity?.channel === "messenger" ? "Facebook" : "Instagram"} razgovorom.`
+      : identityMatch.status === "ambiguous"
+        ? "Meta atribucija: više mogućih razgovora — neće se slati da ne pripišemo pogrešnoj kampanji."
+        : "Meta atribucija: razgovor nije pronađen — potvrda će sačuvati narudžbu bez Meta konverzije.";
   const replyMarkup = {
     inline_keyboard: [
       [
-        { text: "Confirm", callback_data: `confirm:${key}` },
-        { text: "Cancel", callback_data: `cancel:${key}` },
+        {
+          text: metaIdentity ? "✅ Potvrdi + Meta" : "✅ Potvrdi",
+          callback_data: `confirm:${metaIdentity ? "meta" : "none"}:${key}`,
+        },
+        { text: "❌ Otkaži", callback_data: `cancel:${key}` },
       ],
     ],
   };
 
-  const text = formatTelegramOrderPreview(order);
+  const text = `${formatTelegramOrderPreview(order)}\n\n${metaLabel}`;
   const preview = previewMessageId
     ? await editMessageText({
         chat_id: message.chat.id,
@@ -156,6 +173,7 @@ async function saveDraftAndSendPreview(message: TelegramMessage, order: Telegram
     messageId: message.message_id,
     previewMessageId: previewMessageId || preview.message_id,
     order,
+    metaIdentity,
   });
 }
 
@@ -359,7 +377,10 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
   }
 
   if (data.startsWith("confirm:")) {
-    const key = data.slice("confirm:".length);
+    const confirmation = data.slice("confirm:".length);
+    const confirmationMatch = confirmation.match(/^(meta|none):(.+)$/);
+    const mode = confirmationMatch?.[1];
+    const key = confirmationMatch?.[2] || confirmation;
     const draft = getTelegramOrderDraft(key);
     if (!draft) {
       await answerCallbackQuery({ callback_query_id: query.id, text: "Order draft not found." });
@@ -377,10 +398,29 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
         order: draft.order,
       });
       deleteTelegramOrderDraft(key);
+
+      let metaStatus = "";
+      if (mode === "meta" && draft.metaIdentity) {
+        const meta = await trackMetaMessagingPurchase({
+          eventId: sheetOrderId,
+          identity: draft.metaIdentity,
+          order: draft.order,
+        });
+        const channelLabel = draft.metaIdentity.channel === "messenger" ? "Facebook" : "Instagram";
+        metaStatus =
+          meta.status === "sent" || meta.status === "already_sent"
+            ? `\n\nMeta: Purchase poslan tiho (${channelLabel}).`
+            : `\n\nMeta: Purchase je sačuvan za ponovno slanje (${channelLabel}).`;
+      } else if (mode === "none") {
+        metaStatus = "\n\nMeta: preskočeno (nije pronađen pouzdan ID razgovora).";
+      } else {
+        metaStatus = "\n\nMeta: preskočeno za staru potvrdu bez pouzdanog ID-a razgovora.";
+      }
+
       await editMessageText({
         chat_id: Number(draft.chatId),
         message_id: draft.previewMessageId,
-        text: `Narudžba potvrđena i sačuvana u Orders sheet.\n\n${formatTelegramOrderPreview(draft.order)}`,
+        text: `Narudžba potvrđena i sačuvana u Orders sheet.${metaStatus}\n\n${formatTelegramOrderPreview(draft.order)}`,
       });
       await answerCallbackQuery({ callback_query_id: query.id, text: "Saved." });
     } catch (error) {
@@ -400,6 +440,7 @@ export async function GET() {
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
     model: process.env.OPENAI_ORDER_MODEL || "gpt-5.6-luna",
     allowedChatRestricted: Boolean(process.env.TELEGRAM_ORDERS_ALLOWED_CHAT_ID),
+    metaConversionsConfigured: isMetaConversionsConfigured(),
     webhook: "/api/telegram/orders",
   });
 }
@@ -417,6 +458,10 @@ export async function POST(request: NextRequest) {
     } else if (update.callback_query) {
       await handleCallbackQuery(update.callback_query);
     }
+
+    await retryPendingMetaConversions().catch((error) => {
+      console.warn("Meta conversion retry failed:", error instanceof Error ? error.message : error);
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
