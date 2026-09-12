@@ -85,8 +85,27 @@ function openAIErrorMessage(error: unknown) {
 }
 
 function postalHints() {
-  return Object.entries(bosniaPostalCodes)
-    .map(([city, zip]) => `${city}=${zip}`)
+  const commonPlaces = [
+    "sarajevo",
+    "banja luka",
+    "tuzla",
+    "zenica",
+    "mostar",
+    "bijeljina",
+    "brcko",
+    "bihac",
+    "cazin",
+    "travnik",
+    "doboj",
+    "prijedor",
+    "zivinice",
+    "sanski most",
+    "kljuc",
+    "kozarska dubica",
+  ];
+
+  return commonPlaces
+    .map((city) => `${city}=${bosniaPostalCodes[city]}`)
     .join(", ");
 }
 

@@ -1,3 +1,5 @@
+import { BIH_POSTAL_CODES, detectPostalFromText, normalizeBosnianText } from "./bih-postal.ts";
+
 export type TelegramOrderDraft = {
   primalac: string;
   brojTelefona: string;
@@ -11,57 +13,7 @@ export type TelegramOrderDraft = {
   zamjena: string;
 };
 
-export const bosniaPostalCodes: Record<string, string> = {
-  sarajevo: "71000",
-  "banja luka": "78000",
-  tuzla: "75000",
-  zenica: "72000",
-  mostar: "88000",
-  bijeljina: "76300",
-  brcko: "76100",
-  bihac: "77000",
-  "bihać": "77000",
-  cazin: "77220",
-  travnik: "72270",
-  visoko: "71300",
-  gradacac: "76250",
-  "gradačac": "76250",
-  gracanica: "75320",
-  "gračanica": "75320",
-  konjic: "88400",
-  bugojno: "70230",
-  trebinje: "89101",
-  doboj: "74000",
-  prijedor: "79101",
-  zivinice: "75270",
-  "živinice": "75270",
-  kalesija: "75260",
-  lukavac: "75300",
-  kakanj: "72240",
-  maglaj: "74250",
-  rogatica: "73220",
-  grude: "88340",
-  vitez: "72250",
-  jablanica: "88420",
-  banovici: "75290",
-  "banovići": "75290",
-  kozarac: "79202",
-  "han bila": "72245",
-  "čajniče": "73280",
-  cajnice: "73280",
-  "han pijesak": "71360",
-  "bosanska krupa": "77240",
-  "donji vakuf": "70220",
-  foca: "73300",
-  "foča": "73300",
-  "sanski most": "79260",
-  turbe: "72283",
-  laktasi: "78250",
-  "laktaši": "78250",
-  kljuc: "79280",
-  "ključ": "79280",
-  "kozarska dubica": "79240",
-};
+export const bosniaPostalCodes = BIH_POSTAL_CODES;
 
 function cleanup(value: unknown) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -103,29 +55,18 @@ function escapeRegExp(value: string) {
 
 export function detectPostal(text: string) {
   const cleaned = cleanup(text);
-  const lowered = cleaned.toLowerCase();
+  const explicitZip = cleaned.match(/\b(\d{5})\b/)?.[1] || "";
 
-  const exactZipCity = cleaned.match(/\b(\d{5})\b\s+([A-Za-zČĆŽŠĐčćžšđ]+(?:\s+[A-Za-zČĆŽŠĐčćžšđ]+)*)$/);
-  if (exactZipCity) {
-    const zip = exactZipCity[1] || "";
-    const cityName = (exactZipCity[2] || "").toLowerCase();
-    if (bosniaPostalCodes[cityName] === zip) return { city: titleCase(cityName), postalCode: zip };
+  if (explicitZip) {
+    const withoutZip = cleanup(cleaned.replace(explicitZip, " ").replace(/[()]/g, " "));
+    const detected = detectPostalFromText(withoutZip);
+    return {
+      city: detected?.city || titleCase(normalizeBosnianText(withoutZip)),
+      postalCode: explicitZip,
+    };
   }
 
-  const exactCityZip = cleaned.match(/^([A-Za-zČĆŽŠĐčćžšđ]+(?:\s+[A-Za-zČĆŽŠĐčćžšđ]+)*)\s+(\d{5})$/);
-  if (exactCityZip) {
-    const cityName = (exactCityZip[1] || "").toLowerCase();
-    const zip = exactCityZip[2] || "";
-    if (bosniaPostalCodes[cityName] === zip) return { city: titleCase(cityName), postalCode: zip };
-  }
-
-  for (const city of Object.keys(bosniaPostalCodes).sort((a, b) => b.length - a.length)) {
-    if (lowered === city) return { city: titleCase(city), postalCode: bosniaPostalCodes[city] };
-    if (lowered === `${city} ${bosniaPostalCodes[city]}`) return { city: titleCase(city), postalCode: bosniaPostalCodes[city] };
-    if (lowered === `${bosniaPostalCodes[city]} ${city}`) return { city: titleCase(city), postalCode: bosniaPostalCodes[city] };
-  }
-
-  return null;
+  return detectPostalFromText(cleaned);
 }
 
 export function normalizeTelegramPostalCode(value: string) {

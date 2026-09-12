@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  bosniaPostalCodes,
   getTelegramArticleOverrideText,
   normalizeTelegramPostalCode,
   parseTelegramArticleAndAmount,
@@ -38,6 +39,10 @@ const postalCases = [
   ["Jasmina Ikeljic Gornji Vojići bb Ključ (79280) broj 061-823-185", "79280"],
   ["Ključ", "79280"],
   ["Kozarska Dubica", "79240"],
+  ["KoprivnaDonja Osoje", "74489"],
+  ["Nikić Vida 066065991 KoprivnaDonja Osoje", "74489"],
+  ["Gornji Podgradci", "78405"],
+  ["Medjuvodje", "79247"],
   ["Nepoznato mjesto", ""],
 ];
 
@@ -50,5 +55,7 @@ assert.equal(
   "79280",
   "falls back to the original Telegram message when OpenAI leaves Grad empty",
 );
+
+assert.ok(Object.keys(bosniaPostalCodes).length >= 400);
 
 console.log(`Telegram parsing passed (${cases.length} caption and ${postalCases.length} ZIP cases).`);

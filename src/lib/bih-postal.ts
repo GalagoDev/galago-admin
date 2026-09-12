@@ -1,80 +1,123 @@
-export const BIH_POSTAL_CODES: Record<string, string> = {
-  "sarajevo": "71000",
+import { OFFICIAL_BIH_POSTAL_DIRECTORY } from "./bih-postal-directory.ts";
+
+const PREFERRED_POSTAL_CODES: Record<string, string> = {
+  sarajevo: "71000",
   "banja luka": "78000",
-  "tuzla": "75000",
-  "zenica": "72000",
-  "mostar": "88000",
-  "bijeljina": "76300",
-  "brcko": "76100",
-  "bihać": "77000",
-  "bihac": "77000",
-  "cazin": "77220",
-  "travnik": "72270",
-  "visoko": "71300",
-  "gradačac": "76250",
-  "gradacac": "76250",
-  "gračanica": "75320",
-  "gracanica": "75320",
-  "konjic": "88400",
-  "bugojno": "70230",
-  "trebinje": "89101",
-  "doboj": "74000",
-  "prijedor": "79101",
-  "živinice": "75270",
-  "zivinice": "75270",
-  "kalesija": "75260",
-  "lukavac": "75300",
-  "kakanj": "72240",
-  "rogatica": "73220",
-  "grude": "88340",
-  "vitez": "72250",
-  "jablanica": "88420",
-  "banovići": "75290",
-  "banovici": "75290",
-  "kozarac": "79202",
+  tuzla: "75000",
+  zenica: "72000",
+  mostar: "88000",
+  bijeljina: "76300",
+  brcko: "76000",
+  bihac: "77000",
+  cazin: "77220",
+  travnik: "72270",
+  visoko: "71300",
+  gradacac: "76250",
+  gracanica: "75320",
+  konjic: "88400",
+  bugojno: "70230",
+  trebinje: "89101",
+  doboj: "74000",
+  prijedor: "79101",
+  zivinice: "75270",
+  kalesija: "75260",
+  lukavac: "75300",
+  kakanj: "72240",
+  maglaj: "74250",
+  rogatica: "73220",
+  grude: "88340",
+  vitez: "72250",
+  jablanica: "88420",
+  banovici: "75290",
+  kozarac: "79202",
   "han bila": "72245",
-  "čajniče": "73280",
-  "cajnice": "73280",
+  cajnice: "73280",
   "han pijesak": "71360",
   "bosanska krupa": "77240",
-  "turbe": "72283",
-  "orašje": "76270",
-  "orasje": "76270",
-  "hadžići": "71240",
-  "hadzici": "71240",
-  "lukavica": "71123",
-  "fojnica": "71270",
-  "tešanj": "74260",
-  "tesanj": "74260",
+  "donji vakuf": "70220",
+  foca: "73300",
   "sanski most": "79260",
-  "srebrenik": "75350",
-  "velika kladuša": "77230",
-  "velika kladusa": "77230",
-  "goražde": "73000",
-  "gorazde": "73000",
-  "ključ": "79280",
-  "kljuc": "79280",
+  turbe: "72283",
+  laktasi: "78250",
+  kljuc: "79280",
   "kozarska dubica": "79240",
+  "koprivna donja": "74489",
+  koprivnadonja: "74489",
+  "donja koprivna": "77222",
 };
 
 export function normalizeBosnianText(value: string) {
-  return value.toLowerCase().trim();
+  return String(value || "")
+    .toLocaleLowerCase("bs-BA")
+    .replace(/đ/g, "dj")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
+const officialEntries = OFFICIAL_BIH_POSTAL_DIRECTORY.map(([place, postalCode]) => ({
+  place,
+  normalized: normalizeBosnianText(place),
+  postalCode,
+}));
+
+const primaryPlaceLabels = new Map<string, string>();
+const postalCodes: Record<string, string> = {};
+
+for (const entry of officialEntries) {
+  if (!entry.normalized || postalCodes[entry.normalized]) continue;
+  postalCodes[entry.normalized] = entry.postalCode;
+  primaryPlaceLabels.set(entry.normalized, entry.place);
+}
+
+for (const [place, postalCode] of Object.entries(PREFERRED_POSTAL_CODES)) {
+  const normalized = normalizeBosnianText(place);
+  postalCodes[normalized] = postalCode;
+  if (!primaryPlaceLabels.has(normalized)) primaryPlaceLabels.set(normalized, place);
+}
+
+export const BIH_POSTAL_CODES: Record<string, string> = Object.freeze(postalCodes);
+
+const searchablePlaces = Object.keys(BIH_POSTAL_CODES).sort((left, right) => right.length - left.length);
+
 export function lookupPostalCode(value: string) {
-  const normalized = normalizeBosnianText(value);
-  return BIH_POSTAL_CODES[normalized] || null;
+  return BIH_POSTAL_CODES[normalizeBosnianText(value)] || null;
 }
 
 export function detectPostalFromText(text: string) {
-  const lowered = normalizeBosnianText(text);
-  for (const city of Object.keys(BIH_POSTAL_CODES).sort((a, b) => b.length - a.length)) {
-    if (lowered.includes(city)) {
+  const normalizedText = normalizeBosnianText(text);
+  if (!normalizedText) return null;
+
+  const exactPostalCode = BIH_POSTAL_CODES[normalizedText];
+  if (exactPostalCode) {
+    return {
+      city: primaryPlaceLabels.get(normalizedText) || normalizedText,
+      postalCode: exactPostalCode,
+    };
+  }
+
+  const paddedText = ` ${normalizedText} `;
+  for (const place of searchablePlaces) {
+    if (paddedText.includes(` ${place} `)) {
       return {
-        city,
-        postalCode: BIH_POSTAL_CODES[city],
+        city: primaryPlaceLabels.get(place) || place,
+        postalCode: BIH_POSTAL_CODES[place],
       };
     }
   }
+
+  const textParts = normalizedText.split(" ");
+  for (const place of searchablePlaces) {
+    const compactPlace = place.replace(/ /g, "");
+    if (compactPlace.length < 8) continue;
+    if (textParts.some((part) => part.includes(compactPlace))) {
+      return {
+        city: primaryPlaceLabels.get(place) || place,
+        postalCode: BIH_POSTAL_CODES[place],
+      };
+    }
+  }
+
   return null;
 }
