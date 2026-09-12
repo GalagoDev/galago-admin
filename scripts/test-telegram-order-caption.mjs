@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  getTelegramArticleOverrideText,
   normalizeTelegramPostalCode,
   parseTelegramArticleAndAmount,
   resolveTelegramPostalCode,
@@ -19,6 +20,15 @@ for (const [input, expected] of cases) {
   assert.deepEqual(parseTelegramArticleAndAmount(input), expected, input);
 }
 
+assert.equal(
+  getTelegramArticleOverrideText("ZINETA ZVIRAC\nSAFETA ZAJKE 226 71000 SARAJEVO\nBR.TFN. 062 541 141\nLewa gold\nSds 95"),
+  "Lewa gold\nSds 95",
+);
+assert.deepEqual(
+  parseTelegramArticleAndAmount(getTelegramArticleOverrideText("Kozarska Dubica, Studenička ulica 066 998 073\n\nMara white\nSds 119")),
+  { artikal: "Mara white", amount: "119" },
+);
+
 const postalCases = [
   ["Foča", "73300"],
   ["Foca", "73300"],
@@ -27,6 +37,7 @@ const postalCases = [
   ["79260 Sanski Most", "79260"],
   ["Jasmina Ikeljic Gornji Vojići bb Ključ (79280) broj 061-823-185", "79280"],
   ["Ključ", "79280"],
+  ["Kozarska Dubica", "79240"],
   ["Nepoznato mjesto", ""],
 ];
 

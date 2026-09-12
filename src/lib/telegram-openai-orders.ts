@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   bosniaPostalCodes,
+  getTelegramArticleOverrideText,
   normalizePhone,
   parseTelegramArticleAndAmount,
   resolveTelegramPostalCode,
@@ -89,16 +90,8 @@ function postalHints() {
     .join(", ");
 }
 
-function lastMeaningfulLine(value: string) {
-  return String(value || "")
-    .split(/\n+/)
-    .map(cleanup)
-    .filter(Boolean)
-    .at(-1) || "";
-}
-
 function getArtikalOverride(input: { text?: string; caption?: string }) {
-  return cleanup(input.caption) || (input.text ? lastMeaningfulLine(input.text) : "");
+  return getTelegramArticleOverrideText(input.caption || input.text || "");
 }
 
 function systemPrompt() {

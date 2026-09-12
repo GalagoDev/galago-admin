@@ -60,6 +60,7 @@ export const bosniaPostalCodes: Record<string, string> = {
   "laktaši": "78250",
   kljuc: "79280",
   "ključ": "79280",
+  "kozarska dubica": "79240",
 };
 
 function cleanup(value: unknown) {
@@ -137,6 +138,21 @@ export function normalizeTelegramPostalCode(value: string) {
 
 export function resolveTelegramPostalCode(...values: Array<string | undefined>) {
   return normalizeTelegramPostalCode(values.filter(Boolean).join("\n"));
+}
+
+export function getTelegramArticleOverrideText(value: string) {
+  const lines = String(value || "")
+    .split(/\n+/)
+    .map(cleanup)
+    .filter(Boolean);
+  const lastLine = lines.at(-1) || "";
+  const lastLineResult = parseTelegramArticleAndAmount(lastLine);
+
+  if (lastLineResult.amount && !lastLineResult.artikal && lines.length >= 2) {
+    return `${lines.at(-2)}\n${lastLine}`;
+  }
+
+  return lastLine;
 }
 
 function findAmount(text: string) {

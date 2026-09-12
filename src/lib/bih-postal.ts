@@ -54,6 +54,7 @@ export const BIH_POSTAL_CODES: Record<string, string> = {
   "gorazde": "73000",
   "ključ": "79280",
   "kljuc": "79280",
+  "kozarska dubica": "79240",
 };
 
 export function normalizeBosnianText(value: string) {
