@@ -91,12 +91,10 @@ export function getTargetWorkdayLabel(now = new Date()) {
   return formatWorkdayLabel(cycleEndDate);
 }
 
-export function getLatestCompletedExportWindow(now = new Date()) {
+export function getOperationalExportWindow(now = new Date()) {
   const local = zonedParts(now);
-  let endDate: CalendarDate = { year: local.year, month: local.month, day: local.day };
-
-  if (local.hour < CUTOFF_HOUR) endDate = addCalendarDays(endDate, -1);
-  while (weekday(endDate) === 0 || weekday(endDate) === 6) endDate = addCalendarDays(endDate, -1);
+  const calendarDate = { year: local.year, month: local.month, day: local.day };
+  const endDate = nextWeekday(calendarDate);
 
   const startDate = previousWeekday(endDate);
   const start = atSarajevoCutoff(startDate);
@@ -110,4 +108,3 @@ export function getLatestCompletedExportWindow(now = new Date()) {
     marker: `export:${end.toISOString()}`,
   };
 }
-

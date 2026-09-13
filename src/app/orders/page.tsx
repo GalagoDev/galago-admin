@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { OrderListPage } from "@/components/order-list-page";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
-import { getLatestCompletedExportWindow } from "@/lib/order-workday";
+import { getOperationalExportWindow } from "@/lib/order-workday";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function OrdersPage({
   const rows = await getOrdersSheetRows({ fresh: Boolean(params.refresh) }).catch(() => []);
   const latestDate = getLatestSheetDateLabel(rows);
   const orders = latestDate ? rows.filter((row) => row.dateLabel === latestDate) : [];
-  const exportWindow = getLatestCompletedExportWindow();
+  const exportWindow = getOperationalExportWindow();
 
   return (
     <OrderListPage

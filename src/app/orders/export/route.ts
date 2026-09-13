@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 
 import { markLastExportedOrder } from "@/lib/google-orders";
 import { getActiveOrdersSheetRows, type SheetOrderRow } from "@/lib/google-sheets";
-import { getLatestCompletedExportWindow } from "@/lib/order-workday";
+import { getOperationalExportWindow } from "@/lib/order-workday";
 import { normalizeTelegramPostalCode } from "@/lib/telegram-orders";
 
 export const runtime = "nodejs";
@@ -56,7 +56,7 @@ function orderTime(order: SheetOrderRow) {
 }
 
 export async function GET() {
-  const window = getLatestCompletedExportWindow();
+  const window = getOperationalExportWindow();
   const rows = await getActiveOrdersSheetRows({ fresh: true });
   const orders = rows
     .filter((row) => {
