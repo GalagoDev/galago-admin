@@ -1,4 +1,5 @@
 import type { SheetOrderRow } from "@/lib/google-sheets";
+import { parseOrderAmount } from "./order-amount.ts";
 
 export type CourierDeliveryRow = {
   sourceRowNumber: number;
@@ -34,14 +35,9 @@ function normalizeNameTokens(value: string) {
   return normalizeMatchText(value).split(" ").filter(Boolean).sort().join(" ");
 }
 
-function parseAmount(value: string) {
-  const amount = Number(value.replace(/[^\d.,]/g, "").replace(",", "."));
-  return Number.isFinite(amount) ? amount : null;
-}
-
 function candidateScore(source: CourierDeliveryRow, order: SheetOrderRow) {
   let score = 0;
-  const orderAmount = parseAmount(order.otkupnina);
+  const orderAmount = order.otkupnina.trim() ? parseOrderAmount(order.otkupnina) : null;
   if (source.amount !== null && orderAmount !== null && Math.abs(source.amount - orderAmount) < 0.01) score += 4;
 
   const product = normalizeMatchText(source.product);

@@ -309,6 +309,8 @@ export async function getSheetRowsByName(
       if (sheetName === "Povrati" && isRestoredReturnStatus(cells[10] ?? "")) continue;
 
       rowNumber += 1;
+      const otkupnina = cells[6] || cells[7] || "";
+      const vrijednostPosiljke = cells[7] || cells[6] || "";
       const order = {
         rowNumber,
         sheetRowNumber: sourceIndex + 2,
@@ -319,8 +321,8 @@ export async function getSheetRowsByName(
         adresa: cells[3] ?? "",
         artikal: cells[4] ?? "",
         brojPaketa: cells[5] ?? "",
-        otkupnina: cells[6] ?? "",
-        vrijednostPosiljke: cells[7] ?? "",
+        otkupnina,
+        vrijednostPosiljke,
         dop: cells[8] ?? "",
         zamjena: cells[9] ?? "",
         receivedAt: cells[12] ?? "",

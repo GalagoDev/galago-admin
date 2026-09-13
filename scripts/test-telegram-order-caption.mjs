@@ -7,10 +7,12 @@ import {
   parseTelegramArticleAndAmount,
   resolveTelegramPostalCode,
 } from "../src/lib/telegram-orders.ts";
+import { parseOrderAmount } from "../src/lib/order-amount.ts";
 
 const cases = [
   ["Komoda serena\nSds 139", { artikal: "Komoda serena", amount: "139" }],
   ["Komoda serena SDS: 139 KM", { artikal: "Komoda serena", amount: "139" }],
+  ["Komoda Kibo 129 sds", { artikal: "Komoda Kibo", amount: "129" }],
   ["SDS 89", { artikal: "", amount: "89" }],
   ["Komoda serena - 139", { artikal: "Komoda serena", amount: "139" }],
   ["Komoda serena cijena: 89,90 KM", { artikal: "Komoda serena", amount: "89.9" }],
@@ -57,5 +59,10 @@ assert.equal(
 );
 
 assert.ok(Object.keys(bosniaPostalCodes).length >= 400);
+
+assert.equal(parseOrderAmount("129.00"), 129);
+assert.equal(parseOrderAmount("129,50 KM"), 129.5);
+assert.equal(parseOrderAmount("1.250,50 KM"), 1250.5);
+assert.equal(parseOrderAmount("1,250.50 KM"), 1250.5);
 
 console.log(`Telegram parsing passed (${cases.length} caption and ${postalCases.length} ZIP cases).`);

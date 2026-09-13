@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
 import { getActiveOrdersSheetRows, getOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
+import { parseOrderAmount } from "@/lib/order-amount";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +17,6 @@ function getBannerMessage(params: {
   if (params.error === "missing-confirmed-fields") return "Fill at least the main order fields before saving.";
   if (params.success === "order-saved") return "Narudžba sačuvana u Orders sheet.";
   return null;
-}
-
-function parseAmount(value: string) {
-  const amount = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", "."));
-  return Number.isFinite(amount) ? amount : 0;
 }
 
 function parseDateLabel(value: string) {
@@ -90,8 +86,8 @@ export default async function Home({
   ]);
 
   const totalUndelivered = activeRows.length;
-  const totalUndeliveredKm = activeRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
-  const totalReturnedKm = returnedRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
+  const totalUndeliveredKm = activeRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0);
+  const totalReturnedKm = returnedRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0);
   const oldestUndelivered = [...activeRows]
     .sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel))
     .slice(0, 5);

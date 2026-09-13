@@ -25,8 +25,25 @@ function iso(value) {
   assert.equal(window.end.toISOString(), "2026-09-14T06:00:00.000Z");
 }
 
+{
+  const beforeMondayCutoff = getLatestCompletedExportWindow(iso("2026-09-14T05:59:00Z"));
+  assert.equal(beforeMondayCutoff.start.toISOString(), "2026-09-10T06:00:00.000Z");
+  assert.equal(beforeMondayCutoff.end.toISOString(), "2026-09-11T06:00:00.000Z");
+
+  const atMondayCutoff = getLatestCompletedExportWindow(iso("2026-09-14T06:00:00Z"));
+  assert.equal(atMondayCutoff.start.toISOString(), "2026-09-11T06:00:00.000Z");
+  assert.equal(atMondayCutoff.end.toISOString(), "2026-09-14T06:00:00.000Z");
+  assert.equal(atMondayCutoff.startLabel, "11/09/2026");
+  assert.equal(atMondayCutoff.endLabel, "14/09/2026");
+}
+
 assert.equal(getTargetWorkdayLabel(iso("2026-09-09T05:59:00Z")), "09/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-09T06:00:00Z")), "10/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-11T06:00:00Z")), "14/09/2026");
+assert.equal(getTargetWorkdayLabel(iso("2026-09-12T05:59:00Z")), "14/09/2026");
+assert.equal(getTargetWorkdayLabel(iso("2026-09-12T10:00:00Z")), "14/09/2026");
+assert.equal(getTargetWorkdayLabel(iso("2026-09-13T10:00:00Z")), "14/09/2026");
+assert.equal(getTargetWorkdayLabel(iso("2026-09-14T05:59:00Z")), "14/09/2026");
+assert.equal(getTargetWorkdayLabel(iso("2026-09-14T06:00:00Z")), "15/09/2026");
 
 console.log("Order export window tests passed.");

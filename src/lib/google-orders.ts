@@ -351,6 +351,8 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput, options: 
     await insertRows(sheets, spreadsheetId, sheetId, targetRowIndex, TRAILING_EMPTY_ROWS + 1);
   }
 
+  const otkupnina = String(input.otkupnina || input.vrijednostPosiljke || "").trim();
+  const vrijednostPosiljke = String(input.vrijednostPosiljke || input.otkupnina || "").trim();
   const values = [[
     input.primalac || "",
     input.brojTelefona || "",
@@ -358,8 +360,8 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput, options: 
     input.adresa || "",
     input.artikal || "",
     input.brojPaketa || "",
-    input.otkupnina || "",
-    input.vrijednostPosiljke || "",
+    otkupnina,
+    vrijednostPosiljke,
     input.dop || "",
     input.zamjena || "",
     sourceId,

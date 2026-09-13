@@ -1,15 +1,11 @@
 import Link from "next/link";
 
 import { getOrdersSheetRows } from "@/lib/google-sheets";
+import { parseOrderAmount } from "@/lib/order-amount";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
-
-function parseAmount(value: string) {
-  const amount = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", "."));
-  return Number.isFinite(amount) ? amount : 0;
-}
 
 function parseDateLabel(value: string) {
   const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -48,13 +44,13 @@ export default async function StatsPage() {
 
   const todayRows = rows.filter((row) => row.dateLabel === today);
   const monthRows = rows.filter((row) => row.dateLabel.slice(3) === month);
-  const monthTotal = monthRows.reduce((sum, row) => sum + parseAmount(row.otkupnina), 0);
+  const monthTotal = monthRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0);
 
   const byDate = new Map<string, { count: number; amount: number }>();
   for (const row of monthRows) {
     const current = byDate.get(row.dateLabel) || { count: 0, amount: 0 };
     current.count += 1;
-    current.amount += parseAmount(row.otkupnina);
+    current.amount += parseOrderAmount(row.otkupnina);
     byDate.set(row.dateLabel, current);
   }
 

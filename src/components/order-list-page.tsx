@@ -2,13 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { OrderListClient } from "@/components/order-list-client";
+import { parseOrderAmount } from "@/lib/order-amount";
 import { SheetRefreshButton } from "@/components/sheet-refresh-button";
 import type { SheetOrderRow } from "@/lib/google-sheets";
-
-function parseAmount(value: string) {
-  const amount = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", "."));
-  return Number.isFinite(amount) ? amount : 0;
-}
 
 function ArrowIcon() {
   return (
@@ -43,7 +39,7 @@ export function OrderListPage({
   refreshPath?: string;
   headerAction?: ReactNode;
 }) {
-  const totalAmount = orders.reduce((sum, order) => sum + parseAmount(order.otkupnina), 0);
+  const totalAmount = orders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0);
 
   return (
     <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">

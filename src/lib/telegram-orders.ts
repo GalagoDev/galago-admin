@@ -125,6 +125,14 @@ export function parseTelegramArticleAndAmount(value: string) {
     };
   }
 
+  const amountBeforeSds = cleaned.match(/^(.*?)\s*(\d+(?:[.,]\d{1,2})?)\s*\bsds\b\s*(?:km)?$/i);
+  if (amountBeforeSds) {
+    return {
+      artikal: cleanup(amountBeforeSds[1]).replace(/\s*[-|,:]\s*$/g, ""),
+      amount: normalizeAmount(amountBeforeSds[2] || ""),
+    };
+  }
+
   const labelled = cleaned.match(
     /^(.+?)(?:\s*[-|,:]\s*|\s+)(?:cijena|iznos|ukupno)\s*:?[ ]*(\d+(?:[.,]\d{1,2})?)\s*(?:km)?$/i
   );

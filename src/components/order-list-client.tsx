@@ -4,14 +4,10 @@ import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
+import { parseOrderAmount } from "@/lib/order-amount";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 
 const PAGE_SIZE = 25;
-
-function parseAmount(value: string) {
-  const amount = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", "."));
-  return Number.isFinite(amount) ? amount : 0;
-}
 
 function ReturnSubmitButton() {
   const { pending } = useFormStatus();
@@ -267,7 +263,7 @@ export function OrderListClient({
 
       {filteredOrders.length > 0 ? (
         <div className="mt-4 text-center text-[11px] uppercase tracking-[0.14em] text-neutral-500">
-          Ukupna otkupnina: {filteredOrders.reduce((sum, order) => sum + parseAmount(order.otkupnina), 0)} KM
+          Ukupna otkupnina: {filteredOrders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0)} KM
         </div>
       ) : null}
     </>
