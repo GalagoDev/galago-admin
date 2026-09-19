@@ -162,7 +162,7 @@ export function OrderListClient({
   allowReturns = false,
   allowRestoreToTransit = false,
   searchPlaceholder = "Traži ime, telefon, proizvod, ZIP...",
-  riskAssessments = {},
+  riskAssessments,
 }: {
   orders: SheetOrderRow[];
   allowReturns?: boolean;
@@ -175,15 +175,16 @@ export function OrderListClient({
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
   const [showRisksOnly, setShowRisksOnly] = useState(false);
 
-  const riskValues = Object.values(riskAssessments);
+  const riskValues = Object.values(riskAssessments ?? {});
   const unresolvedRisks = riskValues.filter((risk) => risk.unresolved);
   const criticalRisks = unresolvedRisks.filter((risk) => risk.level === "critical");
   const excludedRisks = riskValues.filter((risk) => risk.excluded);
+  const hasRiskResults = riskValues.some((risk) => risk.level !== "none" || risk.excluded);
 
   const filteredOrders = useMemo(() => {
     const q = query.trim().toLowerCase();
     return orders.filter((order) => {
-      const risk = riskAssessments[order.sheetRowNumber];
+      const risk = riskAssessments?.[order.sheetRowNumber];
       if (showRisksOnly && !risk?.unresolved && !risk?.excluded) return false;
       if (!q) return true;
       return [order.primalac, order.brojTelefona, order.grad, order.adresa, order.artikal, order.dateLabel]
@@ -208,25 +209,33 @@ export function OrderListClient({
 
   return (
     <>
-      {riskValues.some((risk) => risk.level !== "none" || risk.excluded) ? (
-        <div id="risk-alerts" className="mb-4 rounded-lg border border-red-300/15 bg-red-300/[0.06] p-3">
+      {riskAssessments ? (
+        <div
+          id="risk-alerts"
+          className={`mb-4 rounded-lg border p-3 ${hasRiskResults ? "border-red-300/15 bg-red-300/[0.06]" : "border-emerald-300/15 bg-emerald-300/[0.06]"}`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-white">Kontrola duplih narudžbi</p>
               <p className="mt-1 text-xs text-neutral-400">
-                Za provjeru {unresolvedRisks.length} · Crveno {criticalRisks.length} · Ne šalji {excludedRisks.length}
+                {hasRiskResults
+                  ? `Za provjeru ${unresolvedRisks.length} · Crveno ${criticalRisks.length} · Ne šalji ${excludedRisks.length}`
+                  : `Aktivno · Skenirano ${riskValues.length} · Nema upozorenja`}
               </p>
+              <p className="mt-1 text-[11px] text-neutral-500">Duplikati 14 dana · Povrati cijela historija</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowRisksOnly((value) => !value);
-                setVisibleCount(PAGE_SIZE);
-              }}
-              className="min-h-10 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white hover:bg-white/[0.08]"
-            >
-              {showRisksOnly ? "Prikaži sve" : "Samo upozorenja"}
-            </button>
+            {hasRiskResults ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRisksOnly((value) => !value);
+                  setVisibleCount(PAGE_SIZE);
+                }}
+                className="min-h-10 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white hover:bg-white/[0.08]"
+              >
+                {showRisksOnly ? "Prikaži sve" : "Samo upozorenja"}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -262,7 +271,7 @@ export function OrderListClient({
           visibleOrders.map((order, index) => {
             const key = `${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`;
             const expanded = !!expandedKeys[key];
-            const risk = riskAssessments[order.sheetRowNumber];
+            const risk = riskAssessments?.[order.sheetRowNumber];
             return (
               <article
                 key={key}
@@ -338,7 +347,7 @@ export function OrderListClient({
           </div>
           <div className="divide-y divide-white/[0.06]">
             {visibleOrders.map((order, index) => {
-              const risk = riskAssessments[order.sheetRowNumber];
+              const risk = riskAssessments?.[order.sheetRowNumber];
               return (
                 <div
                   key={`${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`}
