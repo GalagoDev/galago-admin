@@ -292,6 +292,17 @@ export function getCustomerReturnClaimStats() {
   };
 }
 
+export function getOpenCustomerReturnClaimCount() {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM customer_return_claims
+       WHERE status NOT IN ('resolved', 'rejected')`,
+    )
+    .get() as { count: number };
+  return row.count;
+}
+
 export function updateCustomerReturnClaimStatus(id: string, status: ClaimStatus) {
   const result = getDb()
     .prepare(
@@ -301,6 +312,39 @@ export function updateCustomerReturnClaimStatus(id: string, status: ClaimStatus)
     )
     .run(status, new Date().toISOString(), id);
   return result.changes > 0;
+}
+
+export function deleteCustomerReturnClaim(id: string) {
+  const db = getDb();
+  const exists = db.prepare("SELECT 1 FROM customer_return_claims WHERE id = ?").get(id);
+  if (!exists) return false;
+  const files = db
+    .prepare("SELECT stored_path FROM customer_return_files WHERE claim_id = ?")
+    .all(id) as Array<{ stored_path: string }>;
+
+  const result = db.transaction(() => db.prepare("DELETE FROM customer_return_claims WHERE id = ?").run(id))();
+  if (result.changes === 0) return false;
+
+  const storage = ensureStorage();
+  const claimDirectory = path.join(storage.returnClaimFiles, id);
+  const storageRoot = fs.realpathSync(storage.returnClaimFiles);
+  for (const file of files) {
+    const configuredPath = path.isAbsolute(file.stored_path)
+      ? file.stored_path
+      : path.resolve(storage.root, file.stored_path);
+    try {
+      const storedPath = fs.realpathSync(configuredPath);
+      if (storedPath.startsWith(`${storageRoot}${path.sep}`)) fs.rmSync(storedPath, { force: true });
+    } catch {
+      // A missing legacy attachment should not prevent deleting the claim record.
+    }
+  }
+  try {
+    fs.rmSync(claimDirectory, { recursive: true, force: true });
+  } catch (error) {
+    console.error("Deleted reklamacija record, but failed to remove its files", { id, error });
+  }
+  return true;
 }
 
 export function resolveCustomerReturnFile(id: string) {

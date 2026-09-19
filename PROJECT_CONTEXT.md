@@ -198,6 +198,8 @@ This was already being implemented for order list pages.
 - The panel lists customer claim references, request type, order number, contact details, address, description, uploaded evidence, and processing status.
 - Staff can search by customer, phone, email, order number, or claim reference.
 - Supported statuses are `new`, `in_review`, `approved`, `rejected`, and `resolved`.
+- Every authenticated panel polls the open-claim count and shows a persistent red navigation alert for claims that are not `resolved` or `rejected`.
+- Claims can be deleted with inline confirmation. Deletion removes both the SQLite record and its persistent uploaded evidence directory.
 - Uploaded evidence remains under the persistent `storage/return-claims` directory and is only served through an authenticated app route.
 - The claims tables and files predate the GitHub implementation; preserving them across deploys is required.
 

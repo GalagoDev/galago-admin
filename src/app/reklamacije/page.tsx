@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { ReklamacijaDeleteButton } from "@/components/reklamacija-delete-button";
 import { ReklamacijaStatusForm } from "@/components/reklamacija-status-form";
 import {
   getCustomerReturnClaims,
@@ -15,6 +16,7 @@ export const fetchCache = "force-no-store";
 type Params = {
   q?: string;
   updated?: string;
+  deleted?: string;
   error?: string;
 };
 
@@ -93,7 +95,10 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
           <p className="mt-1 text-sm text-neutral-400">{claim.requestType}</p>
           <p className="mt-1 text-xs text-neutral-600">Zaprimljeno {formatDateTime(claim.createdAt)}</p>
         </div>
-        <ReklamacijaStatusForm claimId={claim.id} status={claim.status} />
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <ReklamacijaStatusForm claimId={claim.id} status={claim.status} />
+          <ReklamacijaDeleteButton claimId={claim.id} />
+        </div>
       </div>
 
       <div className="mt-5 grid gap-px overflow-hidden rounded-lg border border-white/8 bg-white/8 sm:grid-cols-2 lg:grid-cols-4">
@@ -196,8 +201,10 @@ export default async function ReklamacijePage({ searchParams }: { searchParams: 
   const stats = getCustomerReturnClaimStats();
   const notice = params.updated
     ? { tone: "success", text: "Status reklamacije je ažuriran." }
+    : params.deleted
+      ? { tone: "success", text: "Reklamacija i njeni prilozi su obrisani." }
     : params.error
-      ? { tone: "error", text: params.error === "not-found" ? "Reklamacija nije pronađena." : "Status nije promijenjen." }
+      ? { tone: "error", text: params.error === "not-found" ? "Reklamacija nije pronađena." : "Promjena nije sačuvana." }
       : null;
 
   return (

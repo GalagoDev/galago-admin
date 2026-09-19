@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -66,6 +67,35 @@ function InvoiceIcon() {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [openClaimCount, setOpenClaimCount] = useState(0);
+
+  useEffect(() => {
+    if (pathname === "/login") return;
+
+    let active = true;
+    async function refreshClaimCount() {
+      try {
+        const response = await fetch("/api/reklamacije/notifications", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { openClaimCount?: number };
+        if (active) setOpenClaimCount(Math.max(0, Number(payload.openClaimCount) || 0));
+      } catch {
+        // Keep navigation usable when the notification request is temporarily unavailable.
+      }
+    }
+
+    refreshClaimCount();
+    const interval = window.setInterval(refreshClaimCount, 30_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refreshClaimCount();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [pathname]);
 
   if (pathname === "/login") return null;
 
@@ -92,19 +122,31 @@ export function BottomNav() {
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pb-4 sm:max-w-lg sm:px-5 lg:hidden">
+        {openClaimCount > 0 ? (
+          <Link
+            href="/reklamacije"
+            className="mb-2 flex min-h-10 items-center justify-between rounded-lg border border-red-300/25 bg-[#2a1115]/95 px-3 py-2 text-xs font-semibold text-red-100 shadow-lg shadow-black/30 backdrop-blur-xl"
+          >
+            <span>Otvorene reklamacije</span>
+            <span className="rounded-full bg-red-300 px-2 py-0.5 text-[11px] text-neutral-950">{openClaimCount}</span>
+          </Link>
+        ) : null}
         <div className="mx-auto grid grid-cols-6 gap-1 rounded-[1.75rem] border border-white/10 bg-[#111214]/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           {mobileItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={item.active ? "page" : undefined}
-              className={`flex min-w-0 flex-col items-center justify-center rounded-[1.2rem] px-1 py-2.5 transition ${
+              className={`relative flex min-w-0 flex-col items-center justify-center rounded-[1.2rem] px-1 py-2.5 transition ${
                 item.active
                   ? "bg-white/[0.06] text-neutral-100"
                   : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-200"
               }`}
             >
               {item.icon}
+              {item.href === "/reklamacije" && openClaimCount > 0 ? (
+                <span className="absolute right-1.5 top-1 rounded-full bg-red-300 px-1.5 py-0.5 text-[9px] font-bold leading-none text-neutral-950">{openClaimCount}</span>
+              ) : null}
               <span className="mt-1 whitespace-nowrap text-[8px] font-medium sm:text-[9px]">{item.label}</span>
             </Link>
           ))}
@@ -120,13 +162,23 @@ export function BottomNav() {
           </span>
         </Link>
 
+        {openClaimCount > 0 ? (
+          <Link
+            href="/reklamacije"
+            className="mt-3 flex min-h-11 items-center justify-between rounded-lg border border-red-300/25 bg-red-300/[0.09] px-3 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-300/[0.14]"
+          >
+            <span>Otvorene reklamacije</span>
+            <span className="rounded-full bg-red-300 px-2 py-0.5 text-xs text-neutral-950">{openClaimCount}</span>
+          </Link>
+        ) : null}
+
         <nav className="mt-6 flex flex-col gap-1.5" aria-label="Glavna navigacija">
           {desktopItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={item.active ? "page" : undefined}
-              className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+              className={`relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                 item.active
                   ? "bg-white/[0.08] text-white"
                   : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-100"
@@ -134,6 +186,9 @@ export function BottomNav() {
             >
               <span className={item.active ? "text-sky-300" : "text-neutral-500"}>{item.icon}</span>
               <span>{item.label}</span>
+              {item.href === "/reklamacije" && openClaimCount > 0 ? (
+                <span className="ml-auto rounded-full bg-red-300 px-2 py-0.5 text-[10px] font-bold text-neutral-950">{openClaimCount}</span>
+              ) : null}
             </Link>
           ))}
         </nav>
