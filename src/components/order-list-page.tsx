@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { OrderListClient } from "@/components/order-list-client";
-import { parseOrderAmount } from "@/lib/order-amount";
+import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
 import type { OrderRiskAssessment } from "@/lib/order-risk";
 import { SheetRefreshButton } from "@/components/sheet-refresh-button";
 import type { SheetOrderRow } from "@/lib/google-sheets";
@@ -43,7 +43,9 @@ export function OrderListPage({
   riskAssessments?: Record<number, OrderRiskAssessment>;
 }) {
   const activeOrders = orders.filter((order) => !order.appStatus.startsWith("duplicate:"));
-  const totalAmount = activeOrders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0);
+  const totalAmount = roundOrderAmount(
+    activeOrders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0),
+  );
 
   return (
     <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">

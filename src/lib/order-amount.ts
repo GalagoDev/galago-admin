@@ -20,3 +20,7 @@ export function parseOrderAmount(value: string | number | null | undefined) {
   const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : 0;
 }
+
+export function roundOrderAmount(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}

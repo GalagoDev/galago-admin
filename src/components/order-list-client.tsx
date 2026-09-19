@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 
 import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
 import { setOrderRiskDecisionAction } from "@/app/actions/order-risk";
-import { parseOrderAmount } from "@/lib/order-amount";
+import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 import type { OrderRiskAssessment } from "@/lib/order-risk";
 
@@ -388,9 +388,11 @@ export function OrderListClient({
 
       {filteredOrders.length > 0 ? (
         <div className="mt-4 text-center text-[11px] uppercase tracking-[0.14em] text-neutral-500">
-          Ukupna otkupnina: {filteredOrders
-            .filter((order) => !order.appStatus.startsWith("duplicate:"))
-            .reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0)} KM
+          Ukupna otkupnina: {roundOrderAmount(
+            filteredOrders
+              .filter((order) => !order.appStatus.startsWith("duplicate:"))
+              .reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0),
+          )} KM
         </div>
       ) : null}
     </>
