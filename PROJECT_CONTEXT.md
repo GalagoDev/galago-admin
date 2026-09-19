@@ -247,6 +247,7 @@ Not fully mature yet:
 
 ### Daily profitability workflow
 - The top `Danas` block in `Statistika` opens a dedicated daily sales and profitability view.
+- Opening `Danas` requires the separate statistics password. The compact modal intentionally contains only a masked input and `OK`; invalid submissions return to `Statistika`, and direct access to `/stats/today` is also guarded.
 - Daily profitability uses the same latest `Orders` workday block as `Nove narudžbe`. Weekend orders remain grouped in the upcoming Monday block, so the count and revenue stay aligned across both panels.
 - Staff can periodically upload an `.xls`, `.xlsx`, or `.csv` inventory export containing product name, purchase price, and quantity. The latest import becomes the active catalog; imports and manual aliases persist in SQLite.
 - Sold item labels are matched against the catalog by saved alias, exact normalized name, and conservative fuzzy matching. Unmatched labels are listed for explicit manual mapping.

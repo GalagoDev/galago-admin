@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { InventoryAliasForm } from "@/components/inventory-alias-form";
 import { InventoryUploadForm } from "@/components/inventory-upload-form";
@@ -13,6 +14,7 @@ import { getOrdersSheetRows } from "@/lib/google-sheets";
 import { getInventoryOverview } from "@/lib/inventory";
 import { getMetaAdsDailySpend } from "@/lib/meta-ads";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
+import { hasDailyStatisticsAccess } from "@/lib/statistics-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -69,6 +71,7 @@ function errorText(code: string) {
 }
 
 export default async function TodayStatisticsPage({ searchParams }: { searchParams: Promise<Params> }) {
+  if (!(await hasDailyStatisticsAccess())) redirect("/stats");
   const params = await searchParams;
   const ordersResult = await getOrdersSheetRows({ fresh: Boolean(params.refresh) })
     .then((orders) => ({ orders, error: "" }))

@@ -5,12 +5,34 @@ import { redirect } from "next/navigation";
 
 import { importInventoryFile, InventoryError, saveInventoryAlias } from "@/lib/inventory";
 import { normalizeStatisticsDate, sarajevoDateKey } from "@/lib/daily-statistics";
+import {
+  clearDailyStatisticsAccess,
+  grantDailyStatisticsAccess,
+  hasDailyStatisticsAccess,
+  isDailyStatisticsPasswordValid,
+} from "@/lib/statistics-auth";
 
 function returnDate(formData: FormData) {
   return normalizeStatisticsDate(formData.get("date")) || sarajevoDateKey();
 }
 
+export type DailyStatisticsUnlockState = { deniedNonce: string };
+
+export async function unlockDailyStatisticsAction(
+  _previousState: DailyStatisticsUnlockState,
+  formData: FormData,
+): Promise<DailyStatisticsUnlockState> {
+  if (!isDailyStatisticsPasswordValid(formData.get("password"))) {
+    await clearDailyStatisticsAccess();
+    return { deniedNonce: String(formData.get("nonce") || "denied") };
+  }
+
+  await grantDailyStatisticsAccess();
+  redirect("/stats/today");
+}
+
 export async function uploadInventoryAction(formData: FormData) {
+  if (!(await hasDailyStatisticsAccess())) redirect("/stats");
   const date = returnDate(formData);
   const file = formData.get("inventory");
   if (!(file instanceof File)) redirect(`/stats/today?date=${date}&error=file-missing`);
@@ -28,6 +50,7 @@ export async function uploadInventoryAction(formData: FormData) {
 }
 
 export async function saveInventoryAliasAction(formData: FormData) {
+  if (!(await hasDailyStatisticsAccess())) redirect("/stats");
   const date = returnDate(formData);
   const alias = String(formData.get("alias") || "");
   const productId = Number(formData.get("productId"));
