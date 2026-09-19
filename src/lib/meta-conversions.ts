@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { getDb } from "@/lib/db";
 import {
+  type MetaMessagingChannel,
   type MetaMessagingIdentity,
 } from "@/lib/meta-messaging-identities";
 import { bosniaPostalCodes, normalizePhone, type TelegramOrderDraft } from "@/lib/telegram-orders";
@@ -99,6 +100,14 @@ function cityAndZip(value: string) {
   return { city, zip };
 }
 
+function getEventSourceUrl(channel: MetaMessagingChannel) {
+  if (channel === "instagram") {
+    return process.env.META_INSTAGRAM_PROFILE_URL || "https://www.instagram.com/galago.ba/";
+  }
+
+  return process.env.META_FACEBOOK_PAGE_URL || "https://www.facebook.com/galago.shop";
+}
+
 function compactRecord<T extends Record<string, unknown>>(record: T) {
   return Object.fromEntries(
     Object.entries(record).filter(([, value]) => {
@@ -122,7 +131,7 @@ export function buildMetaMessagingPurchasePayload(input: MetaPurchaseInput) {
           page_scoped_user_id: input.identity.pageScopedUserId,
         }
       : {
-          ig_account_id: input.identity.instagramBusinessAccountId,
+          instagram_business_account_id: input.identity.instagramBusinessAccountId,
           ig_sid: input.identity.instagramScopedUserId,
         };
 
@@ -143,6 +152,7 @@ export function buildMetaMessagingPurchasePayload(input: MetaPurchaseInput) {
     event_id: input.eventId,
     action_source: "business_messaging",
     messaging_channel: input.identity.channel,
+    event_source_url: getEventSourceUrl(input.identity.channel),
     user_data: userData,
     custom_data: {
       currency: "BAM",
