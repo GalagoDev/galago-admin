@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 
 import { markLastExportedOrder } from "@/lib/google-orders";
-import { getActiveOrdersSheetRows, type SheetOrderRow } from "@/lib/google-sheets";
+import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow, type SheetOrderRow } from "@/lib/google-sheets";
+import { assessOrderRisks, unresolvedOrderRisks } from "@/lib/order-risk";
 import { getOperationalExportWindow } from "@/lib/order-workday";
 import { normalizeTelegramPostalCode } from "@/lib/telegram-orders";
 
@@ -57,8 +58,12 @@ function orderTime(order: SheetOrderRow) {
 
 export async function GET() {
   const window = getOperationalExportWindow();
-  const rows = await getActiveOrdersSheetRows({ fresh: true });
+  const [rows, returnedRows] = await Promise.all([
+    getOrdersSheetRows({ fresh: true }),
+    getReturnedSheetRows({ fresh: true }),
+  ]);
   const orders = rows
+    .filter(isActiveOrderRow)
     .filter((row) => {
       const receivedAt = Date.parse(row.receivedAt);
       if (Number.isFinite(receivedAt)) return receivedAt >= window.start.getTime() && receivedAt < window.end.getTime();
@@ -68,6 +73,16 @@ export async function GET() {
 
   if (orders.length === 0) {
     return new Response(`Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, { status: 404 });
+  }
+
+  const unresolvedRisks = unresolvedOrderRisks(assessOrderRisks(orders, rows, returnedRows));
+  if (unresolvedRisks.length > 0) {
+    const names = orders
+      .filter((order) => unresolvedRisks.some((risk) => risk.sheetRowNumber === order.sheetRowNumber))
+      .slice(0, 8)
+      .map((order) => order.primalac)
+      .join(", ");
+    return new Response(`Prvo provjeri moguće duple narudžbe: ${names}.`, { status: 409 });
   }
 
   const missingPostalCodes = orders.filter((order) => !normalizeTelegramPostalCode(order.grad));

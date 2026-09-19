@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { OrderListClient } from "@/components/order-list-client";
 import { parseOrderAmount } from "@/lib/order-amount";
+import type { OrderRiskAssessment } from "@/lib/order-risk";
 import { SheetRefreshButton } from "@/components/sheet-refresh-button";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 
@@ -26,6 +27,7 @@ export function OrderListPage({
   searchPlaceholder,
   refreshPath,
   headerAction,
+  riskAssessments,
 }: {
   title: string;
   subtitle: string;
@@ -38,8 +40,10 @@ export function OrderListPage({
   searchPlaceholder?: string;
   refreshPath?: string;
   headerAction?: ReactNode;
+  riskAssessments?: Record<number, OrderRiskAssessment>;
 }) {
-  const totalAmount = orders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0);
+  const activeOrders = orders.filter((order) => !order.appStatus.startsWith("duplicate:"));
+  const totalAmount = activeOrders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0);
 
   return (
     <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">
@@ -68,7 +72,7 @@ export function OrderListPage({
         <section className="mt-5 grid grid-cols-2 gap-3 lg:max-w-2xl">
           <article className="rounded-[1.5rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] px-4 py-4 shadow-[0_20px_50px_rgba(56,189,248,0.08)] lg:rounded-lg">
             <p className="text-[12px] font-medium leading-4 text-neutral-200">Ukupno narudžbi</p>
-            <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{orders.length}</p>
+            <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{activeOrders.length}</p>
           </article>
           <article className="rounded-[1.5rem] border border-emerald-300/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.08))] px-4 py-4 shadow-[0_20px_50px_rgba(16,185,129,0.08)] lg:rounded-lg">
             <p className="text-[12px] font-medium leading-4 text-neutral-200">Ukupno KM</p>
@@ -91,6 +95,7 @@ export function OrderListPage({
             allowReturns={allowReturns}
             allowRestoreToTransit={allowRestoreToTransit}
             searchPlaceholder={searchPlaceholder}
+            riskAssessments={riskAssessments}
           />
         </section>
       </div>

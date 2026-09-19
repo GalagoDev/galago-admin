@@ -2,6 +2,7 @@ import { google, sheets_v4 } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 import { invalidateSheetCache } from "@/lib/google-sheets";
+import { createOrderFingerprint } from "@/lib/order-fingerprint";
 import { getTargetWorkdayLabel } from "@/lib/order-workday";
 
 const SHEET_NAME = "Orders";
@@ -19,7 +20,8 @@ const HEADER = [
 ];
 const TRAILING_EMPTY_ROWS = 5;
 const EXPORT_MARKER_COLUMN = 14;
-const INTERNAL_HEADERS = ["Received at", "Export marker"];
+const RISK_REVIEW_COLUMN = 15;
+const INTERNAL_HEADERS = ["Received at", "Export marker", "Risk review"];
 let trackingColumnsReady = false;
 
 type OrderSheetInput = {
@@ -36,6 +38,15 @@ type OrderSheetInput = {
 };
 
 type AppendOrderOptions = {
+  sourceId?: string;
+};
+
+export type OrderRiskDecision = "approve" | "duplicate" | "restore";
+
+export type OrderRiskReference = {
+  sheetRowNumber: number;
+  fingerprint: string;
+  dateLabel: string;
   sourceId?: string;
 };
 
@@ -123,19 +134,19 @@ async function ensureOrderTrackingColumns(
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!M1:N1`,
+    range: `'${SHEET_NAME}'!M1:O1`,
   });
   const current = response.data.values?.[0] ?? [];
 
   INTERNAL_HEADERS.forEach((header, index) => {
     const value = String(current[index] ?? "").trim();
-    if (value && value !== header) throw new Error(`${SHEET_NAME} column ${index === 0 ? "M" : "N"} is already in use.`);
+    if (value && value !== header) throw new Error(`${SHEET_NAME} column ${["M", "N", "O"][index]} is already in use.`);
   });
 
   await Promise.all([
     sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `'${SHEET_NAME}'!M1:N1`,
+      range: `'${SHEET_NAME}'!M1:O1`,
       valueInputOption: "RAW",
       requestBody: { values: [INTERNAL_HEADERS] },
     }),
@@ -144,7 +155,7 @@ async function ensureOrderTrackingColumns(
       requestBody: {
         requests: [{
           updateDimensionProperties: {
-            range: { sheetId, dimension: "COLUMNS", startIndex: 10, endIndex: EXPORT_MARKER_COLUMN },
+            range: { sheetId, dimension: "COLUMNS", startIndex: 10, endIndex: RISK_REVIEW_COLUMN },
             properties: { hiddenByUser: true },
             fields: "hiddenByUser",
           },
@@ -395,10 +406,103 @@ export async function deleteOrderFromOrdersSheet(sheetOrderId: string) {
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${rowIndex + 1}:N${rowIndex + 1}`,
+    range: `'${SHEET_NAME}'!A${rowIndex + 1}:O${rowIndex + 1}`,
   });
   invalidateSheetCache(SHEET_NAME);
   return true;
+}
+
+function orderIdentityFromRow(row: unknown[]) {
+  const cells = row.map((cell) => String(cell ?? "").trim());
+  return {
+    primalac: cells[0] ?? "",
+    brojTelefona: cells[1] ?? "",
+    grad: cells[2] ?? "",
+    adresa: cells[3] ?? "",
+    artikal: cells[4] ?? "",
+    brojPaketa: cells[5] ?? "",
+    otkupnina: cells[6] || cells[7] || "",
+    vrijednostPosiljke: cells[7] || cells[6] || "",
+    dop: cells[8] ?? "",
+    zamjena: cells[9] ?? "",
+  };
+}
+
+function dateLabelForRow(rows: unknown[][], rowIndex: number) {
+  for (let index = rowIndex - 1; index > 0; index -= 1) {
+    const value = String(rows[index]?.[0] ?? "").trim();
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+  }
+  return "";
+}
+
+function findRiskOrderRow(rows: unknown[][], reference: OrderRiskReference) {
+  const sourceId = String(reference.sourceId || "").trim();
+  if (sourceId) {
+    const sourceIndex = rows.findIndex((row, index) => index > 0 && String(row[10] ?? "").trim() === sourceId);
+    if (sourceIndex !== -1) return sourceIndex;
+  }
+
+  const expectedIndex = reference.sheetRowNumber - 1;
+  const expectedRow = rows[expectedIndex];
+  if (expectedRow
+    && createOrderFingerprint(orderIdentityFromRow(expectedRow)) === reference.fingerprint
+    && dateLabelForRow(rows, expectedIndex) === reference.dateLabel) {
+    return expectedIndex;
+  }
+
+  return rows.findIndex((row, index) => index > 0
+    && createOrderFingerprint(orderIdentityFromRow(row)) === reference.fingerprint
+    && dateLabelForRow(rows, index) === reference.dateLabel);
+}
+
+export async function setOrderRiskDecision(reference: OrderRiskReference, decision: OrderRiskDecision) {
+  const { sheets, spreadsheetId } = getSheetsClient();
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${SHEET_NAME}'!A:O`,
+  });
+  const rows = response.data.values ?? [];
+  const rowIndex = findRiskOrderRow(rows, reference);
+  if (rowIndex < 1) throw new Error("Order changed or no longer exists.");
+
+  const row = rows[rowIndex] ?? [];
+  const fingerprint = createOrderFingerprint(orderIdentityFromRow(row));
+  if (fingerprint !== reference.fingerprint) throw new Error("Order changed or no longer exists.");
+
+  const currentStatus = String(row[11] ?? "").trim();
+  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
+  await ensureOrderTrackingColumns(sheets, spreadsheetId, sheetId);
+  const sheetRowNumber = rowIndex + 1;
+  let appStatus = currentStatus;
+  let riskReview = "";
+
+  if (decision === "approve") {
+    if (currentStatus) throw new Error("Only an active order can be approved.");
+    riskReview = `approved:${fingerprint}`;
+  } else if (decision === "duplicate") {
+    if (currentStatus) throw new Error("Only an active order can be marked as duplicate.");
+    appStatus = `duplicate:${fingerprint}`;
+    riskReview = `duplicate:${fingerprint}`;
+  } else {
+    if (currentStatus !== `duplicate:${fingerprint}`) throw new Error("This order is not marked as duplicate.");
+    appStatus = "";
+    riskReview = "";
+  }
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: "RAW",
+      data: [
+        { range: `'${SHEET_NAME}'!L${sheetRowNumber}`, values: [[appStatus]] },
+        { range: `'${SHEET_NAME}'!O${sheetRowNumber}`, values: [[riskReview]] },
+      ],
+    },
+  });
+
+  invalidateSheetCache(SHEET_NAME);
+  return { sheetRowNumber, decision };
 }
 
 export async function markLastExportedOrder(sheetRowNumber: number, marker: string, label: string) {

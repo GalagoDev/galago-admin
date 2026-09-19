@@ -184,6 +184,15 @@ This was already being implemented for order list pages.
 - Row 1 contains the ten operational Google Sheets headers; customer rows begin immediately on row 2 with no date row or blank spacer rows.
 - Phone and ZIP values remain text, while valid quantity and amount fields are exported as numbers for Brza pošta upload.
 
+### Duplicate and return-risk workflow
+- `Nove narudžbe` scans the permanent `Orders` history for repeat customers during the previous 14 days.
+- Exact normalized phone matches are high-confidence warnings. Exact normalized full-name matches (including reversed name order and ignored diacritics) are warnings when phone matching is unavailable or different.
+- Any active earlier order with the same phone is a critical warning regardless of age. Previous returns are critical warnings across the full available history.
+- Each warning shows the prior-order age and counts for delivered, returned, and still-active shipments.
+- Staff explicitly choose `Provjereno, pošalji` or `Ne šalji – duplikat`. Decisions persist in hidden `Orders` column `O` (`Risk review`).
+- `Ne šalji – duplikat` keeps the row permanently in `Orders`, writes a `duplicate:` status in hidden column `L`, and excludes only that order from `Na dostavi`, totals, and courier exports. The decision can be reversed from `Nove narudžbe`.
+- Courier export is blocked while any order in the export window has an unresolved duplicate/return warning; direct export URLs enforce the same check server-side.
+
 ### Customer reklamacije workflow
 - `Reklamacije` is an authenticated operational panel backed by persistent SQLite storage.
 - The panel lists customer claim references, request type, order number, contact details, address, description, uploaded evidence, and processing status.

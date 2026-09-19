@@ -1,13 +1,98 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
+import { setOrderRiskDecisionAction } from "@/app/actions/order-risk";
 import { parseOrderAmount } from "@/lib/order-amount";
 import type { SheetOrderRow } from "@/lib/google-sheets";
+import type { OrderRiskAssessment } from "@/lib/order-risk";
 
 const PAGE_SIZE = 25;
+
+function riskReference(order: SheetOrderRow) {
+  return JSON.stringify({
+    sheetRowNumber: order.sheetRowNumber,
+    fingerprint: order.fingerprint,
+    dateLabel: order.dateLabel,
+    sourceId: order.sourceId,
+  });
+}
+
+function RiskDecisionButton({
+  order,
+  decision,
+  children,
+  tone,
+}: {
+  order: SheetOrderRow;
+  decision: "approve" | "duplicate" | "restore";
+  children: ReactNode;
+  tone: "approve" | "duplicate" | "restore";
+}) {
+  const classes = tone === "approve"
+    ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/15"
+    : tone === "duplicate"
+      ? "border-red-300/20 bg-red-300/10 text-red-100 hover:bg-red-300/15"
+      : "border-sky-300/20 bg-sky-300/10 text-sky-100 hover:bg-sky-300/15";
+
+  return (
+    <form action={setOrderRiskDecisionAction}>
+      <input type="hidden" name="order" value={riskReference(order)} />
+      <input type="hidden" name="decision" value={decision} />
+      <button type="submit" className={`min-h-9 rounded-lg border px-3 py-2 text-xs font-semibold transition ${classes}`}>
+        {children}
+      </button>
+    </form>
+  );
+}
+
+function RiskBadge({ risk }: { risk: OrderRiskAssessment }) {
+  if (risk.excluded) {
+    return <span className="rounded-full border border-red-300/20 bg-red-300/10 px-2 py-1 text-[10px] font-semibold uppercase text-red-100">Ne šalji</span>;
+  }
+  if (risk.approved) {
+    return <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-1 text-[10px] font-semibold uppercase text-emerald-100">Provjereno</span>;
+  }
+  if (risk.level === "critical") {
+    return <span className="rounded-full border border-red-300/25 bg-red-300/12 px-2 py-1 text-[10px] font-semibold uppercase text-red-100">Provjeri kupca</span>;
+  }
+  if (risk.level === "warning") {
+    return <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[10px] font-semibold uppercase text-amber-100">Mogući duplikat</span>;
+  }
+  return null;
+}
+
+function RiskDetails({ order, risk }: { order: SheetOrderRow; risk: OrderRiskAssessment }) {
+  if (risk.level === "none" && !risk.excluded) return null;
+
+  return (
+    <div className={`mt-3 rounded-lg border p-3 text-xs ${risk.level === "critical" || risk.excluded ? "border-red-300/15 bg-red-300/[0.06]" : "border-amber-300/15 bg-amber-300/[0.05]"}`}>
+      {risk.reasons.map((reason) => <p key={reason} className="mb-1 text-neutral-200">{reason}</p>)}
+      {risk.lastOrderDaysAgo !== null ? (
+        <p className="mt-2 text-neutral-400">
+          Zadnja narudžba prije {risk.lastOrderDaysAgo} dana · {risk.lastOutcome || "Nepoznat ishod"}
+        </p>
+      ) : null}
+      <p className="mt-1 text-neutral-500">
+        Dostavljeno {risk.deliveredCount} · Povrati {risk.returnedCount} · Aktivno {risk.activeCount}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {risk.unresolved ? (
+          <>
+            <RiskDecisionButton order={order} decision="approve" tone="approve">Provjereno, pošalji</RiskDecisionButton>
+            <RiskDecisionButton order={order} decision="duplicate" tone="duplicate">Ne šalji – duplikat</RiskDecisionButton>
+          </>
+        ) : null}
+        {risk.excluded ? (
+          <RiskDecisionButton order={order} decision="restore" tone="restore">Vrati među narudžbe</RiskDecisionButton>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function ReturnSubmitButton() {
   const { pending } = useFormStatus();
@@ -77,27 +162,36 @@ export function OrderListClient({
   allowReturns = false,
   allowRestoreToTransit = false,
   searchPlaceholder = "Traži ime, telefon, proizvod, ZIP...",
+  riskAssessments = {},
 }: {
   orders: SheetOrderRow[];
   allowReturns?: boolean;
   allowRestoreToTransit?: boolean;
   searchPlaceholder?: string;
+  riskAssessments?: Record<number, OrderRiskAssessment>;
 }) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+  const [showRisksOnly, setShowRisksOnly] = useState(false);
+
+  const riskValues = Object.values(riskAssessments);
+  const unresolvedRisks = riskValues.filter((risk) => risk.unresolved);
+  const criticalRisks = unresolvedRisks.filter((risk) => risk.level === "critical");
+  const excludedRisks = riskValues.filter((risk) => risk.excluded);
 
   const filteredOrders = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return orders;
-
-    return orders.filter((order) =>
-      [order.primalac, order.brojTelefona, order.grad, order.adresa, order.artikal, order.dateLabel]
+    return orders.filter((order) => {
+      const risk = riskAssessments[order.sheetRowNumber];
+      if (showRisksOnly && !risk?.unresolved && !risk?.excluded) return false;
+      if (!q) return true;
+      return [order.primalac, order.brojTelefona, order.grad, order.adresa, order.artikal, order.dateLabel]
         .join(" ")
         .toLowerCase()
-        .includes(q)
-    );
-  }, [orders, query]);
+        .includes(q);
+    });
+  }, [orders, query, riskAssessments, showRisksOnly]);
 
   const visibleOrders = filteredOrders.slice(0, visibleCount);
   const hasAction = allowReturns || allowRestoreToTransit;
@@ -114,6 +208,29 @@ export function OrderListClient({
 
   return (
     <>
+      {riskValues.some((risk) => risk.level !== "none" || risk.excluded) ? (
+        <div id="risk-alerts" className="mb-4 rounded-lg border border-red-300/15 bg-red-300/[0.06] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-white">Kontrola duplih narudžbi</p>
+              <p className="mt-1 text-xs text-neutral-400">
+                Za provjeru {unresolvedRisks.length} · Crveno {criticalRisks.length} · Ne šalji {excludedRisks.length}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowRisksOnly((value) => !value);
+                setVisibleCount(PAGE_SIZE);
+              }}
+              className="min-h-10 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white hover:bg-white/[0.08]"
+            >
+              {showRisksOnly ? "Prikaži sve" : "Samo upozorenja"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mb-3 xl:flex xl:items-center xl:justify-between xl:gap-6">
         <input
           type="text"
@@ -145,10 +262,11 @@ export function OrderListClient({
           visibleOrders.map((order, index) => {
             const key = `${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`;
             const expanded = !!expandedKeys[key];
+            const risk = riskAssessments[order.sheetRowNumber];
             return (
               <article
                 key={key}
-                className="rounded-[1.25rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-4 py-3"
+                className={`rounded-[1.25rem] border px-4 py-3 ${risk?.unresolved ? "border-red-300/20 bg-red-300/[0.05]" : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]"}`}
               >
                 <button
                   type="button"
@@ -157,6 +275,7 @@ export function OrderListClient({
                 >
                   <div className="min-w-0">
                     <p className="break-words text-sm font-semibold text-white">{order.primalac || "Bez imena"}</p>
+                    {risk ? <div className="mt-2"><RiskBadge risk={risk} /></div> : null}
                     <p className="mt-1 break-words text-sm text-neutral-400">{order.artikal || "Bez artikla"}</p>
                     <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-neutral-500">
                       <span>{order.dateLabel || "-"}</span>
@@ -193,6 +312,7 @@ export function OrderListClient({
                     </div>
                     {allowReturns ? <ReturnOrderForm order={order} fullWidth /> : null}
                     {allowRestoreToTransit ? <RestoreOrderForm order={order} fullWidth /> : null}
+                    {risk ? <RiskDetails order={order} risk={risk} /> : null}
                   </div>
                 ) : null}
               </article>
@@ -217,16 +337,20 @@ export function OrderListClient({
             {hasAction ? <span>Akcija</span> : null}
           </div>
           <div className="divide-y divide-white/[0.06]">
-            {visibleOrders.map((order, index) => (
-              <div
-                key={`${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`}
-                className={`grid ${desktopGridClass} items-start gap-3 px-3 py-3 text-sm text-neutral-300 transition hover:bg-white/[0.025]`}
-                role="row"
-              >
+            {visibleOrders.map((order, index) => {
+              const risk = riskAssessments[order.sheetRowNumber];
+              return (
+                <div
+                  key={`${order.dateLabel}-${order.rowNumber}-${order.brojTelefona}`}
+                  className={`grid ${desktopGridClass} items-start gap-3 px-3 py-3 text-sm text-neutral-300 transition hover:bg-white/[0.025] ${risk?.unresolved ? "bg-red-300/[0.035]" : ""}`}
+                  role="row"
+                >
                 <span className="text-xs text-neutral-600">{index + 1}</span>
                 <div className="min-w-0">
                   <p className="break-words font-semibold text-white">{order.primalac || "Bez imena"}</p>
+                  {risk ? <div className="mt-2"><RiskBadge risk={risk} /></div> : null}
                   <p className="mt-1 text-xs text-neutral-500">{order.dateLabel || "-"}</p>
+                  {risk ? <RiskDetails order={order} risk={risk} /> : null}
                 </div>
                 <p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p>
                 <div className="min-w-0">
@@ -245,8 +369,9 @@ export function OrderListClient({
                 </div>
                 {allowReturns ? <ReturnOrderForm order={order} /> : null}
                 {allowRestoreToTransit ? <RestoreOrderForm order={order} /> : null}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -263,7 +388,9 @@ export function OrderListClient({
 
       {filteredOrders.length > 0 ? (
         <div className="mt-4 text-center text-[11px] uppercase tracking-[0.14em] text-neutral-500">
-          Ukupna otkupnina: {filteredOrders.reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0)} KM
+          Ukupna otkupnina: {filteredOrders
+            .filter((order) => !order.appStatus.startsWith("duplicate:"))
+            .reduce((sum, order) => sum + parseOrderAmount(order.otkupnina), 0)} KM
         </div>
       ) : null}
     </>

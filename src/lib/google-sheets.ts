@@ -18,7 +18,10 @@ export type SheetOrderRow = {
   vrijednostPosiljke: string;
   dop: string;
   zamjena: string;
+  sourceId: string;
+  appStatus: string;
   receivedAt: string;
+  riskReview: string;
 };
 
 const SHEET_NAME = "Orders";
@@ -40,7 +43,11 @@ const sheetRowsCache = new Map<string, { expiresAt: number; data: SheetOrderRow[
 const sheetRowsInFlight = new Map<string, Promise<SheetOrderRow[]>>();
 
 function isInactiveOrderStatus(value: string) {
-  return value.startsWith("delivered:") || value.startsWith("returned:");
+  return value.startsWith("delivered:") || value.startsWith("returned:") || value.startsWith("duplicate:");
+}
+
+export function isActiveOrderRow(order: Pick<SheetOrderRow, "appStatus">) {
+  return !isInactiveOrderStatus(order.appStatus);
 }
 
 function isRestoredReturnStatus(value: string) {
@@ -287,7 +294,7 @@ export async function getSheetRowsByName(
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:M`,
+      range: `'${sheetName}'!A:O`,
     });
 
     const rows = response.data.values ?? [];
@@ -325,7 +332,10 @@ export async function getSheetRowsByName(
         vrijednostPosiljke,
         dop: cells[8] ?? "",
         zamjena: cells[9] ?? "",
+        sourceId: cells[10] ?? "",
+        appStatus: cells[11] ?? "",
         receivedAt: cells[12] ?? "",
+        riskReview: cells[14] ?? "",
       };
       result.push({
         ...order,
