@@ -7,6 +7,7 @@ import {
   parseTelegramArticleAndAmount,
   resolveTelegramPostalCode,
 } from "../src/lib/telegram-orders.ts";
+import { formatPostalLocation, lookupPlaceByPostalCode } from "../src/lib/bih-postal.ts";
 import { parseOrderAmount } from "../src/lib/order-amount.ts";
 
 const cases = [
@@ -59,6 +60,13 @@ assert.equal(
 );
 
 assert.ok(Object.keys(bosniaPostalCodes).length >= 400);
+
+assert.equal(lookupPlaceByPostalCode("71000"), "Sarajevo");
+assert.equal(formatPostalLocation("75000"), "75000 - Tuzla");
+assert.equal(formatPostalLocation("78430"), "78430 - Prnjavor");
+assert.equal(formatPostalLocation("88000"), "88000 - Mostar");
+assert.equal(formatPostalLocation("88363"), "88363 - Berkovići");
+assert.equal(formatPostalLocation("99999"), "99999");
 
 assert.equal(parseOrderAmount("129.00"), 129);
 assert.equal(parseOrderAmount("129,50 KM"), 129.5);

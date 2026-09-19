@@ -215,6 +215,7 @@ This was already being implemented for order list pages.
 
 ### Desktop layout
 The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
+Admin order lists enrich ZIP-only `Grad` values with the local Bosnia postal directory for display (for example, `75000 - Tuzla`). This is presentation-only: Google Sheets and courier exports continue to contain the ZIP value alone.
 
 ## Current app architecture state
 

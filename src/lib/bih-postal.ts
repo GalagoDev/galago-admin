@@ -79,10 +79,33 @@ for (const [place, postalCode] of Object.entries(PREFERRED_POSTAL_CODES)) {
 
 export const BIH_POSTAL_CODES: Record<string, string> = Object.freeze(postalCodes);
 
+const placeByPostalCode = new Map<string, string>();
+for (const entry of officialEntries) {
+  if (!placeByPostalCode.has(entry.postalCode)) placeByPostalCode.set(entry.postalCode, entry.place);
+}
+for (const [place, postalCode] of Object.entries(PREFERRED_POSTAL_CODES)) {
+  const normalized = normalizeBosnianText(place);
+  placeByPostalCode.set(postalCode, primaryPlaceLabels.get(normalized) || place);
+}
+
 const searchablePlaces = Object.keys(BIH_POSTAL_CODES).sort((left, right) => right.length - left.length);
 
 export function lookupPostalCode(value: string) {
   return BIH_POSTAL_CODES[normalizeBosnianText(value)] || null;
+}
+
+export function lookupPlaceByPostalCode(value: string) {
+  const postalCode = String(value || "").match(/\b\d{5}\b/)?.[0];
+  return postalCode ? placeByPostalCode.get(postalCode) || null : null;
+}
+
+export function formatPostalLocation(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "-";
+  const postalCode = raw.match(/\b\d{5}\b/)?.[0];
+  if (!postalCode) return raw;
+  const place = lookupPlaceByPostalCode(postalCode);
+  return place ? `${postalCode} - ${place}` : postalCode;
 }
 
 export function detectPostalFromText(text: string) {

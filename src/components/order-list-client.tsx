@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 
 import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
 import { setOrderRiskDecisionAction } from "@/app/actions/order-risk";
+import { formatPostalLocation } from "@/lib/bih-postal";
 import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 import type { OrderRiskAssessment } from "@/lib/order-risk";
@@ -187,7 +188,7 @@ export function OrderListClient({
       const risk = riskAssessments?.[order.sheetRowNumber];
       if (showRisksOnly && !risk?.unresolved && !risk?.excluded) return false;
       if (!q) return true;
-      return [order.primalac, order.brojTelefona, order.grad, order.adresa, order.artikal, order.dateLabel]
+      return [order.primalac, order.brojTelefona, order.grad, formatPostalLocation(order.grad), order.adresa, order.artikal, order.dateLabel]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -289,7 +290,7 @@ export function OrderListClient({
                     <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-neutral-500">
                       <span>{order.dateLabel || "-"}</span>
                       <span>•</span>
-                      <span>{order.grad || "-"}</span>
+                      <span>{formatPostalLocation(order.grad)}</span>
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
@@ -304,7 +305,7 @@ export function OrderListClient({
 
                 {expanded ? (
                   <div className="mt-3 grid gap-1.5 text-[13px] text-neutral-300">
-                    <p><span className="text-neutral-500">Grad:</span> {order.grad || "-"}</p>
+                    <p><span className="text-neutral-500">Grad:</span> {formatPostalLocation(order.grad)}</p>
                     <p><span className="text-neutral-500">Adresa:</span> {order.adresa || "-"}</p>
                     <p><span className="text-neutral-500">Telefon:</span> {order.brojTelefona || "-"}</p>
                     <div className="mt-1 flex items-center justify-between gap-3 text-[12px]">
@@ -363,7 +364,7 @@ export function OrderListClient({
                 </div>
                 <p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p>
                 <div className="min-w-0">
-                  <p className="break-words font-medium text-white">{order.grad || "-"}</p>
+                  <p className="break-words font-medium text-white">{formatPostalLocation(order.grad)}</p>
                   <p className="mt-1 break-words text-xs leading-5 text-neutral-500">{order.adresa || "-"}</p>
                 </div>
                 <p className="min-w-0 break-words leading-5 text-neutral-200">{order.artikal || "Bez artikla"}</p>
