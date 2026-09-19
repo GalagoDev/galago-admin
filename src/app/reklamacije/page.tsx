@@ -83,25 +83,38 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
   const status = statusPresentation(claim.status);
 
   return (
-    <article className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-4 lg:rounded-lg lg:p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <details className="group rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] lg:rounded-lg">
+      <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-4 p-4 transition hover:bg-white/[0.025] [&::-webkit-details-marker]:hidden lg:min-h-20 lg:px-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h2 className="break-words font-mono text-base font-semibold text-white sm:text-lg">{claim.reference}</h2>
+            <h2 className="break-words font-mono text-sm font-semibold text-white sm:text-base">{claim.reference}</h2>
             <span className={`rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] ${status.className}`}>
               {status.label}
             </span>
           </div>
           <p className="mt-1 text-sm text-neutral-400">{claim.requestType}</p>
-          <p className="mt-1 text-xs text-neutral-600">Zaprimljeno {formatDateTime(claim.createdAt)}</p>
+          <p className="mt-2 break-words text-xs text-neutral-500">
+            <span className="font-medium text-neutral-300">{claim.customerName || "Bez imena"}</span>
+            <span className="mx-2 text-neutral-700">·</span>
+            {claim.phone || "Bez telefona"}
+            <span className="mx-2 text-neutral-700">·</span>
+            {formatDateTime(claim.createdAt)}
+          </p>
         </div>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-400 transition group-open:rotate-180 group-open:text-white">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+            <path d="m7 10 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </summary>
+
+      <div className="border-t border-white/8 px-4 pb-4 pt-4 lg:px-5 lg:pb-5">
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <ReklamacijaStatusForm claimId={claim.id} status={claim.status} />
           <ReklamacijaDeleteButton claimId={claim.id} />
         </div>
-      </div>
 
-      <div className="mt-5 grid gap-px overflow-hidden rounded-lg border border-white/8 bg-white/8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-white/8 bg-white/8 sm:grid-cols-2 lg:grid-cols-4">
         <div className="min-h-24 bg-[#0d0e10] p-4">
           <p className="text-xs text-neutral-500">Kupac</p>
           <p className="mt-3 break-words text-sm font-medium text-white">{claim.customerName || "-"}</p>
@@ -123,9 +136,9 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
             {claim.email || "-"}
           </a>
         </div>
-      </div>
+        </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
         <div>
           <p className="text-xs text-neutral-500">Adresa</p>
           <p className="mt-2 break-words text-sm leading-6 text-neutral-200">{[claim.address, claim.city].filter(Boolean).join(", ") || "-"}</p>
@@ -134,10 +147,10 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
           <p className="text-xs text-neutral-500">Opis zahtjeva</p>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-neutral-200">{claim.description || "-"}</p>
         </div>
-      </div>
+        </div>
 
-      {claim.companyName || claim.companyIdNumber || claim.companyVatNumber || claim.companyAddress ? (
-        <div className="mt-4 rounded-lg border border-orange-300/15 bg-orange-300/[0.06] p-4">
+        {claim.companyName || claim.companyIdNumber || claim.companyVatNumber || claim.companyAddress ? (
+          <div className="mt-4 rounded-lg border border-orange-300/15 bg-orange-300/[0.06] p-4">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-orange-200">Podaci pravnog lica</p>
           <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -157,11 +170,11 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
               <dd className="mt-1 break-words text-neutral-100">{claim.companyAddress || "-"}</dd>
             </div>
           </dl>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
 
-      {claim.files.length > 0 ? (
-        <div className="mt-5 border-t border-white/8 pt-4">
+        {claim.files.length > 0 ? (
+          <div className="mt-5 border-t border-white/8 pt-4">
           <p className="mb-3 text-xs text-neutral-500">Prilozi ({claim.files.length})</p>
           <div className="flex flex-wrap gap-3">
             {claim.files.map((file) => {
@@ -188,9 +201,10 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
               );
             })}
           </div>
-        </div>
-      ) : null}
-    </article>
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
 }
 

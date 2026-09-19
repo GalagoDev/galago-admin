@@ -196,6 +196,7 @@ This was already being implemented for order list pages.
 ### Customer reklamacije workflow
 - `Reklamacije` is an authenticated operational panel backed by persistent SQLite storage.
 - The panel lists customer claim references, request type, order number, contact details, address, description, uploaded evidence, and processing status.
+- Claim cards are collapsed by default and show a compact operational summary; opening a card reveals full details, files, status controls, and deletion.
 - Staff can search by customer, phone, email, order number, or claim reference.
 - Supported statuses are `new`, `in_review`, `approved`, `rejected`, and `resolved`.
 - Every authenticated panel polls the open-claim count and shows a persistent red navigation alert for claims that are not `resolved` or `rejected`.
