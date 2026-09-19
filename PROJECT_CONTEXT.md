@@ -240,11 +240,20 @@ Connected / active:
 - Reply-to-delete mappings are kept in persistent SQLite and apply to orders confirmed after the feature deployment.
 
 Not fully mature yet:
-- true stats page logic
 - stronger Shopify dedupe stability
 - Telegram allowed chat restriction needs production env hardening
 - Telegram API extraction quality depends on prompt/schema tuning for messy screenshots
 - deeper performance optimization
+
+### Daily profitability workflow
+- The top `Danas` block in `Statistika` opens a dedicated daily sales and profitability view.
+- Daily attribution uses hidden `Orders` column `M` (`Received at`) in the `Europe/Sarajevo` timezone. It does not use the Sheet workday heading, so weekend orders stay on their actual calendar day for comparison with Meta spend.
+- Staff can periodically upload an `.xls`, `.xlsx`, or `.csv` inventory export containing product name, purchase price, and quantity. The latest import becomes the active catalog; imports and manual aliases persist in SQLite.
+- Sold item labels are matched against the catalog by saved alias, exact normalized name, and conservative fuzzy matching. Unmatched labels are listed for explicit manual mapping.
+- Final profit is intentionally hidden until every sold label has a known purchase cost and Meta spend is available; this prevents an incomplete cost list from appearing as inflated profit.
+- The daily formula is revenue minus 14.5% VAT, 8.50 KM per order, matched purchase costs, and combined Meta Ads spend.
+- Product ranking uses sold units and order count for the selected actual calendar date.
+- Meta Ads is read server-side from configured ad accounts with `META_ADS_ACCESS_TOKEN` and comma-separated `META_AD_ACCOUNT_IDS`; the token is never sent to the browser. EUR is converted to BAM at the fixed rate, while other currencies require `META_ADS_TO_BAM_RATES_JSON`.
 
 ## Performance notes
 

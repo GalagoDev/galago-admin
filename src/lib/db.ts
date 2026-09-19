@@ -150,6 +150,37 @@ export function getDb() {
       UNIQUE(invoice_month, file_hash)
     );
 
+    CREATE TABLE IF NOT EXISTS inventory_imports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      original_name TEXT NOT NULL,
+      file_hash TEXT NOT NULL UNIQUE,
+      item_count INTEGER NOT NULL,
+      imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sku TEXT,
+      name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL UNIQUE,
+      unit_cost REAL NOT NULL,
+      quantity REAL NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      last_import_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(last_import_id) REFERENCES inventory_imports(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_product_aliases (
+      normalized_alias TEXT PRIMARY KEY,
+      alias_label TEXT NOT NULL,
+      product_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(product_id) REFERENCES inventory_products(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS telegram_confirmed_orders (
       chat_id TEXT NOT NULL,
       preview_message_id INTEGER NOT NULL,
@@ -174,6 +205,10 @@ export function getDb() {
       ON customer_return_rate_limits(ip_hash, created_at DESC);
     CREATE INDEX IF NOT EXISTS invoices_month_idx
       ON invoices(invoice_month DESC, paid, created_at DESC);
+    CREATE INDEX IF NOT EXISTS inventory_products_active_idx
+      ON inventory_products(active, normalized_name);
+    CREATE INDEX IF NOT EXISTS inventory_aliases_product_idx
+      ON inventory_product_aliases(product_id);
     CREATE INDEX IF NOT EXISTS telegram_confirmed_orders_sheet_idx
       ON telegram_confirmed_orders(sheet_order_id, deleted_at);
   `);

@@ -105,7 +105,7 @@ export function BottomNav() {
     { href: "/reklamacije", label: "Reklamacije", icon: <ClaimIcon />, active: pathname.startsWith("/reklamacije") },
     { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/fakture", label: "Fakture", icon: <InvoiceIcon />, active: pathname.startsWith("/fakture") },
-    { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
+    { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname.startsWith("/stats") },
   ];
 
   const desktopItems = [
@@ -116,7 +116,7 @@ export function BottomNav() {
     { href: "/reklamacije", label: "Reklamacije", icon: <ClaimIcon />, active: pathname.startsWith("/reklamacije") },
     { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/fakture", label: "Fakture", icon: <InvoiceIcon />, active: pathname.startsWith("/fakture") },
-    { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname === "/stats" },
+    { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname.startsWith("/stats") },
   ];
 
   return (

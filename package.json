@@ -8,6 +8,7 @@
     "build": "next build --webpack",
     "test:matching": "node --experimental-strip-types ./scripts/test-order-matching.mjs",
     "test:order-risk": "node --experimental-strip-types ./scripts/test-order-risk.mjs",
+    "test:statistics": "node --experimental-strip-types ./scripts/test-inventory-statistics.mjs",
     "test:telegram-caption": "node --experimental-strip-types ./scripts/test-telegram-order-caption.mjs",
     "test:order-window": "node --experimental-strip-types ./scripts/test-order-window.mjs",
     "start": "next start",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
+    "fuse.js": "^7.5.0",
     "googleapis": "^171.4.0",
     "next": "16.2.1",
     "node-telegram-bot-api": "^0.67.0",
