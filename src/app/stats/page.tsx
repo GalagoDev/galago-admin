@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-import { orderCalendarDate, sarajevoDateKey } from "@/lib/daily-statistics";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
 import { parseOrderAmount } from "@/lib/order-amount";
+import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,14 +13,6 @@ function parseDateLabel(value: string) {
   if (!match) return 0;
   const [, dd, mm, yyyy] = match;
   return new Date(`${yyyy}-${mm}-${dd}T00:00:00`).getTime();
-}
-
-function todayLabel() {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date());
 }
 
 function currentMonthKey() {
@@ -40,10 +32,10 @@ function ArrowIcon() {
 
 export default async function StatsPage() {
   const rows = await getOrdersSheetRows().catch(() => []);
-  const today = todayLabel();
+  const latestDate = getLatestSheetDateLabel(rows);
   const month = currentMonthKey();
 
-  const todayRows = rows.filter((row) => orderCalendarDate(row) === sarajevoDateKey());
+  const todayRows = latestDate ? rows.filter((row) => row.dateLabel === latestDate) : [];
   const monthRows = rows.filter((row) => row.dateLabel.slice(3) === month);
   const monthTotal = monthRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0);
 
@@ -83,7 +75,7 @@ export default async function StatsPage() {
           <Link href="/stats/today" className="rounded-[1.5rem] border border-yellow-300/20 bg-[linear-gradient(135deg,rgba(250,204,21,0.24),rgba(250,204,21,0.08))] px-4 py-4 transition hover:border-yellow-200/35 hover:bg-yellow-300/15 lg:rounded-lg lg:px-5">
             <p className="text-[12px] font-medium leading-4 text-neutral-200">Danas</p>
             <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{todayRows.length}</p>
-            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em] text-neutral-500"><span>{today}</span><span>Otvori →</span></div>
+            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em] text-neutral-500"><span>{latestDate || "-"}</span><span>Otvori →</span></div>
           </Link>
 
           <article className="rounded-[1.5rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] px-4 py-4 lg:rounded-lg lg:px-5">

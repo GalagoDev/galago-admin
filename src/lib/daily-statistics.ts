@@ -30,11 +30,9 @@ export function displayStatisticsDate(dateKey: string) {
   return `${day}/${month}/${year}`;
 }
 
-export function orderCalendarDate(order: SheetOrderRow) {
-  const received = new Date(order.receivedAt);
-  if (!Number.isNaN(received.getTime())) return sarajevoDateKey(received);
-  const match = order.dateLabel.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+export function statisticsDateKeyFromLabel(value: string) {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : null;
 }
 
 export function calculateDailyStatistics(input: {
@@ -46,10 +44,11 @@ export function calculateDailyStatistics(input: {
 }) {
   const vatRate = configuredNumber(process.env.STATISTICS_VAT_RATE, DEFAULT_VAT_RATE);
   const shippingCostPerOrder = configuredNumber(process.env.STATISTICS_SHIPPING_COST_BAM, DEFAULT_SHIPPING_COST);
-  const orders = input.orders.filter((order) => {
-    if (orderCalendarDate(order) !== input.dateKey) return false;
-    return !order.appStatus.startsWith("duplicate:") && !order.appStatus.startsWith("returned:");
-  });
+  const workdayLabel = displayStatisticsDate(input.dateKey);
+  const workdayOrders = input.orders.filter((order) => order.dateLabel === workdayLabel);
+  const orders = workdayOrders.filter(
+    (order) => !order.appStatus.startsWith("duplicate:") && !order.appStatus.startsWith("returned:"),
+  );
   const matcher = new ProductMatcher(input.products, input.aliases || []);
   const ranking = new Map<number, { product: InventoryProduct; units: number; cost: number; orderCount: number }>();
   const unmatched = new Map<string, { label: string; count: number }>();
@@ -98,6 +97,8 @@ export function calculateDailyStatistics(input: {
 
   return {
     dateKey: input.dateKey,
+    workdayLabel,
+    sourceOrderCount: workdayOrders.length,
     orderCount: orders.length,
     revenue,
     vat,

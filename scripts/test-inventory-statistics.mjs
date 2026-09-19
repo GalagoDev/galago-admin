@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { calculateDailyStatistics, orderCalendarDate } from "../src/lib/daily-statistics.ts";
+import { calculateDailyStatistics, statisticsDateKeyFromLabel } from "../src/lib/daily-statistics.ts";
 import { parseInventoryRows } from "../src/lib/inventory-import.ts";
 import { ProductMatcher } from "../src/lib/product-matching.ts";
 
@@ -48,11 +48,11 @@ const order = {
   riskReview: "",
 };
 
-assert.equal(orderCalendarDate(order), "2026-09-19");
+assert.equal(statisticsDateKeyFromLabel(order.dateLabel), "2026-09-21");
 const stats = calculateDailyStatistics({
   orders: [order],
   products,
-  dateKey: "2026-09-19",
+  dateKey: "2026-09-21",
   metaSpendBam: 10,
 });
 assert.equal(stats.orderCount, 1);
@@ -67,11 +67,24 @@ assert.equal(stats.ranking[0].units, 2);
 const incomplete = calculateDailyStatistics({
   orders: [{ ...order, artikal: "Nepoznat proizvod" }],
   products,
-  dateKey: "2026-09-19",
+  dateKey: "2026-09-21",
   metaSpendBam: 10,
 });
 assert.equal(incomplete.costComplete, false);
 assert.equal(incomplete.profitBeforeAds, null);
 assert.equal(incomplete.profitAfterAds, null);
 
-console.log("Inventory import, fuzzy matching, calendar date, and profit calculations passed.");
+const weekendStats = calculateDailyStatistics({
+  orders: [
+    order,
+    { ...order, sheetRowNumber: 5, fingerprint: "saturday", receivedAt: "2026-09-19T15:00:00.000Z" },
+    { ...order, sheetRowNumber: 6, fingerprint: "sunday", receivedAt: "2026-09-20T15:00:00.000Z" },
+  ],
+  products,
+  dateKey: "2026-09-21",
+  metaSpendBam: 0,
+});
+assert.equal(weekendStats.sourceOrderCount, 3);
+assert.equal(weekendStats.orderCount, 3);
+
+console.log("Inventory import, fuzzy matching, workday grouping, and profit calculations passed.");

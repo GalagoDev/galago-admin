@@ -7,10 +7,12 @@ import {
   displayStatisticsDate,
   normalizeStatisticsDate,
   sarajevoDateKey,
+  statisticsDateKeyFromLabel,
 } from "@/lib/daily-statistics";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
 import { getInventoryOverview } from "@/lib/inventory";
 import { getMetaAdsDailySpend } from "@/lib/meta-ads";
+import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -68,16 +70,15 @@ function errorText(code: string) {
 
 export default async function TodayStatisticsPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const dateKey = normalizeStatisticsDate(params.date) || sarajevoDateKey();
-  const [ordersResult, meta] = await Promise.all([
-    getOrdersSheetRows({ fresh: Boolean(params.refresh) })
-      .then((orders) => ({ orders, error: "" }))
-      .catch((error) => {
-        console.error("Daily statistics Sheets read failed", error);
-        return { orders: [], error: "Google Sheets podaci trenutno nisu dostupni. Statistika nije izračunata." };
-      }),
-    getMetaAdsDailySpend(dateKey),
-  ]);
+  const ordersResult = await getOrdersSheetRows({ fresh: Boolean(params.refresh) })
+    .then((orders) => ({ orders, error: "" }))
+    .catch((error) => {
+      console.error("Daily statistics Sheets read failed", error);
+      return { orders: [], error: "Google Sheets podaci trenutno nisu dostupni. Statistika nije izračunata." };
+    });
+  const latestWorkdayKey = statisticsDateKeyFromLabel(getLatestSheetDateLabel(ordersResult.orders));
+  const dateKey = normalizeStatisticsDate(params.date) || latestWorkdayKey || sarajevoDateKey();
+  const meta = await getMetaAdsDailySpend(dateKey);
   const inventory = getInventoryOverview();
   const stats = calculateDailyStatistics({
     orders: ordersResult.orders,
@@ -106,7 +107,7 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Statistika</p>
               <p className="mt-2 text-lg font-semibold text-white">Danas</p>
-              <p className="mt-1 text-sm text-neutral-400">Prodaja i procijenjena dobit za {displayStatisticsDate(dateKey)}</p>
+              <p className="mt-1 text-sm text-neutral-400">Orders blok {displayStatisticsDate(dateKey)} · ista lista kao Nove narudžbe</p>
             </div>
             <Link href="/stats" aria-label="Nazad na statistiku" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
               <ArrowIcon />
@@ -116,7 +117,7 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
 
         <form method="get" className="mt-4 flex flex-wrap items-end gap-2">
           <label>
-            <span className="mb-2 block text-xs text-neutral-500">Datum</span>
+            <span className="mb-2 block text-xs text-neutral-500">Radni dan</span>
             <input type="date" name="date" defaultValue={dateKey} className="min-h-11 rounded-lg border border-white/10 bg-[#111214] px-3 py-2 text-sm text-white [color-scheme:dark] outline-none focus:border-sky-300/35" />
           </label>
           <button type="submit" className="min-h-11 rounded-lg border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white hover:bg-white/[0.08]">Prikaži</button>
@@ -138,7 +139,8 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
         <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <article className="rounded-[1.25rem] border border-sky-300/20 bg-sky-300/[0.09] p-4 lg:rounded-lg">
             <p className="text-xs text-neutral-400">Narudžbe</p>
-            <p className="mt-3 text-2xl font-semibold text-white">{ordersResult.error ? "-" : stats.orderCount}</p>
+            <p className="mt-3 text-2xl font-semibold text-white">{ordersResult.error ? "-" : stats.sourceOrderCount}</p>
+            {stats.sourceOrderCount !== stats.orderCount ? <p className="mt-2 text-[11px] text-neutral-500">{stats.orderCount} aktivnih u obračunu</p> : null}
           </article>
           <article className="rounded-[1.25rem] border border-emerald-300/20 bg-emerald-300/[0.08] p-4 lg:rounded-lg">
             <p className="text-xs text-neutral-400">Prihod</p>

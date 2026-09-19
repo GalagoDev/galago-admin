@@ -247,7 +247,7 @@ Not fully mature yet:
 
 ### Daily profitability workflow
 - The top `Danas` block in `Statistika` opens a dedicated daily sales and profitability view.
-- Daily attribution uses hidden `Orders` column `M` (`Received at`) in the `Europe/Sarajevo` timezone. It does not use the Sheet workday heading, so weekend orders stay on their actual calendar day for comparison with Meta spend.
+- Daily profitability uses the same latest `Orders` workday block as `Nove narudžbe`. Weekend orders remain grouped in the upcoming Monday block, so the count and revenue stay aligned across both panels.
 - Staff can periodically upload an `.xls`, `.xlsx`, or `.csv` inventory export containing product name, purchase price, and quantity. The latest import becomes the active catalog; imports and manual aliases persist in SQLite.
 - Sold item labels are matched against the catalog by saved alias, exact normalized name, and conservative fuzzy matching. Unmatched labels are listed for explicit manual mapping.
 - Final profit is intentionally hidden until every sold label has a known purchase cost and Meta spend is available; this prevents an incomplete cost list from appearing as inflated profit.
