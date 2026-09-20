@@ -4,7 +4,12 @@ type MetaInsight = {
   account_id?: string;
   account_name?: string;
   spend?: string;
-  account_currency?: string;
+};
+
+type MetaAccount = {
+  id?: string;
+  name?: string;
+  currency?: string;
 };
 
 type MetaAccountSpend = {
@@ -61,25 +66,36 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
 
   try {
     const accounts = await Promise.all(accountIds.map(async (accountId): Promise<MetaAccountSpend> => {
-      const params = new URLSearchParams({
-        fields: "account_id,account_name,spend,account_currency",
+      const insightParams = new URLSearchParams({
+        fields: "account_id,account_name,spend",
         level: "account",
         time_increment: "1",
         time_range: JSON.stringify({ since: dateKey, until: dateKey }),
       });
-      const response = await fetch(`https://graph.facebook.com/${graphVersion()}/act_${accountId}/insights?${params}`, {
+      const accountParams = new URLSearchParams({ fields: "id,name,currency" });
+      const request = (url: string) => fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
-      const payload = await response.json() as { data?: MetaInsight[]; error?: { message?: string } };
-      if (!response.ok || payload.error) throw new Error(payload.error?.message || `Meta account ${accountId} nije dostupan.`);
-      const insight = payload.data?.[0];
+      const [accountResponse, insightResponse] = await Promise.all([
+        request(`https://graph.facebook.com/${graphVersion()}/act_${accountId}?${accountParams}`),
+        request(`https://graph.facebook.com/${graphVersion()}/act_${accountId}/insights?${insightParams}`),
+      ]);
+      const accountPayload = await accountResponse.json() as MetaAccount & { error?: { message?: string } };
+      const insightPayload = await insightResponse.json() as { data?: MetaInsight[]; error?: { message?: string } };
+      if (!accountResponse.ok || accountPayload.error) {
+        throw new Error(accountPayload.error?.message || `Meta account ${accountId} nije dostupan.`);
+      }
+      if (!insightResponse.ok || insightPayload.error) {
+        throw new Error(insightPayload.error?.message || `Meta potrošnja za račun ${accountId} nije dostupna.`);
+      }
+      const insight = insightPayload.data?.[0];
       const spend = Number(insight?.spend || 0);
-      const currency = String(insight?.account_currency || "").toUpperCase();
+      const currency = String(accountPayload.currency || "").toUpperCase();
       const rate = rates[currency];
       return {
         accountId,
-        accountName: insight?.account_name || `Ad account ${accountId}`,
+        accountName: accountPayload.name || insight?.account_name || `Ad account ${accountId}`,
         currency: currency || "-",
         spend: Number.isFinite(spend) ? spend : 0,
         spendBam: Number.isFinite(spend) && rate ? Math.round(spend * rate * 100) / 100 : null,
