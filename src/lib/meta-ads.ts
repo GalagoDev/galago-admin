@@ -29,6 +29,7 @@ export type MetaSpendResult = {
 };
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const EUR_TO_BAM = 1.95583;
 const cache = new Map<string, { expiresAt: number; value: MetaSpendResult }>();
 
 function sarajevoDateKey(date = new Date()) {
@@ -46,7 +47,7 @@ function insightsDateKey(requestedDateKey: string) {
 }
 
 function currencyRates() {
-  const rates: Record<string, number> = { BAM: 1, KM: 1, EUR: 1.95583 };
+  const rates: Record<string, number> = { BAM: 1, KM: 1, EUR: EUR_TO_BAM };
   try {
     const configured = JSON.parse(process.env.META_ADS_TO_BAM_RATES_JSON || "{}") as Record<string, unknown>;
     for (const [currency, value] of Object.entries(configured)) {
@@ -57,6 +58,24 @@ function currencyRates() {
     // Invalid optional rates are reported as missing currencies below.
   }
   return rates;
+}
+
+async function rateToBam(currency: string, dateKey: string, rates: Record<string, number>) {
+  if (rates[currency]) return rates[currency];
+  if (!/^[A-Z]{3}$/.test(currency)) return null;
+
+  try {
+    const response = await fetch(
+      `https://api.frankfurter.dev/v2/rate/${currency.toLowerCase()}/eur?date=${dateKey}`,
+      { cache: "no-store", signal: AbortSignal.timeout(5000) },
+    );
+    const payload = await response.json() as { rate?: number };
+    const rateToEur = Number(payload.rate);
+    if (!response.ok || !Number.isFinite(rateToEur) || rateToEur <= 0) return null;
+    return rateToEur * EUR_TO_BAM;
+  } catch {
+    return null;
+  }
 }
 
 function graphVersion() {
@@ -109,7 +128,7 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
       const insight = insightPayload.data?.[0];
       const spend = Number(insight?.spend || 0);
       const currency = String(accountPayload.currency || "").toUpperCase();
-      const rate = rates[currency];
+      const rate = await rateToBam(currency, metaDateKey, rates);
       return {
         accountId,
         accountName: accountPayload.name || insight?.account_name || `Ad account ${accountId}`,

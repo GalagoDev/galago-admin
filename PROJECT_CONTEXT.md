@@ -254,7 +254,7 @@ Not fully mature yet:
 - Final profit is intentionally hidden until every sold label has a known purchase cost and Meta spend is available; this prevents an incomplete cost list from appearing as inflated profit.
 - The daily formula is revenue minus 14.5% VAT, 8.50 KM per order, matched purchase costs, and combined Meta Ads spend.
 - Product ranking uses sold units and order count for the selected actual calendar date.
-- Meta Ads is read server-side from configured ad accounts with `META_ADS_ACCESS_TOKEN` and comma-separated `META_AD_ACCOUNT_IDS`; the token is never sent to the browser. EUR is converted to BAM at the fixed rate, while other currencies require `META_ADS_TO_BAM_RATES_JSON`.
+- Meta Ads is read server-side from configured ad accounts with `META_ADS_ACCESS_TOKEN` and comma-separated `META_AD_ACCOUNT_IDS`; the token is never sent to the browser. EUR is converted to BAM at the fixed rate. Other currencies are converted through the free daily Frankfurter reference rate, while `META_ADS_TO_BAM_RATES_JSON` can override any rate when needed.
 
 ## Performance notes
 
