@@ -31,6 +31,20 @@ export type MetaSpendResult = {
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map<string, { expiresAt: number; value: MetaSpendResult }>();
 
+function sarajevoDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Sarajevo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function insightsDateKey(requestedDateKey: string) {
+  const today = sarajevoDateKey();
+  return requestedDateKey > today ? today : requestedDateKey;
+}
+
 function currencyRates() {
   const rates: Record<string, number> = { BAM: 1, KM: 1, EUR: 1.95583 };
   try {
@@ -60,7 +74,10 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
     return { configured: false, complete: false, spendBam: null, accounts: [], error: "Meta Ads nije povezan." };
   }
 
-  const cached = cache.get(dateKey);
+  // Weekend orders are stored under the next workday (Monday). Meta rejects
+  // future dates, so use today's actual date until that workday arrives.
+  const metaDateKey = insightsDateKey(dateKey);
+  const cached = cache.get(metaDateKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   const rates = currencyRates();
 
@@ -70,7 +87,7 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
         fields: "account_id,account_name,spend",
         level: "account",
         time_increment: "1",
-        time_range: JSON.stringify({ since: dateKey, until: dateKey }),
+        time_range: JSON.stringify({ since: metaDateKey, until: metaDateKey }),
       });
       const accountParams = new URLSearchParams({ fields: "id,name,currency" });
       const request = (url: string) => fetch(url, {
@@ -109,7 +126,7 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
       accounts,
       error: complete ? "" : "Nedostaje KM kurs za jednu od valuta Meta računa.",
     };
-    cache.set(dateKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
+    cache.set(metaDateKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
     return value;
   } catch (error) {
     return {
