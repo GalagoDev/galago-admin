@@ -45,17 +45,6 @@ function toExportRow(order: SheetOrderRow) {
   ];
 }
 
-function legacyOrderTime(order: SheetOrderRow) {
-  const match = order.dateLabel.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!match) return order.sheetRowNumber;
-  return Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])) + order.sheetRowNumber;
-}
-
-function orderTime(order: SheetOrderRow) {
-  const receivedAt = Date.parse(order.receivedAt);
-  return Number.isFinite(receivedAt) ? receivedAt : legacyOrderTime(order);
-}
-
 export async function GET() {
   const window = getOperationalExportWindow();
   const [rows, returnedRows] = await Promise.all([
@@ -68,8 +57,7 @@ export async function GET() {
       const receivedAt = Date.parse(row.receivedAt);
       if (Number.isFinite(receivedAt)) return receivedAt >= window.start.getTime() && receivedAt < window.end.getTime();
       return row.dateLabel === window.startLabel || row.dateLabel === window.endLabel;
-    })
-    .sort((left, right) => orderTime(left) - orderTime(right));
+    });
 
   if (orders.length === 0) {
     return new Response(`Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, { status: 404 });

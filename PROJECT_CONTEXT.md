@@ -183,6 +183,7 @@ This was already being implemented for order list pages.
 - The export reads fresh active rows from `Orders`, so delivered and returned orders are excluded even if the page was opened earlier.
 - Row 1 contains the ten operational Google Sheets headers; customer rows begin immediately on row 2 with no date row or blank spacer rows.
 - Phone and ZIP values remain text, while valid quantity and amount fields are exported as numbers for Brza pošta upload.
+- Exported customers preserve the exact top-to-bottom order currently arranged in the `Orders` sheet. The app filters the 08:00 cycle but never re-sorts those rows by intake time, customer, or product.
 
 ### Duplicate and return-risk workflow
 - `Nove narudžbe` scans the permanent `Orders` history for repeat customers during the previous 14 days.
