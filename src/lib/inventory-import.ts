@@ -105,8 +105,23 @@ export function parseInventoryRows(rows: unknown[][]) {
     throw new InventoryParseError("items-missing", "Nijedan ispravan artikal nije pronađen u lageru.");
   }
 
+  const parsedItems = Array.from(items.values());
+  if (!parsedItems.some((item) => item.unitCost > 0)) {
+    throw new InventoryParseError(
+      "costs-missing",
+      "Lager nema nijednu pozitivnu nabavnu cijenu. Provjerite odabranu kolonu za nabavnu cijenu.",
+    );
+  }
+  const suspiciousQuantities = parsedItems.filter((item) => item.quantity > 100_000).length;
+  if (parsedItems.length >= 3 && suspiciousQuantities > parsedItems.length / 2) {
+    throw new InventoryParseError(
+      "quantities-invalid",
+      "Većina količina u lageru je nerealno velika. Provjerite da kolona količine nije težina ili druga vrijednost.",
+    );
+  }
+
   return {
     headerRowNumber: detected.rowIndex + 1,
-    items: Array.from(items.values()),
+    items: parsedItems,
   };
 }

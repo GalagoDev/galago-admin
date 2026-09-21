@@ -51,6 +51,7 @@ export function calculateDailyStatistics(input: {
   );
   const matcher = new ProductMatcher(input.products, input.aliases || []);
   const ranking = new Map<number, { product: InventoryProduct; units: number; cost: number; orderCount: number }>();
+  const missingCosts = new Map<number, { product: InventoryProduct; units: number; orderCount: number }>();
   const unmatched = new Map<string, { label: string; count: number }>();
   let costOfGoods = 0;
   let matchedLines = 0;
@@ -74,6 +75,16 @@ export function calculateDailyStatistics(input: {
       if (!seenProducts.has(match.product.id)) current.orderCount += 1;
       seenProducts.add(match.product.id);
       ranking.set(match.product.id, current);
+      if (match.product.unitCost <= 0) {
+        const missing = missingCosts.get(match.product.id) || {
+          product: match.product as InventoryProduct,
+          units: 0,
+          orderCount: 0,
+        };
+        missing.units += match.quantity;
+        missing.orderCount = current.orderCount;
+        missingCosts.set(match.product.id, missing);
+      }
     }
     for (const label of result.unmatched) {
       unmatchedLines += 1;
@@ -88,7 +99,7 @@ export function calculateDailyStatistics(input: {
   const vat = roundOrderAmount(revenue * vatRate);
   const shipping = roundOrderAmount(orders.length * shippingCostPerOrder);
   costOfGoods = roundOrderAmount(costOfGoods);
-  const costComplete = unmatchedLines === 0;
+  const costComplete = unmatchedLines === 0 && missingCosts.size === 0;
   const estimatedProfitBeforeAds = roundOrderAmount(revenue - vat - shipping - costOfGoods);
   const profitBeforeAds = costComplete ? estimatedProfitBeforeAds : null;
   const metaSpend = input.metaSpendBam === null || input.metaSpendBam === undefined
@@ -113,6 +124,9 @@ export function calculateDailyStatistics(input: {
     profitAfterAds: metaSpend === null || profitBeforeAds === null ? null : roundOrderAmount(profitBeforeAds - metaSpend),
     matchedLines,
     unmatchedLines,
+    missingCostProducts: Array.from(missingCosts.values())
+      .map((item) => ({ ...item, units: Math.round(item.units * 1000) / 1000 }))
+      .sort((left, right) => right.units - left.units || left.product.name.localeCompare(right.product.name, "bs")),
     ranking: Array.from(ranking.values())
       .map((item) => ({ ...item, units: Math.round(item.units * 1000) / 1000, cost: roundOrderAmount(item.cost) }))
       .sort((left, right) => right.units - left.units || right.orderCount - left.orderCount),

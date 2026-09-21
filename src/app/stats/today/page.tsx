@@ -64,6 +64,8 @@ function errorText(code: string) {
     "file-type": "Lager mora biti XLS, XLSX ili CSV dokument.",
     "columns-missing": "Nisu pronađene kolone za naziv artikla, nabavnu cijenu i količinu.",
     "items-missing": "U lager dokumentu nema ispravnih artikala.",
+    "costs-missing": "Lager nema ispravne nabavne cijene. Provjerite kolonu nabavne cijene.",
+    "quantities-invalid": "Količine izgledaju kao težina ili druga pogrešna kolona. Provjerite lager dokument.",
     "alias-invalid": "Povezivanje artikla nije ispravno.",
     "product-not-found": "Odabrani lager artikal nije pronađen.",
   };
@@ -158,7 +160,17 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
             <p className="mt-3 text-2xl font-semibold text-white">{money(finalProfit)}</p>
             {finalProfit === null ? (
               <p className="mt-2 text-[11px] text-neutral-500">
-                {!sheetsReady ? "Sheets podaci nisu dostupni" : !stats.costComplete ? "Poveži sve artikle sa lagerom" : !meta.complete ? "Poveži Meta Ads" : "Izračun nije dostupan"}
+                {!sheetsReady
+                  ? "Sheets podaci nisu dostupni"
+                  : stats.unmatchedLines > 0 && stats.missingCostProducts.length > 0
+                    ? "Poveži artikle i dodaj nabavne cijene"
+                    : stats.unmatchedLines > 0
+                      ? "Poveži sve artikle sa lagerom"
+                      : stats.missingCostProducts.length > 0
+                        ? "Nedostaju nabavne cijene"
+                        : !meta.complete
+                          ? "Poveži Meta Ads"
+                          : "Izračun nije dostupan"}
               </p>
             ) : null}
           </article>
@@ -169,12 +181,17 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
             <div><p className="text-xs text-neutral-500">Prihod</p><p className="mt-1 font-medium text-white">{money(sheetsReady ? stats.revenue : null)}</p></div>
             <div><p className="text-xs text-neutral-500">PDV ({percent(stats.vatRate)}%)</p><p className="mt-1 font-medium text-red-200">{sheetsReady ? `-${money(stats.vat)}` : "-"}</p></div>
             <div><p className="text-xs text-neutral-500">Brza pošta ({money(stats.shippingCostPerOrder)})</p><p className="mt-1 font-medium text-red-200">{sheetsReady ? `-${money(stats.shipping)}` : "-"}</p></div>
-            <div><p className="text-xs text-neutral-500">Nabavna vrijednost</p><p className="mt-1 font-medium text-red-200">{sheetsReady ? `-${money(stats.costOfGoods)}` : "-"}</p></div>
+            <div><p className="text-xs text-neutral-500">Nabavna vrijednost</p><p className="mt-1 font-medium text-red-200">{sheetsReady && stats.costComplete ? `-${money(stats.costOfGoods)}` : "-"}</p></div>
             <div><p className="text-xs text-neutral-500">Dobit prije oglasa</p><p className="mt-1 font-semibold text-emerald-200">{money(sheetsReady ? stats.profitBeforeAds : null)}</p></div>
           </div>
           {stats.unmatchedLines > 0 ? (
             <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-xs text-amber-100">
               Nabavna vrijednost nije potpuna: {stats.unmatchedLines} naziva artikala nije povezano sa lagerom. Dobit se neće prikazati dok ih ne povežete.
+            </p>
+          ) : null}
+          {stats.missingCostProducts.length > 0 ? (
+            <p className="mt-4 rounded-lg border border-red-300/20 bg-red-300/[0.07] px-3 py-2 text-xs text-red-100">
+              Nabavna vrijednost nije potpuna: {stats.missingCostProducts.length} prodanih artikala nema unesenu nabavnu cijenu. Dobit je sakrivena dok se ne učita ispravan lager.
             </p>
           ) : null}
         </section>
@@ -206,6 +223,9 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
                 <p className="mt-1 text-xs text-neutral-500">
                   {inventory.latestImport ? `${inventory.latestImport.itemCount} artikala · ${formatDateTime(inventory.latestImport.importedAt)}` : "Lager još nije uvezen"}
                 </p>
+                {stats.missingCostProducts.length > 0 ? (
+                  <p className="mt-2 text-xs font-medium text-red-200">{stats.missingCostProducts.length} prodanih artikala bez nabavne cijene</p>
+                ) : null}
               </summary>
               <div className="border-t border-white/8 px-4 pb-4">
                 <InventoryUploadForm date={dateKey} />

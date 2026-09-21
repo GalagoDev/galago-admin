@@ -252,6 +252,10 @@ Not fully mature yet:
 - Daily profitability uses the same latest `Orders` workday block as `Nove narudžbe`. Weekend orders remain grouped in the upcoming Monday block, so the count and revenue stay aligned across both panels.
 - Staff can periodically upload an `.xls`, `.xlsx`, or `.csv` inventory export containing product name, purchase price, and quantity. The latest import becomes the active catalog; imports and manual aliases persist in SQLite.
 - Sold item labels are matched against the catalog by saved alias, exact normalized name, and conservative fuzzy matching. Unmatched labels are listed for explicit manual mapping.
+- Operational product matching understands quantity notation such as `2x Tunda` and `Usiku 2 komada`, ignores `SDS`/`KM` price suffixes and dispatch notes, and can split clear multi-product labels such as `Zuri sto Lulu stolica` without treating descriptive wording (`sa vratima i policama`) as another item.
+- `Mara set` is a known bundle: one set records one `Komoda MARA` and one `Komoda NORA` in the same color. Explicit set multipliers apply to both components, while a redundant textual `i Nora` does not double-count the Nora component.
+- A zero purchase price is treated as missing cost, not as a free product. Daily purchase cost and profit remain hidden whenever a sold inventory item has a zero/missing purchase price.
+- New inventory imports are rejected when every purchase price is zero or when most quantities are unrealistically large, which usually means a weight/other field was selected instead of the intended stock column.
 - Final profit is intentionally hidden until every sold label has a known purchase cost and Meta spend is available; this prevents an incomplete cost list from appearing as inflated profit.
 - The daily formula is revenue minus 14.5% VAT, 8.50 KM per order, matched purchase costs, and combined Meta Ads spend.
 - Product ranking uses sold units and order count for the selected actual calendar date.
