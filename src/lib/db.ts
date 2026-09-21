@@ -193,6 +193,62 @@ export function getDb() {
       PRIMARY KEY(chat_id, preview_message_id)
     );
 
+    CREATE TABLE IF NOT EXISTS ananas_product_links (
+      shopify_variant_id TEXT PRIMARY KEY,
+      shopify_product_id TEXT NOT NULL,
+      shopify_inventory_item_id TEXT UNIQUE,
+      ean TEXT,
+      sku TEXT,
+      ananas_product_id INTEGER,
+      merchant_inventory_id INTEGER,
+      active_discount_id TEXT,
+      import_progress_id TEXT,
+      catalog_submitted_at TEXT,
+      discount_date_from TEXT,
+      discount_date_to TEXT,
+      discount_type TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'pending',
+      last_catalog_hash TEXT,
+      last_inventory INTEGER,
+      last_base_price REAL,
+      last_discount_price REAL,
+      last_error TEXT,
+      last_synced_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ananas_sync_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_type TEXT NOT NULL,
+      entity_key TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      scheduled_for TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS integration_webhook_receipts (
+      provider TEXT NOT NULL,
+      webhook_id TEXT NOT NULL,
+      topic TEXT,
+      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(provider, webhook_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS ananas_invoices (
+      invoice_key TEXT PRIMARY KEY,
+      invoice_type TEXT,
+      invoice_number TEXT,
+      issued_at TEXT,
+      payload_json TEXT NOT NULL,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
       ON receipt_batches(collection_date, id DESC);
     CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx
@@ -211,6 +267,12 @@ export function getDb() {
       ON inventory_product_aliases(product_id);
     CREATE INDEX IF NOT EXISTS telegram_confirmed_orders_sheet_idx
       ON telegram_confirmed_orders(sheet_order_id, deleted_at);
+    CREATE INDEX IF NOT EXISTS ananas_product_links_ean_idx
+      ON ananas_product_links(ean);
+    CREATE INDEX IF NOT EXISTS ananas_product_links_inventory_idx
+      ON ananas_product_links(shopify_inventory_item_id);
+    CREATE INDEX IF NOT EXISTS ananas_sync_jobs_pending_idx
+      ON ananas_sync_jobs(status, scheduled_for, id);
   `);
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");
@@ -221,6 +283,11 @@ export function getDb() {
   ensureColumn(database, "customer_return_claims", "company_id_number", "ALTER TABLE customer_return_claims ADD COLUMN company_id_number TEXT");
   ensureColumn(database, "customer_return_claims", "company_vat_number", "ALTER TABLE customer_return_claims ADD COLUMN company_vat_number TEXT");
   ensureColumn(database, "customer_return_claims", "company_address", "ALTER TABLE customer_return_claims ADD COLUMN company_address TEXT");
+  ensureColumn(database, "ananas_product_links", "import_progress_id", "ALTER TABLE ananas_product_links ADD COLUMN import_progress_id TEXT");
+  ensureColumn(database, "ananas_product_links", "catalog_submitted_at", "ALTER TABLE ananas_product_links ADD COLUMN catalog_submitted_at TEXT");
+  ensureColumn(database, "ananas_product_links", "discount_date_from", "ALTER TABLE ananas_product_links ADD COLUMN discount_date_from TEXT");
+  ensureColumn(database, "ananas_product_links", "discount_date_to", "ALTER TABLE ananas_product_links ADD COLUMN discount_date_to TEXT");
+  ensureColumn(database, "ananas_product_links", "discount_type", "ALTER TABLE ananas_product_links ADD COLUMN discount_type TEXT");
   database.exec(`
     UPDATE receipt_recipients
     SET pdf_uploaded_at = COALESCE(pdf_uploaded_at, updated_at),

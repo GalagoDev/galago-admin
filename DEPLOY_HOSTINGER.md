@@ -156,3 +156,27 @@ https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?store=second-store
 ```
 
 The script stores the hidden duplicate marker in column `K` as `store:shopifyOrderId`. Existing Galago imports that stored only the raw Shopify order id are still recognized when `store` is omitted or set to `galago`.
+
+## Ananas.ba product integration
+
+The app exposes the authenticated endpoint `/api/integrations/ananas/run` and
+Shopify webhook endpoints below `/api/integrations/ananas/shopify`. Configure the
+Ananas and Shopify variables from `.env.production.example`; keep
+`ANANAS_UNTRACKED_STOCK_LEVEL=0` until Shopify inventory tracking or another real
+stock source is enabled.
+
+The production cron schedule uses Europe/Sarajevo time:
+
+```cron
+15 0 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs prices-stock >> storage/logs/ananas-cron.log 2>&1
+15 2 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs discounts >> storage/logs/ananas-cron.log 2>&1
+15 3 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs refresh-ids >> storage/logs/ananas-cron.log 2>&1
+0 4 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs import-catalog >> storage/logs/ananas-cron.log 2>&1
+0 5 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs invoices >> storage/logs/ananas-cron.log 2>&1
+*/10 * * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs process >> storage/logs/ananas-cron.log 2>&1
+```
+
+Register Shopify `products/create`, `products/update`, and
+`inventory_levels/update` webhooks against the corresponding public integration
+routes. The routes verify Shopify HMAC signatures, enqueue idempotent jobs, and
+persist Ananas mappings in SQLite.
