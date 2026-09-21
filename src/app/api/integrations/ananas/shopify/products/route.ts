@@ -1,7 +1,4 @@
-import { after } from "next/server";
-
-import { processPendingAnanasJobs } from "@/lib/ananas-sync";
-import { enqueueAnanasJob, recordWebhook } from "@/lib/ananas-store";
+import { recordWebhook } from "@/lib/ananas-store";
 import type { ShopifyProductWebhook } from "@/lib/ananas-types";
 import { verifyShopifyWebhook } from "@/lib/shopify-ananas-auth";
 
@@ -33,12 +30,5 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Invalid Shopify product payload" }, { status: 400 });
   }
 
-  const jobId = enqueueAnanasJob("product_upsert", String(product.id), product);
-  after(async () => {
-    const results = await processPendingAnanasJobs(5);
-    if (results.some((result) => result.status === "failed")) {
-      console.error("Ananas product webhook processing finished with failures", results);
-    }
-  });
-  return Response.json({ ok: true, queued: true, jobId }, { status: 202 });
+  return Response.json({ ok: true, scheduledForDailySync: true }, { status: 202 });
 }

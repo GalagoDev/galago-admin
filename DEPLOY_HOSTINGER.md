@@ -173,10 +173,9 @@ The production cron schedule uses Europe/Sarajevo time:
 15 3 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs refresh-ids >> storage/logs/ananas-cron.log 2>&1
 0 4 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs import-catalog >> storage/logs/ananas-cron.log 2>&1
 0 5 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs invoices >> storage/logs/ananas-cron.log 2>&1
-*/10 * * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs process >> storage/logs/ananas-cron.log 2>&1
 ```
 
-Register Shopify `products/create`, `products/update`, and
-`inventory_levels/update` webhooks against the corresponding public integration
-routes. The routes verify Shopify HMAC signatures, enqueue idempotent jobs, and
-persist Ananas mappings in SQLite.
+Shopify `products/create`, `products/update`, and `inventory_levels/update`
+webhooks may point to the corresponding public integration routes. The routes
+verify Shopify HMAC signatures and record idempotent receipts, while actual
+Ananas writes remain restricted to the required daily windows.

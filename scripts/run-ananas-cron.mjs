@@ -8,7 +8,6 @@ const allowedActions = new Set([
   "refresh-ids",
   "import-catalog",
   "invoices",
-  "process",
 ]);
 const action = process.argv[2];
 
