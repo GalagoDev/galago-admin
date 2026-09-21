@@ -65,6 +65,15 @@ function InvoiceIcon() {
   );
 }
 
+function StockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M4 5.5h16v13H4v-13Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 10h16M9.5 5.5V10M14.5 10v8.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
   const [openClaimCount, setOpenClaimCount] = useState(0);
@@ -116,6 +125,7 @@ export function BottomNav() {
     { href: "/reklamacije", label: "Reklamacije", icon: <ClaimIcon />, active: pathname.startsWith("/reklamacije") },
     { href: "/receipts", label: "Računi", icon: <ReceiptIcon />, active: pathname === "/receipts" },
     { href: "/fakture", label: "Fakture", icon: <InvoiceIcon />, active: pathname.startsWith("/fakture") },
+    { href: "/inventory", label: "Lager", icon: <StockIcon />, active: pathname.startsWith("/inventory") },
     { href: "/stats", label: "Statistika", icon: <ChartIcon />, active: pathname.startsWith("/stats") },
   ];
 

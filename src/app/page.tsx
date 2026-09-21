@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
 import { getActiveOrdersSheetRows, getOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
+import { getInventoryOverview } from "@/lib/inventory";
 import { parseOrderAmount } from "@/lib/order-amount";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
@@ -79,6 +80,7 @@ export default async function Home({
   }>;
 }) {
   const params = await searchParams;
+  const inventory = getInventoryOverview();
   const [activeRows, ordersRows, returnedRows] = await Promise.all([
     getActiveOrdersSheetRows().catch(() => []),
     getOrdersSheetRows().catch(() => []),
@@ -113,6 +115,7 @@ export default async function Home({
   const chartCounts = monthlyChartPoints.map((point) => point.count);
   const chartLabels = monthlyChartPoints.map((point) => point.date.slice(0, 5));
   const monthlyTotalOrders = currentMonthOrders.length;
+  const totalInventoryQuantity = inventory.products.reduce((sum, product) => sum + product.quantity, 0);
 
   const banner = getBannerMessage(params);
 
@@ -141,6 +144,14 @@ export default async function Home({
       tone: "bg-[linear-gradient(135deg,rgba(192,132,252,0.22),rgba(192,132,252,0.08))] border-fuchsia-300/20",
       glow: "shadow-[0_20px_50px_rgba(192,132,252,0.08)]",
     },
+    {
+      title: "Lager",
+      value: String(inventory.products.length),
+      meta: `${new Intl.NumberFormat("bs-BA", { maximumFractionDigits: 3 }).format(totalInventoryQuantity)} komada`,
+      href: "/inventory",
+      tone: "bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.07))] border-sky-300/20",
+      glow: "shadow-[0_20px_50px_rgba(56,189,248,0.08)]",
+    },
   ];
 
   return (
@@ -166,12 +177,12 @@ export default async function Home({
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {cards.map((card) => (
             <Link
               key={card.title}
               href={card.href}
-              className={`last:col-span-2 rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 lg:last:col-span-1 lg:rounded-lg lg:px-5 lg:py-5 ${card.tone} ${card.glow}`}
+              className={`rounded-[1.5rem] border px-4 py-4 transition active:scale-[0.98] hover:brightness-110 lg:rounded-lg lg:px-5 lg:py-5 ${card.tone} ${card.glow}`}
             >
               <p className="text-[12px] font-medium leading-4 text-neutral-200">{card.title}</p>
               <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{card.value}</p>

@@ -260,6 +260,12 @@ Not fully mature yet:
 - New inventory imports are rejected when every purchase price is zero or when most quantities are unrealistically large, which usually means a weight/other field was selected instead of the intended stock column.
 - Final profit is intentionally hidden until every sold label has a known purchase cost and Meta spend is available; this prevents an incomplete cost list from appearing as inflated profit.
 - The daily formula is revenue minus 14.5% VAT, 8.50 KM per order, matched purchase costs, and combined Meta Ads spend.
+
+### Inventory overview workflow
+- `Lager` is a dedicated authenticated operational page backed by the latest imported inventory catalog in persistent SQLite storage.
+- It displays product name, optional SKU, and the exact quantity from the latest uploaded lager document. Purchase prices remain confined to the password-protected profitability view.
+- The page includes search, stock-status filters, totals, and clear warnings for zero stock and quantities from one through five.
+- `Lager` is available in the desktop sidebar and as a dashboard summary card, keeping the six-item mobile bottom navigation touch-friendly.
 - Product ranking uses sold units and order count for the selected actual calendar date.
 - Meta Ads is read server-side from configured ad accounts with `META_ADS_ACCESS_TOKEN` and comma-separated `META_AD_ACCOUNT_IDS`; the token is never sent to the browser. EUR is converted to BAM at the fixed rate. Other currencies are converted through the free daily Frankfurter reference rate, while `META_ADS_TO_BAM_RATES_JSON` can override any rate when needed.
 
