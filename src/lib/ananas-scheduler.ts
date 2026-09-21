@@ -105,7 +105,7 @@ async function execute(action: ScheduledAction) {
   }
   const dateTo = new Date();
   const dateFrom = new Date(dateTo.getTime() - 7 * 24 * 60 * 60 * 1000);
-  return syncAnanasInvoices({ dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString(), type: "FISCAL" });
+  return syncAnanasInvoices({ dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString(), type: "NON_FISCAL" });
 }
 
 async function tick() {

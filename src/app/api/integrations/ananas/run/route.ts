@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     jobId = enqueueAnanasJob("invoice_sync", `${body.dateFrom || "recent"}:${body.dateTo || "now"}`, {
       dateFrom: body.dateFrom || isoDaysAgo(7),
       dateTo: body.dateTo || new Date().toISOString(),
-      type: body.type || "FISCAL",
+      type: body.type || "NON_FISCAL",
     });
   } else if (action !== "process") {
     return Response.json({ ok: false, error: "Unsupported action" }, { status: 400 });
