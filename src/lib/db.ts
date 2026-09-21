@@ -249,6 +249,16 @@ export function getDb() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS ananas_scheduler_runs (
+      run_date TEXT NOT NULL,
+      action TEXT NOT NULL,
+      status TEXT NOT NULL,
+      last_error TEXT,
+      started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      PRIMARY KEY(run_date, action)
+    );
+
     CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
       ON receipt_batches(collection_date, id DESC);
     CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx

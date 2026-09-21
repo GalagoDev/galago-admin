@@ -167,6 +167,10 @@ stock source is enabled.
 
 The production cron schedule uses Europe/Sarajevo time:
 
+On Hostinger Web Apps, set `ANANAS_INTERNAL_SCHEDULER_ENABLED=true`; the app runs
+the same schedule internally and records one successful run per action/day in
+SQLite. On VPS plans with system cron, use the equivalent commands below instead.
+
 ```cron
 15 0 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs prices-stock >> storage/logs/ananas-cron.log 2>&1
 15 2 * * * cd /var/www/store-admin && /usr/bin/node scripts/run-ananas-cron.mjs discounts >> storage/logs/ananas-cron.log 2>&1
