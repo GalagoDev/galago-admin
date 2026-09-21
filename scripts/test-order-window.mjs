@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { getOperationalExportWindow, getTargetWorkdayLabel } from "../src/lib/order-workday.ts";
+import { getOperationalExportWindow, getTargetWorkdayLabel, getWorkdayCycle } from "../src/lib/order-workday.ts";
 
 function iso(value) {
   return new Date(value);
@@ -51,5 +51,21 @@ assert.equal(getTargetWorkdayLabel(iso("2026-09-12T10:00:00Z")), "14/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-13T10:00:00Z")), "14/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-14T05:59:00Z")), "14/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-14T06:00:00Z")), "15/09/2026");
+
+{
+  const cycle = getWorkdayCycle("2026-09-22");
+  assert.equal(cycle.start.toISOString(), "2026-09-21T06:00:00.000Z");
+  assert.equal(cycle.end.toISOString(), "2026-09-22T06:00:00.000Z");
+  assert.deepEqual(cycle.metaDateKeys, ["2026-09-21"]);
+  assert.equal(cycle.spansWeekend, false);
+}
+
+{
+  const cycle = getWorkdayCycle("2026-09-21");
+  assert.equal(cycle.start.toISOString(), "2026-09-18T06:00:00.000Z");
+  assert.equal(cycle.end.toISOString(), "2026-09-21T06:00:00.000Z");
+  assert.deepEqual(cycle.metaDateKeys, ["2026-09-18", "2026-09-19", "2026-09-20"]);
+  assert.equal(cycle.spansWeekend, true);
+}
 
 console.log("Order export window tests passed.");

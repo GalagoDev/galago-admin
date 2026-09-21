@@ -1,8 +1,10 @@
 import Link from "next/link";
 
 import { DailyStatisticsAccessCard } from "@/components/daily-statistics-access-card";
+import { statisticsDateKeyFromLabel } from "@/lib/daily-statistics";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
 import { parseOrderAmount } from "@/lib/order-amount";
+import { getWorkdayCycle } from "@/lib/order-workday";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +36,8 @@ function ArrowIcon() {
 export default async function StatsPage() {
   const rows = await getOrdersSheetRows().catch(() => []);
   const latestDate = getLatestSheetDateLabel(rows);
+  const latestDateKey = statisticsDateKeyFromLabel(latestDate);
+  const latestCycle = latestDateKey ? getWorkdayCycle(latestDateKey) : null;
   const month = currentMonthKey();
 
   const todayRows = latestDate ? rows.filter((row) => row.dateLabel === latestDate) : [];
@@ -73,7 +77,12 @@ export default async function StatsPage() {
         </section>
 
         <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <DailyStatisticsAccessCard count={todayRows.length} dateLabel={latestDate} />
+          <DailyStatisticsAccessCard
+            count={todayRows.length}
+            dateLabel={latestCycle
+              ? `${latestCycle.startLabel.slice(0, 5)} 08:00 - ${latestCycle.endLabel.slice(0, 5)} 08:00`
+              : latestDate}
+          />
 
           <article className="rounded-[1.5rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] px-4 py-4 lg:rounded-lg lg:px-5">
             <p className="text-[12px] font-medium leading-4 text-neutral-200">Ovaj mjesec</p>

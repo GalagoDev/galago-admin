@@ -67,6 +67,27 @@ function previousWeekday(date: CalendarDate) {
   return result;
 }
 
+function parseDateKey(value: string): CalendarDate | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+  const roundTrip = new Date(Date.UTC(date.year, date.month - 1, date.day, 12));
+  if (
+    roundTrip.getUTCFullYear() !== date.year
+    || roundTrip.getUTCMonth() + 1 !== date.month
+    || roundTrip.getUTCDate() !== date.day
+  ) return null;
+  return date;
+}
+
+function formatDateKey(date: CalendarDate) {
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
+
 function timeZoneOffsetMs(date: Date) {
   const local = zonedParts(date);
   const representedAsUtc = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second);
@@ -89,6 +110,28 @@ export function getTargetWorkdayLabel(now = new Date()) {
   const calendarDate = { year: local.year, month: local.month, day: local.day };
   const cycleEndDate = nextWeekday(local.hour >= CUTOFF_HOUR ? addCalendarDays(calendarDate, 1) : calendarDate);
   return formatWorkdayLabel(cycleEndDate);
+}
+
+export function getWorkdayCycle(dateKey: string) {
+  const endDate = parseDateKey(dateKey);
+  if (!endDate) throw new Error(`Invalid workday date: ${dateKey}`);
+  const startDate = previousWeekday(endDate);
+  const metaDateKeys: string[] = [];
+
+  for (let current = startDate; formatDateKey(current) < dateKey; current = addCalendarDays(current, 1)) {
+    metaDateKeys.push(formatDateKey(current));
+  }
+
+  return {
+    start: atSarajevoCutoff(startDate),
+    end: atSarajevoCutoff(endDate),
+    startDateKey: formatDateKey(startDate),
+    endDateKey: dateKey,
+    startLabel: formatWorkdayLabel(startDate),
+    endLabel: formatWorkdayLabel(endDate),
+    metaDateKeys,
+    spansWeekend: metaDateKeys.length > 1,
+  };
 }
 
 export function getOperationalExportWindow(now = new Date()) {

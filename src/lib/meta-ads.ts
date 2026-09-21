@@ -157,3 +157,34 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
     };
   }
 }
+
+export async function getMetaAdsWorkdaySpend(dateKeys: string[]): Promise<MetaSpendResult> {
+  const today = sarajevoDateKey();
+  const elapsedDateKeys = Array.from(new Set(dateKeys.filter((dateKey) => dateKey <= today))).sort();
+  if (elapsedDateKeys.length === 0) return getMetaAdsDailySpend(today);
+
+  const dailyResults = await Promise.all(elapsedDateKeys.map((dateKey) => getMetaAdsDailySpend(dateKey)));
+  const firstFailure = dailyResults.find((result) => !result.configured || !result.complete);
+  if (firstFailure) return firstFailure;
+
+  const accounts = new Map<string, MetaAccountSpend>();
+  for (const result of dailyResults) {
+    for (const account of result.accounts) {
+      const current = accounts.get(account.accountId);
+      accounts.set(account.accountId, {
+        ...account,
+        spend: Math.round(((current?.spend || 0) + account.spend) * 100) / 100,
+        spendBam: Math.round(((current?.spendBam || 0) + (account.spendBam || 0)) * 100) / 100,
+      });
+    }
+  }
+
+  const combinedAccounts = Array.from(accounts.values());
+  return {
+    configured: true,
+    complete: true,
+    spendBam: Math.round(combinedAccounts.reduce((sum, account) => sum + (account.spendBam || 0), 0) * 100) / 100,
+    accounts: combinedAccounts,
+    error: "",
+  };
+}

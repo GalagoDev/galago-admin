@@ -12,7 +12,8 @@ import {
 } from "@/lib/daily-statistics";
 import { getOrdersSheetRows } from "@/lib/google-sheets";
 import { getInventoryOverview } from "@/lib/inventory";
-import { getMetaAdsDailySpend } from "@/lib/meta-ads";
+import { getMetaAdsWorkdaySpend } from "@/lib/meta-ads";
+import { getWorkdayCycle } from "@/lib/order-workday";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 import { hasDailyStatisticsAccess } from "@/lib/statistics-auth";
 
@@ -83,7 +84,8 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
     });
   const latestWorkdayKey = statisticsDateKeyFromLabel(getLatestSheetDateLabel(ordersResult.orders));
   const dateKey = normalizeStatisticsDate(params.date) || latestWorkdayKey || sarajevoDateKey();
-  const meta = await getMetaAdsDailySpend(dateKey);
+  const cycle = getWorkdayCycle(dateKey);
+  const meta = await getMetaAdsWorkdaySpend(cycle.metaDateKeys);
   const inventory = getInventoryOverview();
   const stats = calculateDailyStatistics({
     orders: ordersResult.orders,
@@ -112,7 +114,9 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Statistika</p>
               <p className="mt-2 text-lg font-semibold text-white">Danas</p>
-              <p className="mt-1 text-sm text-neutral-400">Orders blok {displayStatisticsDate(dateKey)} · ista lista kao Nove narudžbe</p>
+              <p className="mt-1 text-sm text-neutral-400">
+                {cycle.startLabel} u 08:00 → {cycle.endLabel} u 08:00{cycle.spansWeekend ? " · vikend ciklus" : ""}
+              </p>
             </div>
             <Link href="/stats" aria-label="Nazad na statistiku" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
               <ArrowIcon />
@@ -122,7 +126,7 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
 
         <form method="get" className="mt-4 flex flex-wrap items-end gap-2">
           <label>
-            <span className="mb-2 block text-xs text-neutral-500">Radni dan</span>
+            <span className="mb-2 block text-xs text-neutral-500">Kraj ciklusa</span>
             <input type="date" name="date" defaultValue={dateKey} className="min-h-11 rounded-lg border border-white/10 bg-[#111214] px-3 py-2 text-sm text-white [color-scheme:dark] outline-none focus:border-sky-300/35" />
           </label>
           <button type="submit" className="min-h-11 rounded-lg border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white hover:bg-white/[0.08]">Prikaži</button>
@@ -235,6 +239,9 @@ export default async function TodayStatisticsPage({ searchParams }: { searchPara
             <div className={`rounded-lg border p-4 ${meta.complete ? "border-emerald-300/15 bg-emerald-300/[0.05]" : "border-amber-300/15 bg-amber-300/[0.05]"}`}>
               <p className="font-semibold text-white">Meta Ads</p>
               <p className="mt-1 text-xs text-neutral-400">{meta.complete ? `${meta.accounts.length} računa povezano` : meta.error}</p>
+              <p className="mt-1 text-[11px] text-neutral-500">
+                Potrošnja za {cycle.metaDateKeys.map(displayStatisticsDate).join(", ")}
+              </p>
               {meta.accounts.map((account) => (
                 <div key={account.accountId} className="mt-3 flex items-center justify-between gap-3 text-xs">
                   <span className="min-w-0 truncate text-neutral-300">{account.accountName}</span>

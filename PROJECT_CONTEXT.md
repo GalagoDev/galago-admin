@@ -250,6 +250,7 @@ Not fully mature yet:
 - The top `Danas` block in `Statistika` opens a dedicated daily sales and profitability view.
 - Opening `Danas` requires the separate statistics password. The compact modal intentionally contains only a masked input and `OK`; invalid submissions return to `Statistika`, and direct access to `/stats/today` is also guarded.
 - Daily profitability uses the same latest `Orders` workday block as `Nove narudžbe`. Weekend orders remain grouped in the upcoming Monday block, so the count and revenue stay aligned across both panels.
+- The daily profitability header shows the exact operational cycle from 08:00 to 08:00. A Monday block is one weekend cycle from Friday 08:00 through Monday 08:00, and its Meta Ads cost combines Friday, Saturday, and Sunday spend.
 - Staff can periodically upload an `.xls`, `.xlsx`, or `.csv` inventory export containing product name, purchase price, and quantity. The latest import becomes the active catalog; imports and manual aliases persist in SQLite.
 - Sold item labels are matched against the catalog by saved alias, exact normalized name, and conservative fuzzy matching. Unmatched labels are listed for explicit manual mapping.
 - Operational product matching understands quantity notation such as `2x Tunda` and `Usiku 2 komada`, ignores `SDS`/`KM` price suffixes and dispatch notes, and can split clear multi-product labels such as `Zuri sto Lulu stolica` without treating descriptive wording (`sa vratima i policama`) as another item.
