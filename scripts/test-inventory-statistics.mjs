@@ -65,6 +65,7 @@ const operationalProducts = parseInventoryRows([
   ["Komoda MARA orah", 50, 10],
   ["Komoda NORA bijela", 25, 10],
   ["Komoda NORA orah", 25, 10],
+  ["Klub sto Duma bijeli", 37.07, 10],
 ]).items.map((item, index) => ({ id: index + 20, ...item }));
 const operationalMatcher = new ProductMatcher(operationalProducts);
 const implicitPair = operationalMatcher.match("Zuri sto Lulu stolica", 2);
@@ -100,6 +101,13 @@ const doubleMaraSet = operationalMatcher.match("2x Mara set bijela", 4);
 assert.deepEqual(doubleMaraSet.matches.map((match) => match.quantity), [2, 2]);
 const redundantNora = operationalMatcher.match("Mara orah set i nora orah", 2);
 assert.deepEqual(redundantNora.matches.map((match) => match.product.name), ["Komoda MARA orah", "Komoda NORA orah"]);
+const savedMultiplierAlias = new ProductMatcher(operationalProducts, [{
+  normalizedAlias: "klub stol duma smedji sa policama 120x60 2x",
+  productId: operationalProducts.find((product) => product.name === "Klub sto Duma bijeli").id,
+}]).match("Klub stol Duma smeđi sa policama 120x60 2x", 1);
+assert.equal(savedMultiplierAlias.matches[0]?.product.name, "Klub sto Duma bijeli");
+assert.equal(savedMultiplierAlias.matches[0]?.quantity, 2);
+assert.deepEqual(savedMultiplierAlias.unmatched, []);
 const maraCombo = operationalMatcher.match("Komoda Kibo + Mara set bijela", 3);
 assert.deepEqual(maraCombo.matches.map((match) => match.product.name), [
   "Komoda Kibo",

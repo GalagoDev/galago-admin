@@ -141,6 +141,12 @@ export class ProductMatcher {
     });
   }
 
+  private matchAlias(sourceLabel: string): Omit<ProductMatch, "quantity"> | null {
+    const normalized = normalizeInventoryName(sourceLabel);
+    const product = normalized ? this.aliases.get(normalized) : null;
+    return product ? { sourceLabel, product, confidence: 1, method: "alias" } : null;
+  }
+
   private matchMaraSet(sourceLabel: string): Array<Omit<ProductMatch, "quantity">> | null {
     const normalized = normalizeInventoryName(cleanProductLabel(sourceLabel));
     const tokens = normalized.split(" ").map(canonicalProductToken).filter(Boolean);
@@ -177,8 +183,8 @@ export class ProductMatcher {
   private matchOne(sourceLabel: string): Omit<ProductMatch, "quantity"> | null {
     const rawNormalized = normalizeInventoryName(sourceLabel);
     if (!rawNormalized) return null;
-    const rawAlias = this.aliases.get(rawNormalized);
-    if (rawAlias) return { sourceLabel, product: rawAlias, confidence: 1, method: "alias" };
+    const rawAlias = this.matchAlias(sourceLabel);
+    if (rawAlias) return rawAlias;
     const normalized = normalizeInventoryName(cleanProductLabel(sourceLabel));
     if (!normalized) return null;
     const alias = this.aliases.get(normalized);
@@ -268,6 +274,13 @@ export class ProductMatcher {
     if (!source || this.products.length === 0) return { matches: [], unmatched: source ? [source] : [] };
     const totalQuantity = parseQuantity(orderQuantity);
     const sourceSegment = segmentQuantity(source);
+    const savedAlias = this.matchAlias(source);
+    if (savedAlias) {
+      return {
+        matches: [{ ...savedAlias, quantity: sourceSegment.quantity || totalQuantity }],
+        unmatched: [],
+      };
+    }
     let parts = splitDescription(source);
     const wholeBundle = parts.length === 1 ? this.matchMaraSet(sourceSegment.label) : null;
     if (wholeBundle) {
