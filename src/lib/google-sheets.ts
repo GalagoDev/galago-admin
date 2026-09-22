@@ -22,6 +22,7 @@ export type SheetOrderRow = {
   appStatus: string;
   receivedAt: string;
   riskReview: string;
+  deliveredChecked: boolean;
 };
 
 const SHEET_NAME = "Orders";
@@ -46,8 +47,8 @@ function isInactiveOrderStatus(value: string) {
   return value.startsWith("delivered:") || value.startsWith("returned:") || value.startsWith("duplicate:");
 }
 
-export function isActiveOrderRow(order: Pick<SheetOrderRow, "appStatus">) {
-  return !isInactiveOrderStatus(order.appStatus);
+export function isActiveOrderRow(order: Pick<SheetOrderRow, "appStatus"> & { deliveredChecked?: boolean }) {
+  return !isInactiveOrderStatus(order.appStatus) && !order.deliveredChecked;
 }
 
 function isRestoredReturnStatus(value: string) {
@@ -294,7 +295,7 @@ export async function getSheetRowsByName(
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${sheetName}'!A:O`,
+      range: `'${sheetName}'!A:${sheetName === SHEET_NAME ? "P" : "O"}`,
     });
 
     const rows = response.data.values ?? [];
@@ -312,7 +313,7 @@ export async function getSheetRowsByName(
         continue;
       }
 
-      if (sheetName === SHEET_NAME && options.activeOnly && isInactiveOrderStatus(cells[11] ?? "")) continue;
+      if (sheetName === SHEET_NAME && options.activeOnly && (isInactiveOrderStatus(cells[11] ?? "") || cells[15]?.toUpperCase() === "TRUE")) continue;
       if (sheetName === "Povrati" && isRestoredReturnStatus(cells[10] ?? "")) continue;
 
       rowNumber += 1;
@@ -336,6 +337,7 @@ export async function getSheetRowsByName(
         appStatus: cells[11] ?? "",
         receivedAt: cells[12] ?? "",
         riskReview: cells[14] ?? "",
+        deliveredChecked: sheetName === SHEET_NAME && cells[15]?.toUpperCase() === "TRUE",
       };
       result.push({
         ...order,

@@ -18,6 +18,7 @@ const INTERNAL_ID_COLUMN = 11; // K
 const APP_STATUS_COLUMN = 12; // L
 const RECEIVED_AT_COLUMN = 13; // M
 const EXPORT_MARKER_COLUMN = 14; // N
+const DELIVERED_CHECKBOX_COLUMN = 16; // P
 const INTERNAL_HEADERS = ['Source ID', 'App status', 'Received at', 'Export marker'];
 const SPREADSHEET_ID = '1P99qsJa4HzruxVCB3BHLTpZ5Jvb1jiTVvjf6IuRho9s';
 const DEFAULT_SHOPIFY_STORE_KEY = 'galago';
@@ -239,6 +240,7 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
 
   sheet.getRange(insertRow, INTERNAL_ID_COLUMN).setValue(shopifyOrderId);
   sheet.getRange(insertRow, RECEIVED_AT_COLUMN).setValue(new Date().toISOString());
+  sheet.getRange(insertRow, DELIVERED_CHECKBOX_COLUMN).insertCheckboxes();
 
   maintainEmptyRowsForBlock_(sheet, insertRow);
 }

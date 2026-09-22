@@ -157,6 +157,7 @@ This was already being implemented for order list pages.
 - Courier `.xls` and `.xlsx` reports are uploaded on `Na dostavi`, previewed, and confirmed before any Sheet mutation.
 - Matching is conservative: normalized exact names (including reversed first/last name order), with amount/product/city only used to resolve duplicates.
 - Confirmed deliveries are copied from `Orders` to `Delivered orders` and marked inactive in hidden `Orders` column `L`.
+- Visible `Orders` column `P` (`Dostavljeno`) is a native checkbox beside the operational columns. It is not part of the ten-column courier export. Confirmed delivery imports set both hidden `L` and the checkbox; checking `P` manually also excludes that row from `Na dostavi` and exports after refresh, but does not create a historical copy in `Delivered orders`. Unchecking cannot reactivate a row already marked delivered in `L`.
 - `Povrati` has an autocomplete over active `Na dostavi` customers; selecting a customer moves that exact order to the return history.
 - Return actions do not use confirmation popups. A recorded return can be restored to `Na dostavi`; the source row is reactivated and the `Povrati` copy is kept in Sheets with a hidden `restored` status.
 - Source rows remain permanently in `Orders`; hidden column `K` stores the intake source ID and hidden column `L` removes delivered/returned rows only from active app views.

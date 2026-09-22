@@ -442,10 +442,10 @@ async function performMove(references: OrderMoveReference[], destination: Status
       spreadsheetId,
       requestBody: {
         valueInputOption: "RAW",
-        data: valid.map((entry) => ({
-          range: `'${SOURCE_SHEET}'!L${entry.reference.sheetRowNumber}`,
-          values: [[entry.sourceStatus]],
-        })),
+        data: valid.flatMap((entry) => [
+          { range: `'${SOURCE_SHEET}'!L${entry.reference.sheetRowNumber}`, values: [[entry.sourceStatus]] },
+          { range: `'${SOURCE_SHEET}'!P${entry.reference.sheetRowNumber}`, values: [[true]] },
+        ]),
       },
     });
   }

@@ -9,6 +9,7 @@ function order({
   receivedAt,
   dateLabel = "10/09/2026",
   appStatus = "",
+  deliveredChecked = false,
   riskReview = "",
 }) {
   return {
@@ -28,6 +29,7 @@ function order({
     zamjena: "0",
     sourceId: `source-${row}`,
     appStatus,
+    deliveredChecked,
     receivedAt,
     riskReview,
   };
@@ -96,6 +98,18 @@ assert.equal(risks[40].level, "none");
 assert.equal(risks[41].level, "critical");
 assert.equal(risks[51].level, "none");
 assert.equal(unresolvedOrderRisks(risks).length, 3);
+
+const manuallyDelivered = order({
+  row: 60,
+  name: "Lejla Alić",
+  phone: "063555666",
+  receivedAt: "2026-09-18T09:00:00.000Z",
+  deliveredChecked: true,
+});
+const checkedRisk = assessOrderRisks([firstToday], [manuallyDelivered, firstToday], [], new Date("2026-09-19T12:00:00.000Z"));
+assert.equal(checkedRisk[40].deliveredCount, 1);
+assert.equal(checkedRisk[40].activeCount, 0);
+assert.equal(checkedRisk[40].lastOutcome, "Dostavljeno");
 
 current.riskReview = `approved:${current.fingerprint}`;
 const reviewed = assessOrderRisks([current], all, [], new Date("2026-09-19T12:00:00.000Z"));

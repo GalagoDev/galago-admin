@@ -80,10 +80,10 @@ function matchIdentity(current: SheetOrderRow, candidate: SheetOrderRow) {
   };
 }
 
-function outcome(status: string) {
-  if (status.startsWith("delivered:")) return "Dostavljeno";
-  if (status.startsWith("returned:")) return "Povrat";
-  if (status.startsWith("duplicate:")) return "Nije poslano";
+function outcome(order: SheetOrderRow) {
+  if (order.appStatus.startsWith("delivered:") || order.deliveredChecked) return "Dostavljeno";
+  if (order.appStatus.startsWith("returned:")) return "Povrat";
+  if (order.appStatus.startsWith("duplicate:")) return "Nije poslano";
   return "Na dostavi";
 }
 
@@ -125,7 +125,7 @@ export function assessOrderRisks(
     });
     const recentPhoneMatches = recentMatches.filter(({ match }) => match.phone);
     const recentNameMatches = recentMatches.filter(({ match }) => match.name);
-    const activePhoneMatches = previousMatches.filter(({ candidate, match }) => match.phone && !candidate.appStatus);
+    const activePhoneMatches = previousMatches.filter(({ candidate, match }) => match.phone && !candidate.appStatus && !candidate.deliveredChecked);
     const historicalReturns = previousMatches.filter(({ candidate }) => candidate.appStatus.startsWith("returned:"));
     const returnSheetMatches = returnedOrders.filter((candidate) => {
       const match = matchIdentity(current, candidate);
@@ -167,12 +167,12 @@ export function assessOrderRisks(
       excluded,
       reasons,
       recentMatchCount: recentMatches.length,
-      deliveredCount: previousMatches.filter(({ candidate }) => candidate.appStatus.startsWith("delivered:")).length,
+      deliveredCount: previousMatches.filter(({ candidate }) => candidate.appStatus.startsWith("delivered:") || candidate.deliveredChecked).length,
       returnedCount: Math.max(returnedCount, returnSheetMatches.length),
-      activeCount: previousMatches.filter(({ candidate }) => !candidate.appStatus).length,
+      activeCount: previousMatches.filter(({ candidate }) => !candidate.appStatus && !candidate.deliveredChecked).length,
       lastOrderDaysAgo: Number.isFinite(latestTime) ? differenceInDays(nowTime, latestTime) : null,
       lastOrderDate: latestMatch?.dateLabel || "",
-      lastOutcome: latestMatch ? outcome(latestMatch.appStatus) : "",
+      lastOutcome: latestMatch ? outcome(latestMatch) : "",
     };
   }
 

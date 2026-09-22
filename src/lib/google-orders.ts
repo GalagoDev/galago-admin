@@ -387,6 +387,18 @@ export async function appendOrderToOrdersSheet(input: OrderSheetInput, options: 
     requestBody: { values },
   });
 
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        setDataValidation: {
+          range: { sheetId, startRowIndex: targetRowIndex, endRowIndex: targetRowIndex + 1, startColumnIndex: 15, endColumnIndex: 16 },
+          rule: { condition: { type: "BOOLEAN" }, strict: true, showCustomUi: true },
+        },
+      }],
+    },
+  });
+
   invalidateSheetCache(SHEET_NAME);
   return { created: true, sheetRowNumber: targetRowIndex + 1, sheetOrderId: sourceId };
 }
@@ -406,7 +418,7 @@ export async function deleteOrderFromOrdersSheet(sheetOrderId: string) {
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A${rowIndex + 1}:O${rowIndex + 1}`,
+    range: `'${SHEET_NAME}'!A${rowIndex + 1}:P${rowIndex + 1}`,
   });
   invalidateSheetCache(SHEET_NAME);
   return true;
