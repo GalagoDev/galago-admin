@@ -108,6 +108,16 @@ const savedMultiplierAlias = new ProductMatcher(operationalProducts, [{
 assert.equal(savedMultiplierAlias.matches[0]?.product.name, "Klub sto Duma bijeli");
 assert.equal(savedMultiplierAlias.matches[0]?.quantity, 2);
 assert.deepEqual(savedMultiplierAlias.unmatched, []);
+const dumaVariant = operationalMatcher.match("Klub stol Duma smeđi sa policama 120x60", 1);
+assert.equal(dumaVariant.matches[0]?.product.name, "Klub sto Duma bijeli");
+assert.deepEqual(dumaVariant.unmatched, []);
+const dumaCombo = operationalMatcher.match("Klub stol Duma smeđi sa policama 120x60 + Komoda Kibo", 2);
+assert.deepEqual(dumaCombo.matches.map((match) => match.product.name), ["Klub sto Duma bijeli", "Komoda Kibo"]);
+const ambiguousDuma = new ProductMatcher([
+  ...operationalProducts,
+  { ...operationalProducts.find((product) => product.name === "Klub sto Duma bijeli"), id: 1000, name: "Klub sto Duma smeđi", normalizedName: "klub sto duma smedji" },
+]).match("Klub stol Duma sa policama", 1);
+assert.deepEqual(ambiguousDuma.matches, []);
 const maraCombo = operationalMatcher.match("Komoda Kibo + Mara set bijela", 3);
 assert.deepEqual(maraCombo.matches.map((match) => match.product.name), [
   "Komoda Kibo",
@@ -152,6 +162,28 @@ assert.equal(stats.costOfGoods, 41);
 assert.equal(stats.profitBeforeAds, 36);
 assert.equal(stats.profitAfterAds, 26);
 assert.equal(stats.ranking[0].units, 2);
+
+const replacementByName = calculateDailyStatistics({
+  orders: [order, { ...order, artikal: "Zuri ogledalo zamjena", otkupnina: "89" }],
+  products,
+  dateKey: "2026-09-21",
+  metaSpendBam: 10,
+});
+assert.equal(replacementByName.sourceOrderCount, 2);
+assert.equal(replacementByName.orderCount, 1);
+assert.equal(replacementByName.unmatchedLines, 0);
+assert.equal(replacementByName.revenue, 100);
+assert.equal(replacementByName.profitAfterAds, 26);
+
+const replacementByColumn = calculateDailyStatistics({
+  orders: [order, { ...order, artikal: "Nepoznat proizvod", zamjena: "1", otkupnina: "89" }],
+  products,
+  dateKey: "2026-09-21",
+  metaSpendBam: 10,
+});
+assert.equal(replacementByColumn.orderCount, 1);
+assert.equal(replacementByColumn.unmatchedLines, 0);
+assert.equal(replacementByColumn.profitAfterAds, 26);
 
 const incomplete = calculateDailyStatistics({
   orders: [{ ...order, artikal: "Nepoznat proizvod" }],

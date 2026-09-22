@@ -191,10 +191,18 @@ export class ProductMatcher {
     if (alias) return { sourceLabel, product: alias, confidence: 1, method: "alias" };
     const exact = this.productsByName.get(normalized);
     if (exact) return { sourceLabel, product: exact, confidence: 1, method: "exact" };
+    const sourceCategories = normalizedTokenSet(normalized, PRODUCT_CATEGORY_TOKENS);
     const sourceTokens = semanticProductTokens(normalized);
+    if (sourceCategories.has("sto") && sourceTokens.includes("duma")) {
+      const dumaTables = this.products.filter((product) =>
+        normalizedTokenSet(product.normalizedName, PRODUCT_CATEGORY_TOKENS).has("sto")
+        && semanticProductTokens(product.normalizedName).includes("duma"));
+      if (dumaTables.length === 1) {
+        return { sourceLabel, product: dumaTables[0], confidence: 0.8, method: "fuzzy" };
+      }
+    }
     if (sourceTokens.length > 0) {
       const sourceNumbers = new Set(sourceTokens.filter((token) => /^\d+(?:[.,]\d+)?$/.test(token)));
-      const sourceCategories = normalizedTokenSet(normalized, PRODUCT_CATEGORY_TOKENS);
       const sourceColors = normalizedTokenSet(normalized, PRODUCT_COLOR_TOKENS);
       const candidates = this.products
         .map((product) => {

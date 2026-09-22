@@ -11,6 +11,11 @@ function configuredNumber(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function isReplacementOrder(order: SheetOrderRow) {
+  return /\bzamjena\b/i.test(order.artikal)
+    || !/^(?:0+(?:[.,]0+)?|)$/.test(order.zamjena.trim());
+}
+
 export function sarajevoDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Sarajevo",
@@ -47,7 +52,9 @@ export function calculateDailyStatistics(input: {
   const workdayLabel = displayStatisticsDate(input.dateKey);
   const workdayOrders = input.orders.filter((order) => order.dateLabel === workdayLabel);
   const orders = workdayOrders.filter(
-    (order) => !order.appStatus.startsWith("duplicate:") && !order.appStatus.startsWith("returned:"),
+    (order) => !order.appStatus.startsWith("duplicate:")
+      && !order.appStatus.startsWith("returned:")
+      && !isReplacementOrder(order),
   );
   const matcher = new ProductMatcher(input.products, input.aliases || []);
   const ranking = new Map<number, { product: InventoryProduct; units: number; cost: number; orderCount: number }>();
