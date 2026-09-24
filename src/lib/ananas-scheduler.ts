@@ -25,6 +25,7 @@ function sarajevoClock() {
   );
   return {
     date: `${values.year}-${values.month}-${values.day}`,
+    day: Number(values.day),
     hour: Number(values.hour),
     minute: Number(values.minute),
   };
@@ -32,10 +33,11 @@ function sarajevoClock() {
 
 function dueActions(clock: ReturnType<typeof sarajevoClock>) {
   const actions: ScheduledAction[] = [];
+  // Ananas product IDs must be refreshed before price/stock updates.
+  if (clock.hour === 0 && clock.minute >= 5) actions.push("refresh-ids");
   if ((clock.hour === 0 && clock.minute >= 15) || clock.hour === 1) actions.push("prices-stock");
   if (clock.hour === 2 && clock.minute >= 15) actions.push("discounts");
-  if (clock.hour >= 3 && (clock.hour > 3 || clock.minute >= 15)) actions.push("refresh-ids");
-  if (clock.hour >= 4) actions.push("import-catalog");
+  if ((clock.day === 1 || clock.day === 15) && clock.hour >= 4) actions.push("import-catalog");
   if (clock.hour >= 5) actions.push("invoices");
   return actions;
 }
