@@ -33,6 +33,27 @@ function parseQuantity(value: string | number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
+const WORD_QUANTITIES: Record<string, number> = {
+  jedan: 1,
+  jedna: 1,
+  jedno: 1,
+  dva: 2,
+  dvije: 2,
+  dvoje: 2,
+  tri: 3,
+  cetiri: 4,
+  pet: 5,
+  sest: 6,
+  sedam: 7,
+  osam: 8,
+  devet: 9,
+  deset: 10,
+};
+
+function parseWordQuantity(value: string) {
+  return WORD_QUANTITIES[normalizeInventoryName(value)] || null;
+}
+
 function splitDescription(value: string) {
   return value
     .split(/\s*\+\s*|\s+&\s+/i)
@@ -60,6 +81,22 @@ function segmentQuantity(value: string) {
     return {
       label: trailingMultiplier[1].trim(),
       quantity: parseQuantity(trailingMultiplier[2]),
+    };
+  }
+  const leadingWord = value.match(/^\s*([\p{L}]+)\s+(?:(?:kom|komad|komada)\s+)?(.+)$/iu);
+  const leadingWordQuantity = leadingWord ? parseWordQuantity(leadingWord[1]) : null;
+  if (leadingWord && leadingWordQuantity) {
+    return {
+      label: leadingWord[2].trim(),
+      quantity: leadingWordQuantity,
+    };
+  }
+  const trailingWord = value.match(/^(.+?)\s+([\p{L}]+)(?:\s+(?:kom|komad|komada))?\s*$/iu);
+  const trailingWordQuantity = trailingWord ? parseWordQuantity(trailingWord[2]) : null;
+  if (trailingWord && trailingWordQuantity) {
+    return {
+      label: trailingWord[1].trim(),
+      quantity: trailingWordQuantity,
     };
   }
   return { label: value.trim(), quantity: null as number | null };

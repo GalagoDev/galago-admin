@@ -83,6 +83,15 @@ assert.equal(tundaPair.matches[0]?.quantity, 2);
 const usikuPair = operationalMatcher.match("usiku bijeli 2 komada", 1);
 assert.equal(usikuPair.matches[0]?.product.name, "Usiku bijeli");
 assert.equal(usikuPair.matches[0]?.quantity, 2);
+const usikuPairAsWord = operationalMatcher.match("usiku bijeli dva", 1);
+assert.equal(usikuPairAsWord.matches[0]?.product.name, "Usiku bijeli");
+assert.equal(usikuPairAsWord.matches[0]?.quantity, 2);
+const leadingWordQuantity = operationalMatcher.match("dvije komode Kibo", 1);
+assert.equal(leadingWordQuantity.matches[0]?.product.name, "Komoda Kibo");
+assert.equal(leadingWordQuantity.matches[0]?.quantity, 2);
+const drawerCountAsWord = operationalMatcher.match("Tunda bijeli tri ladice", 1);
+assert.equal(drawerCountAsWord.matches[0]?.product.name, "Tunda bijeli 3 ladice");
+assert.equal(drawerCountAsWord.matches[0]?.quantity, 1);
 const sdsSuffix = operationalMatcher.match("Tunda bijeli 3 ladice SDS 95", 1);
 assert.equal(sdsSuffix.matches[0]?.product.name, "Tunda bijeli 3 ladice");
 const dispatchNote = operationalMatcher.match("Zuri u utorak da ide", 1);
@@ -162,6 +171,17 @@ assert.equal(stats.costOfGoods, 41);
 assert.equal(stats.profitBeforeAds, 36);
 assert.equal(stats.profitAfterAds, 26);
 assert.equal(stats.ranking[0].units, 2);
+
+const wordQuantityStats = calculateDailyStatistics({
+  orders: [{ ...order, artikal: "Usiku bijeli dva", brojPaketa: "1" }],
+  products: operationalProducts,
+  dateKey: "2026-09-21",
+  metaSpendBam: 0,
+});
+assert.equal(wordQuantityStats.orderCount, 1);
+assert.equal(wordQuantityStats.costOfGoods, 50);
+assert.equal(wordQuantityStats.ranking[0].product.name, "Usiku bijeli");
+assert.equal(wordQuantityStats.ranking[0].units, 2);
 
 const replacementByName = calculateDailyStatistics({
   orders: [order, { ...order, artikal: "Zuri ogledalo zamjena", otkupnina: "89" }],
