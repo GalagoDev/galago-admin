@@ -36,6 +36,13 @@ function formatQuantity(value: number) {
   return new Intl.NumberFormat("bs-BA", { maximumFractionDigits: 3 }).format(value);
 }
 
+function formatMoney(value: number) {
+  return `${new Intl.NumberFormat("bs-BA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)} KM`;
+}
+
 function formatDateTime(value: string) {
   const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(" ", "T")}Z` : value;
   const date = new Date(normalized);
@@ -87,6 +94,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     });
 
   const totalQuantity = inventory.products.reduce((sum, product) => sum + product.quantity, 0);
+  const totalPurchaseValue = inventory.products.reduce(
+    (sum, product) => sum + Math.max(0, product.quantity) * Math.max(0, product.unitCost),
+    0,
+  );
   const lowStockCount = inventory.products.filter((product) => stockStatus(product.quantity) === "low").length;
   const emptyStockCount = inventory.products.filter((product) => stockStatus(product.quantity) === "empty").length;
   const filters: Array<{ value: StockStatus; label: string }> = [
@@ -100,7 +111,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-28 pt-4 sm:max-w-lg sm:px-5 lg:max-w-[1480px] lg:px-8 lg:pb-8 lg:pt-8 2xl:px-10">
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/30 lg:rounded-lg lg:px-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <h1 className="mt-2 text-lg font-semibold text-white">Lager</h1>
@@ -108,9 +119,15 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                 {inventory.latestImport ? `Stanje iz uvoza · ${formatDateTime(inventory.latestImport.importedAt)}` : "Lager još nije uvezen"}
               </p>
             </div>
-            <Link href="/" aria-label="Nazad na pregled" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
-              <ArrowIcon />
-            </Link>
+            <div className="flex items-center justify-between gap-4 sm:justify-end">
+              <div className="sm:border-r sm:border-white/10 sm:pr-4 sm:text-right">
+                <p className="text-xs text-neutral-500">Nabavna vrijednost</p>
+                <p className="mt-1 text-xl font-semibold text-emerald-100">{formatMoney(totalPurchaseValue)}</p>
+              </div>
+              <Link href="/" aria-label="Nazad na pregled" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
+                <ArrowIcon />
+              </Link>
+            </div>
           </div>
         </section>
 
