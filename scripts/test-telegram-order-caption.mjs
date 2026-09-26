@@ -5,6 +5,7 @@ import {
   getTelegramArticleOverrideText,
   normalizeTelegramPostalCode,
   parseTelegramArticleAndAmount,
+  parseTelegramPackageCount,
   resolveTelegramPostalCode,
 } from "../src/lib/telegram-orders.ts";
 import { formatPostalLocation, lookupPlaceByPostalCode } from "../src/lib/bih-postal.ts";
@@ -32,6 +33,26 @@ assert.deepEqual(
   parseTelegramArticleAndAmount(getTelegramArticleOverrideText("Kozarska Dubica, Studenička ulica 066 998 073\n\nMara white\nSds 119")),
   { artikal: "Mara white", amount: "119" },
 );
+assert.equal(
+  getTelegramArticleOverrideText("Mihajlovic Sanja\n066-097-765\nUlice 7/12 Zvornik\nZola set\nSDS 209\nPaketa 2"),
+  "Zola set\nSDS 209",
+);
+assert.deepEqual(
+  parseTelegramArticleAndAmount(getTelegramArticleOverrideText("Zola set\nSDS 209\nPaketa 2")),
+  { artikal: "Zola set", amount: "209" },
+);
+
+const packageCases = [
+  ["Paketa 2", "2"],
+  ["paket: 3", "3"],
+  ["Broj paketa 4", "4"],
+  ["2 paketa", "2"],
+  ["Zola set SDS 209", ""],
+];
+
+for (const [input, expected] of packageCases) {
+  assert.equal(parseTelegramPackageCount(input), expected, input);
+}
 
 const postalCases = [
   ["Foča", "73300"],

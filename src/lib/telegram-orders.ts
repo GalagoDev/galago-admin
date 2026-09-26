@@ -81,10 +81,27 @@ export function resolveTelegramPostalCode(...values: Array<string | undefined>) 
   return normalizeTelegramPostalCode(values.filter(Boolean).join("\n"));
 }
 
+export function parseTelegramPackageCount(value: string) {
+  const cleaned = cleanup(value);
+  const labelled = cleaned.match(/\b(?:broj\s+)?paket(?:a)?\s*[:=-]?\s*(\d{1,2})\b/i);
+  const countFirst = cleaned.match(/\b(\d{1,2})\s*paket(?:a)?\b/i);
+  const rawCount = labelled?.[1] || countFirst?.[1] || "";
+  const count = Number(rawCount);
+  return Number.isInteger(count) && count > 0 ? String(count) : "";
+}
+
+function stripTelegramPackageCount(value: string) {
+  return cleanup(
+    value
+      .replace(/\b(?:broj\s+)?paket(?:a)?\s*[:=-]?\s*\d{1,2}\b/gi, " ")
+      .replace(/\b\d{1,2}\s*paket(?:a)?\b/gi, " "),
+  );
+}
+
 export function getTelegramArticleOverrideText(value: string) {
   const lines = String(value || "")
     .split(/\n+/)
-    .map(cleanup)
+    .map(stripTelegramPackageCount)
     .filter(Boolean);
   const lastLine = lines.at(-1) || "";
   const lastLineResult = parseTelegramArticleAndAmount(lastLine);
@@ -153,7 +170,7 @@ function emptyDraft(): TelegramOrderDraft {
     grad: "",
     adresa: "",
     artikal: "",
-    brojPaketa: "",
+    brojPaketa: "1",
     otkupnina: "",
     vrijednostPosiljke: "",
     dop: "1",
@@ -162,11 +179,12 @@ function emptyDraft(): TelegramOrderDraft {
 }
 
 export function parseTelegramOrderText(rawText: string): TelegramOrderDraft {
-  const lines = splitSegments(rawText);
+  const lines = splitSegments(rawText).map(stripTelegramPackageCount).filter(Boolean);
   const hasLabels = lines.some((line) => /^(ime|adresa|grad|mjesto|mob|br tel|br\. tel|telefon)\s*[:-]/i.test(line));
 
   if (hasLabels) {
     const order = emptyDraft();
+    order.brojPaketa = parseTelegramPackageCount(rawText) || "1";
     const amount = findAmount(rawText);
     order.otkupnina = amount;
     order.vrijednostPosiljke = amount;
@@ -203,6 +221,7 @@ export function parseTelegramOrderText(rawText: string): TelegramOrderDraft {
   const articleLine = lines.length > 1 ? lines[lines.length - 1] || "" : "";
   const amount = findAmount(articleLine || rawText);
   const order = emptyDraft();
+  order.brojPaketa = parseTelegramPackageCount(rawText) || "1";
   order.otkupnina = amount;
   order.vrijednostPosiljke = amount;
   order.artikal = articleLine
@@ -274,6 +293,7 @@ export function formatTelegramOrderPreview(order: TelegramOrderDraft) {
     `Grad: ${order.grad || "-"}`,
     `Adresa: ${order.adresa || "-"}`,
     `Artikal: ${order.artikal || "-"}`,
+    `Broj paketa: ${order.brojPaketa || "1"}`,
     `Otkupnina: ${order.otkupnina || "-"}`,
     `Vrijednost posiljke: ${order.vrijednostPosiljke || "-"}`,
     `DOP: ${order.dop || "1"}`,

@@ -7,6 +7,7 @@ import {
   getTelegramArticleOverrideText,
   normalizePhone,
   parseTelegramArticleAndAmount,
+  parseTelegramPackageCount,
   resolveTelegramPostalCode,
   type TelegramOrderDraft,
 } from "@/lib/telegram-orders";
@@ -21,6 +22,7 @@ const telegramOrderSchema = z
     grad: z.string().describe("Bosnia ZIP/postal code only when known; otherwise the visible city/place."),
     adresa: z.string().describe("Shipping street/address, without city/ZIP when separable."),
     artikal: z.string().describe("Product name from the last user-provided item text, without its trailing price."),
+    brojPaketa: z.string().describe("Number of packages when explicitly stated; otherwise 1."),
     ukupanIznos: z.string().describe("Final customer payment amount from the item caption/text, without currency; empty if absent."),
   })
   .strict();
@@ -52,6 +54,11 @@ function normalizeDraft(
   const modelAmount = cleanup(order.ukupanIznos).match(/\d+(?:[.,]\d{1,2})?/)?.[0]?.replace(",", ".") || "";
   const amount = override.amount || modelAmount || extracted.amount;
   const grad = resolveTelegramPostalCode(order.grad, order.adresa, sourceText);
+  const modelPackageCount = cleanup(order.brojPaketa).match(/^\d{1,2}$/)?.[0] || "";
+  const parsedModelPackageCount = Number(modelPackageCount);
+  const brojPaketa = parseTelegramPackageCount(sourceText)
+    || (Number.isInteger(parsedModelPackageCount) && parsedModelPackageCount > 0 ? modelPackageCount : "")
+    || "1";
 
   return {
     primalac: cleanup(order.primalac),
@@ -59,7 +66,7 @@ function normalizeDraft(
     grad,
     adresa: cleanup(order.adresa),
     artikal: override.artikal || extracted.artikal,
-    brojPaketa: "",
+    brojPaketa,
     otkupnina: amount,
     vrijednostPosiljke: amount,
     dop: "1",
@@ -128,11 +135,13 @@ Rules:
 - Adresa is the street/place/address only, without ZIP/city when separable.
 - Artikal must be the product portion of the final user-provided item text. If an image caption or text below the image is provided separately, treat it as authoritative.
 - "SDS" is an amount marker and must never be included in Artikal. Example: "Komoda serena\nSDS 139" means Artikal="Komoda serena" and ukupanIznos="139".
+- Broj paketa is the explicitly written package count, such as "Paketa 2", "Paket: 2", or "2 paketa". Use 1 when it is not written.
+- A package-count line is metadata and must never become Artikal or ukupanIznos.
 - The authoritative item text may also end with a plain total, such as "Komoda serena - 139 KM".
 - ukupanIznos is the final amount the customer pays, not an older offer price or delivery fee. Leave it empty when the final item text has no amount.
 - Do not infer Artikal from older price/offer discussion when a later item caption/text exists.
-- Extract Primalac, Broj telefona, Grad, Adresa, Artikal, and ukupanIznos.
-- Do not extract package count, DOP, or zamjena. The app supplies those defaults.`;
+- Extract Primalac, Broj telefona, Grad, Adresa, Artikal, Broj paketa, and ukupanIznos.
+- Do not extract DOP or zamjena. The app supplies those defaults.`;
 }
 
 async function extractWithOpenAI(input: {
