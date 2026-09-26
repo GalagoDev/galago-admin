@@ -36,6 +36,9 @@ assert.deepEqual(
 const postalCases = [
   ["Foča", "73300"],
   ["Foca", "73300"],
+  ["Goražde", "73000"],
+  ["Gorazde", "73000"],
+  ["Kadric Tarik Zaima Imamovica 27 Gorazde 067 129 6610", "73000"],
   ["Donji Vakuf", "70220"],
   ["Sanski Most", "79260"],
   ["79260 Sanski Most", "79260"],
@@ -63,6 +66,7 @@ assert.ok(Object.keys(bosniaPostalCodes).length >= 400);
 
 assert.equal(lookupPlaceByPostalCode("71000"), "Sarajevo");
 assert.equal(formatPostalLocation("75000"), "75000 - Tuzla");
+assert.equal(formatPostalLocation("73000"), "73000 - Goražde");
 assert.equal(formatPostalLocation("78430"), "78430 - Prnjavor");
 assert.equal(formatPostalLocation("88000"), "88000 - Mostar");
 assert.equal(formatPostalLocation("88363"), "88363 - Berkovići");

@@ -99,6 +99,7 @@ function postalHints() {
     "doboj",
     "prijedor",
     "zivinice",
+    "gorazde",
     "sanski most",
     "kljuc",
     "kozarska dubica",
@@ -122,8 +123,8 @@ Rules:
 - Intake language is Bosnian/Croatian/Serbian; preserve names and addresses in Latin script.
 - Primalac is the customer full name, not page/admin labels unless it is also the customer name.
 - Broj telefona must be normalized to digits only. Bosnia mobile examples: 061417206 -> 38761417206, +387 61 417 206 -> 38761417206.
-- Grad must always be a five-digit ZIP/postal code, never a city name. Common mappings: ${postalHints()}.
-- If the city is visible but its ZIP cannot be determined reliably, return an empty Grad so the app can reject the incomplete draft.
+- Grad should be a five-digit ZIP/postal code when known. Common mappings: ${postalHints()}.
+- If a city/place is visible but you do not know its ZIP reliably, return the visible city/place in Grad. The app resolves it through its Bosnia postal directory.
 - Adresa is the street/place/address only, without ZIP/city when separable.
 - Artikal must be the product portion of the final user-provided item text. If an image caption or text below the image is provided separately, treat it as authoritative.
 - "SDS" is an amount marker and must never be included in Artikal. Example: "Komoda serena\nSDS 139" means Artikal="Komoda serena" and ukupanIznos="139".

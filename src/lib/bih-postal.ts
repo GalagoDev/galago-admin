@@ -36,6 +36,7 @@ const PREFERRED_POSTAL_CODES: Record<string, string> = {
   "bosanska krupa": "77240",
   "donji vakuf": "70220",
   foca: "73300",
+  gorazde: "73000",
   "sanski most": "79260",
   turbe: "72283",
   laktasi: "78250",
