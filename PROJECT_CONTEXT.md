@@ -264,7 +264,9 @@ Not fully mature yet:
 
 ### Inventory overview workflow
 - `Lager` is a dedicated authenticated operational page backed by the latest imported inventory catalog in persistent SQLite storage.
-- It displays product name, optional SKU, and the exact quantity from the latest uploaded lager document. Purchase prices remain confined to the password-protected profitability view.
+- Uploaded lager documents remain the source for product names, SKUs, aliases, and purchase prices.
+- Quantities are refreshed automatically from the configured Galago Shopify Admin API every 10 minutes, on relevant Shopify webhooks, and manually from the `Lager` page. Only confidently matched tracked variants update local quantities; unmatched or ambiguous Shopify products never overwrite imported stock.
+- The page displays product name, optional SKU, and the latest safely matched Shopify quantity. Purchase prices remain confined to the password-protected profitability view.
 - The page includes search, stock-status filters, totals, and clear warnings for zero stock and quantities from one through five.
 - `Lager` is available in the desktop sidebar and as a dashboard summary card, keeping the six-item mobile bottom navigation touch-friendly.
 - Product ranking uses sold units and order count for the selected actual calendar date.

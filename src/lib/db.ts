@@ -181,6 +181,18 @@ export function getDb() {
       FOREIGN KEY(product_id) REFERENCES inventory_products(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS inventory_shopify_sync_state (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      last_attempt_at TEXT,
+      last_success_at TEXT,
+      matched_products INTEGER NOT NULL DEFAULT 0,
+      catalog_products INTEGER NOT NULL DEFAULT 0,
+      total_variants INTEGER NOT NULL DEFAULT 0,
+      matched_variants INTEGER NOT NULL DEFAULT 0,
+      unmatched_variants INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS telegram_confirmed_orders (
       chat_id TEXT NOT NULL,
       preview_message_id INTEGER NOT NULL,

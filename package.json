@@ -10,6 +10,7 @@
     "test:matching": "node --experimental-strip-types ./scripts/test-order-matching.mjs",
     "test:order-risk": "node --experimental-strip-types ./scripts/test-order-risk.mjs",
     "test:statistics": "node --experimental-strip-types ./scripts/test-inventory-statistics.mjs",
+    "test:shopify-inventory": "node --experimental-strip-types ./scripts/test-shopify-inventory-matching.mjs",
     "test:telegram-caption": "node --experimental-strip-types ./scripts/test-telegram-order-caption.mjs",
     "test:order-window": "node --experimental-strip-types ./scripts/test-order-window.mjs",
     "start": "next start",

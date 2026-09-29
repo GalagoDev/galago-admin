@@ -37,6 +37,17 @@ export type InventoryAlias = {
   productId: number;
 };
 
+export type InventoryShopifySyncState = {
+  lastAttemptAt: string;
+  lastSuccessAt: string;
+  matchedProducts: number;
+  catalogProducts: number;
+  totalVariants: number;
+  matchedVariants: number;
+  unmatchedVariants: number;
+  lastError: string;
+};
+
 export class InventoryError extends Error {
   code: string;
 
@@ -122,6 +133,22 @@ export function getInventoryOverview() {
   const aliases = db
     .prepare("SELECT normalized_alias, alias_label, product_id FROM inventory_product_aliases")
     .all() as Array<{ normalized_alias: string; alias_label: string; product_id: number }>;
+  const shopifySync = db
+    .prepare(
+      `SELECT last_attempt_at, last_success_at, matched_products, catalog_products,
+              total_variants, matched_variants, unmatched_variants, last_error
+       FROM inventory_shopify_sync_state WHERE id = 1`,
+    )
+    .get() as {
+      last_attempt_at: string | null;
+      last_success_at: string | null;
+      matched_products: number;
+      catalog_products: number;
+      total_variants: number;
+      matched_variants: number;
+      unmatched_variants: number;
+      last_error: string | null;
+    } | undefined;
 
   return {
     products: products.map(mapProduct),
@@ -137,6 +164,18 @@ export function getInventoryOverview() {
           itemCount: latestImport.item_count,
           importedAt: latestImport.imported_at,
         }
+      : null,
+    shopifySync: shopifySync
+      ? {
+          lastAttemptAt: shopifySync.last_attempt_at || "",
+          lastSuccessAt: shopifySync.last_success_at || "",
+          matchedProducts: shopifySync.matched_products,
+          catalogProducts: shopifySync.catalog_products,
+          totalVariants: shopifySync.total_variants,
+          matchedVariants: shopifySync.matched_variants,
+          unmatchedVariants: shopifySync.unmatched_variants,
+          lastError: shopifySync.last_error || "",
+        } satisfies InventoryShopifySyncState
       : null,
   };
 }

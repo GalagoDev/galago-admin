@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import { syncInventoryFromShopifyAction } from "@/app/actions/inventory";
 import { getInventoryOverview } from "@/lib/inventory";
 import { normalizeInventoryName } from "@/lib/inventory-import";
+import { refreshInventoryFromShopifyIfStale } from "@/lib/inventory-shopify-sync";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,6 +12,10 @@ export const fetchCache = "force-no-store";
 type Params = {
   q?: string;
   status?: string;
+  sync?: string;
+  matched?: string;
+  catalog?: string;
+  unmatched?: string;
 };
 
 type StockStatus = "all" | "available" | "low" | "empty";
@@ -28,6 +34,14 @@ function UploadIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
       <path d="M12 15V4M8 8l4-4 4 4M5 14v5h14v-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <path d="M20 11a8 8 0 10-2.34 5.66M20 5v6h-6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -74,6 +88,11 @@ function statusClass(status: Exclude<StockStatus, "all">) {
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
+  try {
+    await refreshInventoryFromShopifyIfStale();
+  } catch (error) {
+    console.error("Automatic Shopify Lager refresh failed", error);
+  }
   const inventory = getInventoryOverview();
   const query = String(params.q || "").trim();
   const normalizedQuery = normalizeInventoryName(query);
@@ -106,6 +125,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     { value: "low", label: "Pri kraju" },
     { value: "empty", label: "Nema" },
   ];
+  const syncSuccess = params.sync === "success";
+  const syncError = params.sync === "error" || Boolean(inventory.shopifySync?.lastError);
+  const stockSourceLabel = inventory.shopifySync?.lastSuccessAt
+    ? `Stanje sa Galago Shopifyja · ${formatDateTime(inventory.shopifySync.lastSuccessAt)}`
+    : inventory.latestImport
+      ? `Stanje iz uvoza · ${formatDateTime(inventory.latestImport.importedAt)}`
+      : "Lager još nije uvezen";
 
   return (
     <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">
@@ -115,9 +141,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <h1 className="mt-2 text-lg font-semibold text-white">Lager</h1>
-              <p className="mt-1 text-sm text-neutral-400">
-                {inventory.latestImport ? `Stanje iz uvoza · ${formatDateTime(inventory.latestImport.importedAt)}` : "Lager još nije uvezen"}
-              </p>
+              <p className="mt-1 text-sm text-neutral-400">{stockSourceLabel}</p>
+              {inventory.shopifySync?.lastSuccessAt ? (
+                <p className="mt-1 text-xs text-neutral-600">
+                  Povezano {inventory.shopifySync.matchedProducts} od {inventory.shopifySync.catalogProducts} lager artikala
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center justify-between gap-4 sm:justify-end">
               <div className="sm:border-r sm:border-white/10 sm:pr-4 sm:text-right">
@@ -130,6 +159,22 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </div>
           </div>
         </section>
+
+        {syncSuccess ? (
+          <div className="mt-4 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.08] px-4 py-3 text-sm text-emerald-100">
+            Lager je osvježen sa Galago Shopifyja. Povezano {params.matched || inventory.shopifySync?.matchedProducts || 0} od {params.catalog || inventory.products.length} artikala.
+          </div>
+        ) : null}
+        {syncError ? (
+          <div className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/[0.08] px-4 py-3 text-sm text-amber-100">
+            Shopify količine trenutno nisu osvježene. Posljednje ispravno stanje ostaje sačuvano; pokušajte ponovo.
+          </div>
+        ) : null}
+        {inventory.shopifySync?.lastSuccessAt && inventory.shopifySync.unmatchedVariants > 0 ? (
+          <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
+            {inventory.shopifySync.unmatchedVariants} Shopify varijanti nije sigurno povezano i njihove stare količine nisu prepisane.
+          </div>
+        ) : null}
 
         <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <article className="rounded-[1.25rem] border border-sky-300/20 bg-sky-300/[0.08] p-4 lg:rounded-lg">
@@ -167,9 +212,16 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               </label>
               <button type="submit" className="min-h-11 rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/[0.1]">Traži</button>
             </form>
-            <Link href="/stats/today" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-300/20 bg-sky-300/[0.08] px-4 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-300/[0.13]">
-              <UploadIcon /> Ažuriraj lager
-            </Link>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <form action={syncInventoryFromShopifyAction}>
+                <button type="submit" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.09] px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/[0.14] sm:w-auto">
+                  <RefreshIcon /> Osvježi sa Galago
+                </button>
+              </form>
+              <Link href="/stats/today" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-300/20 bg-sky-300/[0.08] px-4 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-300/[0.13]">
+                <UploadIcon /> Uvezi cijene
+              </Link>
+            </div>
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {filters.map((filter) => {
