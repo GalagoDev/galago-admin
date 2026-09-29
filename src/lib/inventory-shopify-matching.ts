@@ -1,4 +1,5 @@
 import type { ShopifyProductWebhook, ShopifyVariantInput } from "./ananas-types.ts";
+import { normalizeInventoryName } from "./inventory-import.ts";
 import type { MatchableInventoryAlias, MatchableInventoryProduct } from "./product-matching.ts";
 import { ProductMatcher } from "./product-matching.ts";
 
@@ -38,6 +39,49 @@ function inventoryIdentifiers(value: string) {
 
 function shopifyIdentifiers(variant: ShopifyVariantInput) {
   return [variant.sku, variant.barcode].map(normalizeIdentifier).filter(Boolean);
+}
+
+function canonicalTitleToken(value: string) {
+  if (["bijela", "bijeli", "bijelo", "bijelu", "white"].includes(value)) return "bijeli";
+  if (["black", "crna", "crne", "crni", "crno"].includes(value)) return "crni";
+  if (["braon", "smedja", "smedji", "smedje"].includes(value)) return "smedji";
+  if (["gold", "zlatna", "zlatni", "zlatno"].includes(value)) return "zlatni";
+  if (["simaknje", "simkanje", "simnkanje", "sminaknje", "sminkanje"].includes(value)) return "sminkanje";
+  if (value === "stol") return "sto";
+  return value;
+}
+
+function titleTokens(value: string) {
+  return normalizeInventoryName(value)
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(/\s+/)
+    .map(canonicalTitleToken)
+    .filter(Boolean);
+}
+
+function uniqueTitleMatch(products: MatchableInventoryProduct[], label: string) {
+  const sourceTokens = new Set(titleTokens(label));
+  const candidates = products.filter((product) => {
+    const productTokens = titleTokens(product.name);
+    return productTokens.length >= 2 && productTokens.every((token) => sourceTokens.has(token));
+  });
+  return candidates.length === 1
+    ? { product: candidates[0], ambiguous: false }
+    : { product: null, ambiguous: candidates.length > 1 };
+}
+
+const COLOR_TOKENS = new Set(["bijeli", "crni", "hrast", "orah", "smedji", "zlatni"]);
+
+function unsafeNameMatch(label: string, product: MatchableInventoryProduct) {
+  const sourceTokens = new Set(titleTokens(label));
+  const productTokens = new Set(titleTokens(product.name));
+  const sourceColors = [...sourceTokens].filter((token) => COLOR_TOKENS.has(token));
+  const productColors = [...productTokens].filter((token) => COLOR_TOKENS.has(token));
+  const colorConflict = sourceColors.length > 0
+    && productColors.length > 0
+    && !sourceColors.some((color) => productColors.includes(color));
+  const setMappedToComponent = sourceTokens.has("set") && !productTokens.has("set");
+  return colorConflict || setMappedToComponent;
 }
 
 function variantLabel(product: ShopifyProductWebhook, variant: ShopifyVariantInput) {
@@ -107,8 +151,29 @@ export function matchShopifyInventory(
         continue;
       }
 
+      const titleMatch = uniqueTitleMatch(products, label);
+      if (titleMatch.ambiguous) {
+        ambiguousLabels.push(label);
+        continue;
+      }
+      if (titleMatch.product) {
+        candidates.push({
+          inventoryProductId: titleMatch.product.id,
+          shopifyProductId: String(shopifyProduct.id),
+          quantity,
+          label,
+          method: "name",
+        });
+        continue;
+      }
+
       const matched = matcher.match(label, 1);
-      if (matched.unmatched.length || matched.matches.length !== 1 || matched.matches[0].confidence < 0.8) {
+      if (
+        matched.unmatched.length
+        || matched.matches.length !== 1
+        || matched.matches[0].confidence < 0.8
+        || unsafeNameMatch(label, matched.matches[0].product)
+      ) {
         unmatchedLabels.push(label);
         continue;
       }

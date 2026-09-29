@@ -40,8 +40,8 @@ function shopifyProduct(id, title, quantity, sku = "") {
 const result = matchShopifyInventory(products, [], [
   shopifyProduct(101, "Komoda Tanzi Bijela", 180, "5"),
   shopifyProduct(102, "Komoda Serena bijela sa 3 ladice i vratima", 109, "8"),
-  shopifyProduct(103, "Klub stol Duma bijeli sa policama 120x60", 150, "9"),
-  shopifyProduct(104, "Klub stol Duma smeđi sa policama 120x60", 149, "10"),
+  shopifyProduct(103, "Klub stol Duma bijeli sa policama 120x60", 150),
+  shopifyProduct(104, "Klub stol Duma smeđi sa policama 120x60", 149),
   shopifyProduct(105, "Zola Bijeli – Sto za šminkanje sa LED ogledalom", 80, "27"),
   shopifyProduct(106, "Stolica za šminkanje Lulu Zlatna", 196, "18"),
   shopifyProduct(107, "Set za dnevni boravak Mara Bijeli 200 cm", 79, "set-mara"),
@@ -51,7 +51,7 @@ const result = matchShopifyInventory(products, [], [
 const updates = new Map(result.updates.map((update) => [update.productId, update.quantity]));
 assert.equal(updates.get(5), 180);
 assert.equal(updates.get(8), 109);
-assert.equal(updates.get(9), 150, "exact Duma SKU must beat the fuzzy brown Duma candidate");
+assert.equal(updates.get(9), 150, "white Duma must not be overwritten by the similar brown product");
 assert.equal(updates.get(27), 80);
 assert.equal(updates.get(18), 196);
 assert.equal(updates.has(21), false, "Mara set must not overwrite a component quantity");
