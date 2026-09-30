@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { markLastExportedOrder } from "@/lib/google-orders";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow, type SheetOrderRow } from "@/lib/google-sheets";
 import { assessOrderRisks, unresolvedOrderRisks } from "@/lib/order-risk";
-import { getOperationalExportWindow } from "@/lib/order-workday";
+import { getOperationalExportWindow, isOrderInOperationalExportWindow } from "@/lib/order-workday";
 import { normalizeTelegramPostalCode } from "@/lib/telegram-orders";
 
 export const runtime = "nodejs";
@@ -53,11 +53,7 @@ export async function GET() {
   ]);
   const orders = rows
     .filter(isActiveOrderRow)
-    .filter((row) => {
-      const receivedAt = Date.parse(row.receivedAt);
-      if (Number.isFinite(receivedAt)) return receivedAt >= window.start.getTime() && receivedAt < window.end.getTime();
-      return row.dateLabel === window.startLabel || row.dateLabel === window.endLabel;
-    });
+    .filter((row) => isOrderInOperationalExportWindow(row, window));
 
   if (orders.length === 0) {
     return new Response(`Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, { status: 404 });

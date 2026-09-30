@@ -151,3 +151,17 @@ export function getOperationalExportWindow(now = new Date()) {
     marker: `export:${end.toISOString()}`,
   };
 }
+
+export function isOrderInOperationalExportWindow(
+  order: { dateLabel: string; receivedAt: string },
+  window: ReturnType<typeof getOperationalExportWindow>,
+) {
+  // The workday block is operationally authoritative. Orders are sometimes
+  // moved into today's block for shipment while retaining their original intake timestamp.
+  if (order.dateLabel === window.endLabel) return true;
+
+  const receivedAt = Date.parse(order.receivedAt);
+  return Number.isFinite(receivedAt)
+    && receivedAt >= window.start.getTime()
+    && receivedAt < window.end.getTime();
+}

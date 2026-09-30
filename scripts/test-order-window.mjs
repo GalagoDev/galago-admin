@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 
-import { getOperationalExportWindow, getTargetWorkdayLabel, getWorkdayCycle } from "../src/lib/order-workday.ts";
+import {
+  getOperationalExportWindow,
+  getTargetWorkdayLabel,
+  getWorkdayCycle,
+  isOrderInOperationalExportWindow,
+} from "../src/lib/order-workday.ts";
 
 function iso(value) {
   return new Date(value);
@@ -51,6 +56,25 @@ assert.equal(getTargetWorkdayLabel(iso("2026-09-12T10:00:00Z")), "14/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-13T10:00:00Z")), "14/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-14T05:59:00Z")), "14/09/2026");
 assert.equal(getTargetWorkdayLabel(iso("2026-09-14T06:00:00Z")), "15/09/2026");
+
+{
+  const window = getOperationalExportWindow(iso("2026-09-30T05:25:00Z"));
+  assert.equal(window.start.toISOString(), "2026-09-29T06:00:00.000Z");
+  assert.equal(window.end.toISOString(), "2026-09-30T06:00:00.000Z");
+  assert.equal(window.endLabel, "30/09/2026");
+  assert.equal(isOrderInOperationalExportWindow({
+    dateLabel: "30/09/2026",
+    receivedAt: "2026-09-23T10:24:32.434Z",
+  }, window), true, "an order moved into the current workday block must be exported");
+  assert.equal(isOrderInOperationalExportWindow({
+    dateLabel: "29/09/2026",
+    receivedAt: "2026-09-29T07:00:00.000Z",
+  }, window), true, "a valid timestamp inside the cycle remains eligible");
+  assert.equal(isOrderInOperationalExportWindow({
+    dateLabel: "29/09/2026",
+    receivedAt: "2026-09-28T20:00:00.000Z",
+  }, window), false, "an older order in an older block must stay excluded");
+}
 
 {
   const cycle = getWorkdayCycle("2026-09-22");
