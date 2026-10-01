@@ -248,6 +248,7 @@ Not fully mature yet:
 - deeper performance optimization
 
 ### Daily profitability workflow
+- The main `Statistika` page provides a whole-year overview with a year selector, all 12 monthly totals, and a compact daily breakdown for the selected month. Annual and monthly sales exclude duplicate, returned, and replacement rows using the same inclusion rule as daily profitability.
 - The top `Danas` block in `Statistika` opens a dedicated daily sales and profitability view.
 - Opening `Danas` requires the separate statistics password. The compact modal intentionally contains only a masked input and `OK`; invalid submissions return to `Statistika`, and direct access to `/stats/today` is also guarded.
 - Daily profitability uses the same latest `Orders` workday block as `Nove narudžbe`. Weekend orders remain grouped in the upcoming Monday block, so the count and revenue stay aligned across both panels.

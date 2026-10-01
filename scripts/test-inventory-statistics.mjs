@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import { calculateDailyStatistics, statisticsDateKeyFromLabel } from "../src/lib/daily-statistics.ts";
 import { parseInventoryRows } from "../src/lib/inventory-import.ts";
+import { calculatePeriodStatistics, getStatisticsYears } from "../src/lib/period-statistics.ts";
 import { ProductMatcher } from "../src/lib/product-matching.ts";
 
 const parsed = parseInventoryRows([
@@ -171,6 +172,29 @@ assert.equal(stats.costOfGoods, 41);
 assert.equal(stats.profitBeforeAds, 36);
 assert.equal(stats.profitAfterAds, 26);
 assert.equal(stats.ranking[0].units, 2);
+
+const periodOrders = [
+  order,
+  { ...order, dateLabel: "15/01/2026", otkupnina: "100" },
+  { ...order, dateLabel: "02/02/2026", otkupnina: "200" },
+  { ...order, dateLabel: "03/02/2026", otkupnina: "120", appStatus: "returned:test" },
+  { ...order, dateLabel: "04/03/2026", otkupnina: "89", artikal: "Zuri zamjena" },
+  { ...order, dateLabel: "05/04/2026", otkupnina: "95", appStatus: "duplicate:test" },
+  { ...order, dateLabel: "10/12/2025", otkupnina: "50" },
+];
+assert.deepEqual(getStatisticsYears(periodOrders), [2026, 2025]);
+const periodStats = calculatePeriodStatistics(periodOrders, 2026);
+assert.equal(periodStats.sourceOrderCount, 6);
+assert.equal(periodStats.orderCount, 3);
+assert.equal(periodStats.excludedOrderCount, 3);
+assert.equal(periodStats.revenue, 400);
+assert.equal(periodStats.months[0].orderCount, 1);
+assert.equal(periodStats.months[0].revenue, 100);
+assert.equal(periodStats.months[1].sourceOrderCount, 2);
+assert.equal(periodStats.months[1].orderCount, 1);
+assert.equal(periodStats.months[1].revenue, 200);
+assert.equal(periodStats.months[2].orderCount, 0);
+assert.equal(periodStats.days[0].dateLabel, "21/09/2026");
 
 const wordQuantityStats = calculateDailyStatistics({
   orders: [{ ...order, artikal: "Usiku bijeli dva", brojPaketa: "1" }],
