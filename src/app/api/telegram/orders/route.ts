@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 import { appendOrderToOrdersSheet, deleteOrderFromOrdersSheet } from "@/lib/google-orders";
 import {
@@ -393,6 +393,14 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
   }
 }
 
+async function processTelegramUpdate(update: TelegramUpdate) {
+  if (update.message) {
+    await handleMessage(update.message);
+  } else if (update.callback_query) {
+    await handleCallbackQuery(update.callback_query);
+  }
+}
+
 export async function GET() {
   return NextResponse.json({
     ok: true,
@@ -412,11 +420,17 @@ export async function POST(request: NextRequest) {
   try {
     const update = (await request.json()) as TelegramUpdate;
 
-    if (update.message) {
-      await handleMessage(update.message);
-    } else if (update.callback_query) {
-      await handleCallbackQuery(update.callback_query);
-    }
+    // Telegram retries updates when OpenAI or Google Sheets processing takes too
+    // long. Acknowledge the webhook first, then finish the durable work in the
+    // server lifecycle after the response has been sent.
+    after(async () => {
+      try {
+        await processTelegramUpdate(update);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown Telegram processing error";
+        console.error("Telegram order processing failed after webhook acknowledgement:", message);
+      }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -237,6 +237,7 @@ Connected / active:
 - Telegram orders always write DOP as `1` and Zamjena as `0`
 - Telegram Grad is accepted only as a five-digit ZIP; known Bosnia city names are normalized locally, and unresolved cities reject the draft instead of writing city text into Sheets
 - Telegram webhook secret mismatches are logged but not hard-failed, to avoid Hostinger env drift breaking intake
+- Telegram webhook updates are acknowledged before OpenAI/Sheets processing finishes, preventing slow external calls from making Telegram retry the same order or mark the webhook unhealthy.
 - Confirmed Telegram orders store a stable hidden `telegram:<chat>:<message>` ID in Orders column `K`, making callback retries idempotent.
 - Replying `delete`, `obriši`, or `obrisi` directly to a bot-confirmed order clears only that exact Orders row while preserving sheet layout. Repeated deletion is harmless, and standalone delete messages cannot select arbitrary orders.
 - Reply-to-delete mappings are kept in persistent SQLite and apply to orders confirmed after the feature deployment.
