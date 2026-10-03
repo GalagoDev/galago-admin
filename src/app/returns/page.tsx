@@ -1,6 +1,6 @@
 import { OrderListPage } from "@/components/order-list-page";
 import { ReturnOrderPicker } from "@/components/return-order-picker";
-import { getActiveOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
+import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,6 +24,11 @@ function getNotice(params: { returned?: string; restored?: string; skipped?: str
   return null;
 }
 
+function packageCount(value: string) {
+  const count = Number(value.trim().replace(",", "."));
+  return Number.isInteger(count) && count > 0 ? count : 1;
+}
+
 export default async function ReturnsPage({
   searchParams,
 }: {
@@ -31,10 +36,23 @@ export default async function ReturnsPage({
 }) {
   const params = await searchParams;
   const fresh = Boolean(params.returned || params.restored || params.refresh);
-  const [orders, activeOrders] = await Promise.all([
-    getReturnedSheetRows({ fresh }).catch(() => []),
-    getActiveOrdersSheetRows({ fresh }).catch(() => []),
+  const [returnsResult, ordersResult] = await Promise.allSettled([
+    getReturnedSheetRows({ fresh }),
+    getOrdersSheetRows({ fresh }),
   ]);
+  const orders = returnsResult.status === "fulfilled" ? returnsResult.value : [];
+  const allOrders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
+  const totalsAvailable = returnsResult.status === "fulfilled" && ordersResult.status === "fulfilled";
+  const activeOrders = allOrders.filter(isActiveOrderRow);
+  const recordedPackages = allOrders
+    .filter((order) => !order.appStatus.startsWith("duplicate:"))
+    .reduce((sum, order) => sum + packageCount(order.brojPaketa), 0);
+  const returnedPackages = orders
+    .filter((order) => !order.appStatus.startsWith("duplicate:"))
+    .reduce((sum, order) => sum + packageCount(order.brojPaketa), 0);
+  const returnRate = totalsAvailable && recordedPackages > 0
+    ? (returnedPackages / recordedPackages) * 100
+    : null;
   const notice = getNotice(params);
 
   return (
@@ -44,6 +62,22 @@ export default async function ReturnsPage({
       orders={orders}
       refreshPath="/returns"
       allowRestoreToTransit
+      summaryExtra={(
+        <article className="col-span-2 rounded-[1.5rem] border border-rose-300/20 bg-rose-300/10 px-4 py-4 lg:col-span-1 lg:rounded-lg">
+          <p className="text-[12px] font-medium leading-4 text-neutral-200">Stopa povrata</p>
+          <p className="mt-4 text-[30px] font-semibold leading-none text-white">
+            {returnRate === null
+              ? "—"
+              : `${new Intl.NumberFormat("bs-BA", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(returnRate)}%`}
+          </p>
+          <p className="mt-2 text-xs text-neutral-400">
+            {totalsAvailable
+              ? `${returnedPackages} od ${recordedPackages} evidentiranih paketa`
+              : "Podaci iz Sheets trenutno nisu dostupni"}
+          </p>
+          {totalsAvailable ? <p className="mt-1 text-[11px] text-neutral-500">Uključuje i narudžbe na dostavi</p> : null}
+        </article>
+      )}
       listTitle="Evidentirani povrati"
       listSubtitle="Pošiljke koje su već premještene u Povrate"
       searchPlaceholder="Traži među evidentiranim povratima..."

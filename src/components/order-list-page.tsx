@@ -27,6 +27,7 @@ export function OrderListPage({
   searchPlaceholder,
   refreshPath,
   headerAction,
+  summaryExtra,
   riskAssessments,
 }: {
   title: string;
@@ -40,6 +41,7 @@ export function OrderListPage({
   searchPlaceholder?: string;
   refreshPath?: string;
   headerAction?: ReactNode;
+  summaryExtra?: ReactNode;
   riskAssessments?: Record<number, OrderRiskAssessment>;
 }) {
   const activeOrders = orders.filter((order) => !order.appStatus.startsWith("duplicate:"));
@@ -71,7 +73,7 @@ export function OrderListPage({
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3 lg:max-w-2xl">
+        <section className={`mt-5 grid grid-cols-2 gap-3 ${summaryExtra ? "lg:max-w-5xl lg:grid-cols-3" : "lg:max-w-2xl"}`}>
           <article className="rounded-[1.5rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] px-4 py-4 shadow-[0_20px_50px_rgba(56,189,248,0.08)] lg:rounded-lg">
             <p className="text-[12px] font-medium leading-4 text-neutral-200">Ukupno narudžbi</p>
             <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{activeOrders.length}</p>
@@ -80,6 +82,7 @@ export function OrderListPage({
             <p className="text-[12px] font-medium leading-4 text-neutral-200">Ukupno KM</p>
             <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{totalAmount} KM</p>
           </article>
+          {summaryExtra}
         </section>
 
         {workflow}
