@@ -69,6 +69,8 @@ const postalCases = [
   ["KoprivnaDonja Osoje", "74489"],
   ["Nikić Vida 066065991 KoprivnaDonja Osoje", "74489"],
   ["Gornji Podgradci", "78405"],
+  ["Podgajevi Kršići", "75272"],
+  ["Đurđevik", "75272"],
   ["Medjuvodje", "79247"],
   ["Nepoznato mjesto", ""],
 ];
@@ -82,12 +84,18 @@ assert.equal(
   "79280",
   "falls back to the original Telegram message when OpenAI leaves Grad empty",
 );
+assert.equal(
+  resolveTelegramPostalCode("Kršići", "Podgajevi", "Jahic asmira podgajevi krsici 062767215 Tanzi 89 sds"),
+  "75272",
+  "resolves Podgajevi from the original message even when the model returns only Kršići",
+);
 
 assert.ok(Object.keys(bosniaPostalCodes).length >= 400);
 
 assert.equal(lookupPlaceByPostalCode("71000"), "Sarajevo");
 assert.equal(formatPostalLocation("75000"), "75000 - Tuzla");
 assert.equal(formatPostalLocation("73000"), "73000 - Goražde");
+assert.equal(formatPostalLocation("75272"), "75272 - Đurđevik");
 assert.equal(formatPostalLocation("78430"), "78430 - Prnjavor");
 assert.equal(formatPostalLocation("88000"), "88000 - Mostar");
 assert.equal(formatPostalLocation("88363"), "88363 - Berkovići");

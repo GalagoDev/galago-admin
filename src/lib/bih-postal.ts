@@ -20,6 +20,8 @@ const PREFERRED_POSTAL_CODES: Record<string, string> = {
   doboj: "74000",
   prijedor: "79101",
   zivinice: "75270",
+  podgajevi: "75272",
+  "Đurđevik": "75272",
   kalesija: "75260",
   lukavac: "75300",
   kakanj: "72240",
