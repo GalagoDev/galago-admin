@@ -124,14 +124,8 @@ The user strongly prefers:
 Remembered current direction:
 - label: `Galago control panel`
 - live indicator text: `Live and listening`
-- bottom nav with custom icons
-- bottom nav labels:
-  - `Narudzbe`
-  - `Na dostavi`
-  - `Reklamacije`
-  - `Računi`
-  - `Fakture`
-  - `Statistika`
+- mobile top bar and hamburger menu exposing every active panel, including `Povrati` and `Lager`
+- desktop sidebar retains the same navigation destinations
 - three top dashboard blocks:
   - `Nove narudžbe`
   - `Na dostavi`
@@ -207,17 +201,13 @@ This was already being implemented for order list pages.
 - Uploaded evidence remains under the persistent `storage/return-claims` directory and is only served through an authenticated app route.
 - The claims tables and files predate the GitHub implementation; preserving them across deploys is required.
 
-### Monthly invoice workflow
-- `Fakture` is a separate authenticated panel for business invoices and monthly payment tracking. It does not change Google Sheets orders and is distinct from customer `Računi`.
-- Invoices are grouped by a selected `YYYY-MM` month; staff can navigate backward or forward, jump directly to a month, and reopen any month with saved invoices.
-- Each entry stores a supplier/title, optional KM amount, protected PDF or image document, paid/unpaid status, and payment timestamp.
-- Paid status is reversible so mistakes can be corrected. Invoice deletion uses inline confirmation and removes both the register entry and its stored document.
-- Duplicate document uploads are blocked within the same month using a file hash.
-- Invoice metadata is stored in SQLite and files remain under persistent `storage/invoices`, outside Hostinger versioned build folders.
-- Invoice documents are served only through the authenticated `/fakture/files/<id>` route.
+### Retired Fakture workflow
+- The user no longer uses the manual `Fakture` panel. Its routes, upload actions, and navigation links were removed.
+- Existing invoice files and SQLite rows are deliberately left in persistent storage; removing the app feature must not delete historical data.
+- Ananas marketplace invoice synchronization is separate and remains active.
 
 ### Desktop layout
-The authenticated app now keeps the mobile bottom navigation below the large-screen breakpoint and switches to a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
+The authenticated app uses a compact mobile top bar with a hamburger menu for all panels and a persistent desktop sidebar on larger screens. Dashboard summaries expand to three columns, dashboard panels can sit side by side, and order lists use a wrapped desktop table that exposes all operational fields without truncating long names, addresses, products, or phone numbers.
 Admin order lists enrich ZIP-only `Grad` values with the local Bosnia postal directory for display (for example, `75000 - Tuzla`). This is presentation-only: Google Sheets and courier exports continue to contain the ZIP value alone.
 
 ## Current app architecture state
@@ -271,7 +261,7 @@ Not fully mature yet:
 - Quantities are refreshed automatically from the configured Galago Shopify Admin API every 10 minutes, on relevant Shopify webhooks, and manually from the `Lager` page. Only confidently matched tracked variants update local quantities; unmatched or ambiguous Shopify products never overwrite imported stock.
 - The page displays product name, optional SKU, and the latest safely matched Shopify quantity. Purchase prices remain confined to the password-protected profitability view.
 - The page includes search, stock-status filters, totals, and clear warnings for zero stock and quantities from one through five.
-- `Lager` is available in the desktop sidebar and as a dashboard summary card, keeping the six-item mobile bottom navigation touch-friendly.
+- `Lager` is available in the mobile menu, desktop sidebar, and as a dashboard summary card.
 - Product ranking uses sold units and order count for the selected actual calendar date.
 - Meta Ads is read server-side from configured ad accounts with `META_ADS_ACCESS_TOKEN` and comma-separated `META_AD_ACCOUNT_IDS`; the token is never sent to the browser. EUR is converted to BAM at the fixed rate. Other currencies are converted through the free daily Frankfurter reference rate, while `META_ADS_TO_BAM_RATES_JSON` can override any rate when needed.
 

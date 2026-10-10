@@ -132,24 +132,6 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS invoices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      invoice_month TEXT NOT NULL,
-      title TEXT NOT NULL,
-      amount REAL,
-      original_name TEXT NOT NULL,
-      stored_name TEXT NOT NULL,
-      stored_path TEXT NOT NULL,
-      mime_type TEXT NOT NULL,
-      size_bytes INTEGER NOT NULL,
-      file_hash TEXT NOT NULL,
-      paid INTEGER NOT NULL DEFAULT 0,
-      paid_at TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(invoice_month, file_hash)
-    );
-
     CREATE TABLE IF NOT EXISTS inventory_imports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       original_name TEXT NOT NULL,
@@ -281,8 +263,6 @@ export function getDb() {
       ON customer_return_files(claim_id, created_at);
     CREATE INDEX IF NOT EXISTS customer_return_rate_limits_idx
       ON customer_return_rate_limits(ip_hash, created_at DESC);
-    CREATE INDEX IF NOT EXISTS invoices_month_idx
-      ON invoices(invoice_month DESC, paid, created_at DESC);
     CREATE INDEX IF NOT EXISTS inventory_products_active_idx
       ON inventory_products(active, normalized_name);
     CREATE INDEX IF NOT EXISTS inventory_aliases_product_idx
