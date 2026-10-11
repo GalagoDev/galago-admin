@@ -1,7 +1,9 @@
 import { google, sheets_v4 } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
+import { findCopiedOrderRows } from "@/lib/copied-orders";
 import { createOrderFingerprint } from "@/lib/order-fingerprint";
+import { getOperationalExportWindow, getTargetWorkdayLabel } from "@/lib/order-workday";
 
 export type SheetOrderRow = {
   rowNumber: number;
@@ -282,7 +284,12 @@ export async function ensureTodayBlockAtTop() {
 export async function getSheetRowsByName(
   sheetName: string,
   options: { fresh?: boolean; activeOnly?: boolean } = {},
-) {
+): Promise<SheetOrderRow[]> {
+  if (sheetName === SHEET_NAME && options.activeOnly) {
+    const rows = await getSheetRowsByName(sheetName, { fresh: options.fresh });
+    return rows.filter(isActiveOrderRow).map((order, index) => ({ ...order, rowNumber: index + 1 }));
+  }
+
   const cacheKey = `${sheetName}:${options.activeOnly ? "active" : "all"}`;
   if (options.fresh) invalidateSheetCache(sheetName);
   const cached = getCachedSheetRows(cacheKey);
@@ -313,7 +320,6 @@ export async function getSheetRowsByName(
         continue;
       }
 
-      if (sheetName === SHEET_NAME && options.activeOnly && (isInactiveOrderStatus(cells[11] ?? "") || cells[15]?.toUpperCase() === "TRUE")) continue;
       if (sheetName === "Povrati" && isRestoredReturnStatus(cells[10] ?? "")) continue;
 
       rowNumber += 1;
@@ -343,6 +349,33 @@ export async function getSheetRowsByName(
         ...order,
         fingerprint: createOrderFingerprint(order),
       });
+    }
+
+    if (sheetName === SHEET_NAME) {
+      const copied = findCopiedOrderRows(result, new Set([
+        getOperationalExportWindow().endLabel,
+        getTargetWorkdayLabel(),
+      ]));
+      if (copied.length > 0) {
+        const receivedAt = new Date().toISOString();
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            valueInputOption: "RAW",
+            data: copied.map((order) => ({
+              range: `'${SHEET_NAME}'!K${order.sheetRowNumber}:P${order.sheetRowNumber}`,
+              values: [["", "", receivedAt, "", "", false]],
+            })),
+          },
+        });
+        for (const order of copied) {
+          order.sourceId = "";
+          order.appStatus = "";
+          order.receivedAt = receivedAt;
+          order.riskReview = "";
+          order.deliveredChecked = false;
+        }
+      }
     }
 
     setCachedSheetRows(cacheKey, result);
