@@ -27,9 +27,8 @@ export function findCopiedOrderRows<T extends TrackedOrder>(rows: T[], eligibleD
       if (!previousDate || !hasCopiedTracking(current, previous)) return false;
       if (previousDate < currentDate) return true;
       return previousDate === currentDate
-        && previous.sheetRowNumber < current.sheetRowNumber
-        && previous.deliveredChecked
-        && !current.deliveredChecked;
+        && (previous.deliveredChecked && !current.deliveredChecked
+          || previous.sheetRowNumber < current.sheetRowNumber && !(current.deliveredChecked && !previous.deliveredChecked));
     });
   });
 }

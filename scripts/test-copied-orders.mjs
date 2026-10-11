@@ -17,6 +17,7 @@ function row(sheetRowNumber, dateLabel, overrides = {}) {
 const original = row(290, "05/10/2026");
 const copied = row(88, "09/10/2026", { deliveredChecked: false });
 const sameDayCopy = row(291, "05/10/2026", { deliveredChecked: false });
+const fullRowSameDayCopy = row(292, "05/10/2026");
 const independentlyDelivered = row(18, "12/10/2026", { appStatus: "delivered:new-delivery" });
 const newIntake = row(19, "12/10/2026", {
   appStatus: "",
@@ -26,6 +27,8 @@ const newIntake = row(19, "12/10/2026", {
 
 assert.deepEqual(findCopiedOrderRows([copied, original], new Set(["09/10/2026"])), [copied]);
 assert.deepEqual(findCopiedOrderRows([sameDayCopy, original], new Set(["05/10/2026"])), [sameDayCopy]);
+assert.deepEqual(findCopiedOrderRows([fullRowSameDayCopy, original], new Set(["05/10/2026"])), [fullRowSameDayCopy]);
+assert.deepEqual(findCopiedOrderRows([sameDayCopy, original], new Set(["05/10/2026"])).includes(original), false);
 assert.deepEqual(findCopiedOrderRows([original, independentlyDelivered, newIntake], new Set(["12/10/2026"])), []);
 assert.deepEqual(findCopiedOrderRows([copied, original], new Set(["12/10/2026"])), []);
 
