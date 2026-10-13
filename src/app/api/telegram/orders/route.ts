@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from "next/server";
 
 import { appendOrderToOrdersSheet, deleteOrderFromOrdersSheet } from "@/lib/google-orders";
+import { isTelegramMessageNotModified } from "@/lib/telegram-api-errors";
 import {
   getTelegramConfirmedOrder,
   markTelegramConfirmedOrderDeleted,
@@ -117,7 +118,15 @@ async function sendMessage(payload: Record<string, unknown>) {
 }
 
 async function editMessageText(payload: Record<string, unknown>) {
-  return telegramRequest<TelegramMessage>("editMessageText", payload);
+  try {
+    return await telegramRequest<TelegramMessage>("editMessageText", payload);
+  } catch (error) {
+    if (!isTelegramMessageNotModified(error)) throw error;
+    return {
+      message_id: Number(payload.message_id),
+      chat: { id: Number(payload.chat_id) },
+    } satisfies TelegramMessage;
+  }
 }
 
 async function answerCallbackQuery(payload: Record<string, unknown>) {
@@ -362,12 +371,13 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
     const key = data.slice("confirm:".length);
     const draft = getTelegramOrderDraft(key);
     if (!draft) {
-      await answerCallbackQuery({ callback_query_id: query.id, text: "Order draft not found." });
+      const confirmed = query.message && getTelegramConfirmedOrder(chatId, query.message.message_id);
+      await answerCallbackQuery({ callback_query_id: query.id, text: confirmed ? "Narudžba je već sačuvana." : "Order draft not found." });
       return;
     }
 
+    const sheetOrderId = `telegram:${draft.chatId}:${draft.messageId}`;
     try {
-      const sheetOrderId = `telegram:${draft.chatId}:${draft.messageId}`;
       await appendOrderToOrdersSheet(draft.order, { sourceId: sheetOrderId });
       saveTelegramConfirmedOrder({
         chatId: draft.chatId,
@@ -377,19 +387,25 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
         order: draft.order,
       });
       deleteTelegramOrderDraft(key);
-      await editMessageText({
-        chat_id: Number(draft.chatId),
-        message_id: draft.previewMessageId,
-        text: `Narudžba potvrđena i sačuvana u Orders sheet.\n\n${formatTelegramOrderPreview(draft.order)}`,
-      });
-      await answerCallbackQuery({ callback_query_id: query.id, text: "Saved." });
     } catch (error) {
       await answerCallbackQuery({ callback_query_id: query.id, text: "Save failed." });
       await sendMessage({
         chat_id: Number(draft.chatId),
         text: `Greška pri spremanju: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
+      return;
     }
+
+    try {
+      await editMessageText({
+        chat_id: Number(draft.chatId),
+        message_id: draft.previewMessageId,
+        text: `Narudžba potvrđena i sačuvana u Orders sheet.\n\n${formatTelegramOrderPreview(draft.order)}`,
+      });
+    } catch (error) {
+      console.warn("Telegram order was saved, but its preview message could not be updated:", error);
+    }
+    await answerCallbackQuery({ callback_query_id: query.id, text: "Saved." });
   }
 }
 

@@ -231,12 +231,19 @@ bot.on('callback_query', async (query) => {
     try {
       await appendOrderToSheet(entry.order);
       pending.delete(key);
-      await bot.editMessageText('Narudžba potvrđena i sačuvana u Orders sheet.\n\n' + formatPreview(entry.order), { chat_id: Number(chatId), message_id: entry.previewMessageId });
-      await bot.answerCallbackQuery(query.id, { text: 'Saved.' });
     } catch (error) {
       await bot.answerCallbackQuery(query.id, { text: 'Save failed.' });
       await bot.sendMessage(Number(chatId), `Greška pri spremanju: ${error.message}`);
+      return;
     }
+    try {
+      await bot.editMessageText('Narudžba potvrđena i sačuvana u Orders sheet.\n\n' + formatPreview(entry.order), { chat_id: Number(chatId), message_id: entry.previewMessageId });
+    } catch (error) {
+      if (!/message is not modified/i.test(error.message || '')) {
+        console.warn('Order was saved, but the Telegram preview could not be updated:', error.message);
+      }
+    }
+    await bot.answerCallbackQuery(query.id, { text: 'Saved.' });
   }
 });
 
