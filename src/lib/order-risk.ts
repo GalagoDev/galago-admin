@@ -162,7 +162,7 @@ export function assessOrderRisks(
     result[current.sheetRowNumber] = {
       sheetRowNumber: current.sheetRowNumber,
       level,
-      unresolved: level !== "none" && !current.appStatus && !approved && !excluded,
+      unresolved: level !== "none" && !current.appStatus && !current.deliveredChecked && !approved && !excluded,
       approved,
       excluded,
       reasons,

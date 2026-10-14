@@ -187,6 +187,8 @@ This was already being implemented for order list pages.
 - Any active earlier order with the same phone is a critical warning regardless of age. Previous returns are critical warnings across the full available history.
 - Each warning shows the prior-order age and counts for delivered, returned, and still-active shipments.
 - Staff explicitly choose `Provjereno, pošalji` or `Ne šalji – duplikat`. Decisions persist in hidden `Orders` column `O` (`Risk review`).
+- `Provjereno, pošalji sve (N)` approves all unresolved warnings in the displayed workday block, including orders beyond the current search/page. It does not restore excluded orders or approve delivered/returned ones. The server validates the complete selection against a fresh sheet snapshot before one batch write; changed orders require refreshing/reviewing again.
+- Single and bulk risk decisions reuse the freshly read snapshot after saving, avoiding a second full sheet reload and unnecessary metadata/style requests. The buttons show a pending state while saving.
 - `Ne šalji – duplikat` keeps the row permanently in `Orders`, writes a `duplicate:` status in hidden column `L`, and excludes only that order from `Na dostavi`, totals, and courier exports. The decision can be reversed from `Nove narudžbe`.
 - Courier export is blocked while any order in the export window has an unresolved duplicate/return warning; direct export URLs enforce the same check server-side.
 

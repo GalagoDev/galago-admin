@@ -1,8 +1,9 @@
 import { google, sheets_v4 } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
-import { invalidateSheetCache } from "@/lib/google-sheets";
-import { createOrderFingerprint } from "@/lib/order-fingerprint";
+import { cacheOrdersSheetSnapshot, invalidateSheetCache } from "@/lib/google-sheets";
+import { planOrderRiskDecisions, type OrderRiskDecision, type OrderRiskReference } from "@/lib/order-risk-decisions";
+import { parseSheetOrderRows } from "@/lib/sheet-order-parser";
 import { getTargetWorkdayLabel } from "@/lib/order-workday";
 
 const SHEET_NAME = "Orders";
@@ -41,14 +42,7 @@ type AppendOrderOptions = {
   sourceId?: string;
 };
 
-export type OrderRiskDecision = "approve" | "duplicate" | "restore";
-
-export type OrderRiskReference = {
-  sheetRowNumber: number;
-  fingerprint: string;
-  dateLabel: string;
-  sourceId?: string;
-};
+export type { OrderRiskDecision, OrderRiskReference } from "@/lib/order-risk-decisions";
 
 function indexIsSheetDateRow(index: number, value: string) {
   return index > 0 && /^\d{2}\/\d{2}\/\d{4}$/.test(value);
@@ -424,97 +418,41 @@ export async function deleteOrderFromOrdersSheet(sheetOrderId: string) {
   return true;
 }
 
-function orderIdentityFromRow(row: unknown[]) {
-  const cells = row.map((cell) => String(cell ?? "").trim());
-  return {
-    primalac: cells[0] ?? "",
-    brojTelefona: cells[1] ?? "",
-    grad: cells[2] ?? "",
-    adresa: cells[3] ?? "",
-    artikal: cells[4] ?? "",
-    brojPaketa: cells[5] ?? "",
-    otkupnina: cells[6] || cells[7] || "",
-    vrijednostPosiljke: cells[7] || cells[6] || "",
-    dop: cells[8] ?? "",
-    zamjena: cells[9] ?? "",
-  };
-}
-
-function dateLabelForRow(rows: unknown[][], rowIndex: number) {
-  for (let index = rowIndex - 1; index > 0; index -= 1) {
-    const value = String(rows[index]?.[0] ?? "").trim();
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
-  }
-  return "";
-}
-
-function findRiskOrderRow(rows: unknown[][], reference: OrderRiskReference) {
-  const sourceId = String(reference.sourceId || "").trim();
-  if (sourceId) {
-    const sourceIndex = rows.findIndex((row, index) => index > 0 && String(row[10] ?? "").trim() === sourceId);
-    if (sourceIndex !== -1) return sourceIndex;
-  }
-
-  const expectedIndex = reference.sheetRowNumber - 1;
-  const expectedRow = rows[expectedIndex];
-  if (expectedRow
-    && createOrderFingerprint(orderIdentityFromRow(expectedRow)) === reference.fingerprint
-    && dateLabelForRow(rows, expectedIndex) === reference.dateLabel) {
-    return expectedIndex;
-  }
-
-  return rows.findIndex((row, index) => index > 0
-    && createOrderFingerprint(orderIdentityFromRow(row)) === reference.fingerprint
-    && dateLabelForRow(rows, index) === reference.dateLabel);
-}
-
-export async function setOrderRiskDecision(reference: OrderRiskReference, decision: OrderRiskDecision) {
+export async function setOrderRiskDecisions(references: OrderRiskReference[], decision: OrderRiskDecision) {
   const { sheets, spreadsheetId } = getSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${SHEET_NAME}'!A:O`,
+    range: `'${SHEET_NAME}'!A:P`,
   });
   const rows = response.data.values ?? [];
-  const rowIndex = findRiskOrderRow(rows, reference);
-  if (rowIndex < 1) throw new Error("Order changed or no longer exists.");
+  const orders = parseSheetOrderRows(SHEET_NAME, rows);
+  const updates = planOrderRiskDecisions(orders, references, decision);
+  const header = String(rows[0]?.[RISK_REVIEW_COLUMN - 1] ?? "").trim();
+  if (header && header !== "Risk review") throw new Error("Orders column O is already in use.");
 
-  const row = rows[rowIndex] ?? [];
-  const fingerprint = createOrderFingerprint(orderIdentityFromRow(row));
-  if (fingerprint !== reference.fingerprint) throw new Error("Order changed or no longer exists.");
-
-  const currentStatus = String(row[11] ?? "").trim();
-  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
-  await ensureOrderTrackingColumns(sheets, spreadsheetId, sheetId);
-  const sheetRowNumber = rowIndex + 1;
-  let appStatus = currentStatus;
-  let riskReview = "";
-
-  if (decision === "approve") {
-    if (currentStatus) throw new Error("Only an active order can be approved.");
-    riskReview = `approved:${fingerprint}`;
-  } else if (decision === "duplicate") {
-    if (currentStatus) throw new Error("Only an active order can be marked as duplicate.");
-    appStatus = `duplicate:${fingerprint}`;
-    riskReview = `duplicate:${fingerprint}`;
-  } else {
-    if (currentStatus !== `duplicate:${fingerprint}`) throw new Error("This order is not marked as duplicate.");
-    appStatus = "";
-    riskReview = "";
+  const data: sheets_v4.Schema$ValueRange[] = [];
+  if (!header) data.push({ range: `'${SHEET_NAME}'!O1`, values: [["Risk review"]] });
+  for (const update of updates) {
+    if (update.changeStatus) data.push({ range: `'${SHEET_NAME}'!L${update.sheetRowNumber}`, values: [[update.appStatus]] });
+    if (update.changeReview) data.push({ range: `'${SHEET_NAME}'!O${update.sheetRowNumber}`, values: [[update.riskReview]] });
+  }
+  if (data.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: { valueInputOption: "RAW", data },
+    });
   }
 
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId,
-    requestBody: {
-      valueInputOption: "RAW",
-      data: [
-        { range: `'${SHEET_NAME}'!L${sheetRowNumber}`, values: [[appStatus]] },
-        { range: `'${SHEET_NAME}'!O${sheetRowNumber}`, values: [[riskReview]] },
-      ],
-    },
-  });
+  const byRow = new Map(updates.map((update) => [update.sheetRowNumber, update]));
+  cacheOrdersSheetSnapshot(orders.map((order) => {
+    const update = byRow.get(order.sheetRowNumber);
+    return update ? { ...order, appStatus: update.appStatus, riskReview: update.riskReview } : order;
+  }));
+  return { count: updates.length, decision };
+}
 
-  invalidateSheetCache(SHEET_NAME);
-  return { sheetRowNumber, decision };
+export async function setOrderRiskDecision(reference: OrderRiskReference, decision: OrderRiskDecision) {
+  return setOrderRiskDecisions([reference], decision);
 }
 
 export async function markLastExportedOrder(sheetRowNumber: number, marker: string, label: string) {

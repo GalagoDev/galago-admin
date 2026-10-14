@@ -2,7 +2,7 @@ import { google, sheets_v4 } from "googleapis";
 
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 import { findCopiedOrderRows } from "@/lib/copied-orders";
-import { createOrderFingerprint } from "@/lib/order-fingerprint";
+import { parseSheetOrderRows } from "@/lib/sheet-order-parser";
 import { getOperationalExportWindow, getTargetWorkdayLabel } from "@/lib/order-workday";
 
 export type SheetOrderRow = {
@@ -53,10 +53,6 @@ export function isActiveOrderRow(order: Pick<SheetOrderRow, "appStatus"> & { del
   return !isInactiveOrderStatus(order.appStatus) && !order.deliveredChecked;
 }
 
-function isRestoredReturnStatus(value: string) {
-  return value.startsWith("restored:");
-}
-
 export function invalidateSheetCache(sheetName?: string) {
   if (sheetName) {
     for (const key of sheetRowsCache.keys()) {
@@ -87,6 +83,16 @@ function setCachedSheetRows(sheetName: string, data: SheetOrderRow[]) {
     expiresAt: Date.now() + SHEET_CACHE_TTL_MS,
     data,
   });
+}
+
+export function cacheOrdersSheetSnapshot(orders: SheetOrderRow[]) {
+  invalidateSheetCache(SHEET_NAME);
+  // Copied tracking must still go through the normal read/repair path.
+  const copied = findCopiedOrderRows(orders, new Set([
+    getOperationalExportWindow().endLabel,
+    getTargetWorkdayLabel(),
+  ]));
+  if (copied.length === 0) setCachedSheetRows(`${SHEET_NAME}:all`, orders);
 }
 
 function getTodayLabel() {
@@ -298,7 +304,7 @@ export async function getSheetRowsByName(
   const existingRequest = sheetRowsInFlight.get(cacheKey);
   if (existingRequest) return existingRequest;
 
-  const request = (async () => {
+  const request: Promise<SheetOrderRow[]> = (async () => {
     const { sheets, spreadsheetId } = getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -306,50 +312,7 @@ export async function getSheetRowsByName(
     });
 
     const rows = response.data.values ?? [];
-    const result: SheetOrderRow[] = [];
-    let currentDate = "";
-    let rowNumber = 0;
-
-    for (const [sourceIndex, row] of rows.slice(1).entries()) {
-      const cells = row.map((cell) => (cell ?? "").toString().trim());
-      const filled = cells.slice(0, 10).filter(Boolean);
-      if (filled.length === 0) continue;
-
-      if (filled.length === 1 && /^\d{2}\/\d{2}\/\d{4}$/.test(cells[0] ?? "")) {
-        currentDate = cells[0] ?? "";
-        continue;
-      }
-
-      if (sheetName === "Povrati" && isRestoredReturnStatus(cells[10] ?? "")) continue;
-
-      rowNumber += 1;
-      const otkupnina = cells[6] || cells[7] || "";
-      const vrijednostPosiljke = cells[7] || cells[6] || "";
-      const order = {
-        rowNumber,
-        sheetRowNumber: sourceIndex + 2,
-        dateLabel: currentDate,
-        primalac: cells[0] ?? "",
-        brojTelefona: cells[1] ?? "",
-        grad: cells[2] ?? "",
-        adresa: cells[3] ?? "",
-        artikal: cells[4] ?? "",
-        brojPaketa: cells[5] ?? "",
-        otkupnina,
-        vrijednostPosiljke,
-        dop: cells[8] ?? "",
-        zamjena: cells[9] ?? "",
-        sourceId: cells[10] ?? "",
-        appStatus: cells[11] ?? "",
-        receivedAt: cells[12] ?? "",
-        riskReview: cells[14] ?? "",
-        deliveredChecked: sheetName === SHEET_NAME && cells[15]?.toUpperCase() === "TRUE",
-      };
-      result.push({
-        ...order,
-        fingerprint: createOrderFingerprint(order),
-      });
-    }
+    const result = parseSheetOrderRows(sheetName, rows);
 
     if (sheetName === SHEET_NAME) {
       const copied = findCopiedOrderRows(result, new Set([
@@ -378,16 +341,17 @@ export async function getSheetRowsByName(
       }
     }
 
-    setCachedSheetRows(cacheKey, result);
     return result;
   })();
 
   sheetRowsInFlight.set(cacheKey, request);
 
   try {
-    return await request;
+    const result = await request;
+    if (sheetRowsInFlight.get(cacheKey) === request) setCachedSheetRows(cacheKey, result);
+    return result;
   } finally {
-    sheetRowsInFlight.delete(cacheKey);
+    if (sheetRowsInFlight.get(cacheKey) === request) sheetRowsInFlight.delete(cacheKey);
   }
 }
 

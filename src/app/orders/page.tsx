@@ -23,7 +23,7 @@ function DownloadIcon() {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ refresh?: string; risk?: string; error?: string }>;
+  searchParams: Promise<{ refresh?: string; risk?: string; error?: string; count?: string }>;
 }) {
   const params = await searchParams;
   const [rows, returnedRows] = await Promise.all([
@@ -37,6 +37,8 @@ export default async function OrdersPage({
   const exportWindow = getOperationalExportWindow();
   const notice = params.error
     ? { tone: "error", text: params.error === "invalid-risk-decision" ? "Nevažeći odabir narudžbe." : "Odluka nije sačuvana. Osvježite listu i pokušajte ponovo." }
+    : params.risk === "approve-all"
+      ? { tone: "success", text: `Potvrđeno za slanje: ${Math.max(0, Math.min(1000, Number(params.count) || 0))} narudžbi.` }
     : params.risk === "approve"
       ? { tone: "success", text: "Narudžba je provjerena i ostaje u exportu." }
       : params.risk === "duplicate"
