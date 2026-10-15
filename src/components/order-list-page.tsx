@@ -53,13 +53,13 @@ export function OrderListPage({
     <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-8 pt-4 sm:max-w-lg sm:px-5 lg:max-w-[1480px] lg:px-8 lg:pt-8 2xl:px-10">
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl lg:rounded-lg lg:px-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <p className="mt-2 text-lg font-semibold text-white">{title}</p>
               <p className="mt-1 text-sm text-neutral-400">{subtitle}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
               {headerAction}
               {refreshPath ? <SheetRefreshButton path={refreshPath} /> : null}
               <Link
