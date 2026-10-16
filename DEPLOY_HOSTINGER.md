@@ -145,6 +145,48 @@ pm2 restart store-admin-orders-bot
 - Telegram orders use the app webhook route; no separate polling bot process is required.
 - Keep Google auth configured with `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` on Hostinger.
 
+## Google Ads reporting
+
+The authenticated `/reklame` page reads Google Ads reporting data only. Configure
+`GOOGLE_ADS_CUSTOMER_ID` (Galago: `3221742913`). The existing Sheets service account
+can be reused without copying its private key; add its email to that Ads account
+with **Read-only** access. Enable Google Ads API and obtain Explorer or higher
+production access in the Cloud project that owns the credentials. As of
+September 9, 2026, a developer token is no longer required. See Google's
+[service account setup](https://developers.google.com/google-ads/api/docs/oauth/service-accounts)
+and [Cloud project setup](https://developers.google.com/google-ads/api/docs/oauth/cloud-project).
+
+Optional dedicated credentials use `GOOGLE_ADS_SERVICE_ACCOUNT_JSON` (JSON or
+base64), or all three OAuth values in `.env.production.example`. A manager login
+ID is optional; direct account access does not require a manager account. Never
+put credentials in public Next.js environment variables or client-side code.
+
+The internal scheduler refreshes the latest 90 account-calendar days hourly,
+including older conversions that arrive late. Set `GOOGLE_ADS_SYNC_ENABLED=false`
+to disable it. Manual refresh is limited to once per five minutes. An optional
+external scheduler can POST `/api/ads/sync` with `x-integration-secret` matching
+`GOOGLE_ADS_SYNC_SECRET`; no secret is accepted in the URL. SQLite stores the last
+complete snapshot and settings in the existing persistent storage. Failed
+downloads preserve that snapshot. Read requests never call Google directly.
+
+Campaign summaries use hourly reporting for Sarajevo 08:00–08:00 workdays and
+Friday 08:00–Monday 08:00 weekends. Individual ads use a separately labelled
+14-day calendar window, excluding today and the configured conversion lag
+(default three complete days), because Google does not offer hourly ad rows.
+Revenue is primary PURCHASE conversion value attributed by Google to interaction
+date; it is not all Shopify/Sheets revenue, courier-confirmed sales, or net profit.
+ROAS divides attributed revenue by ad cost in the same currency. EUR/BAM uses
+1.95583; unsupported currencies cannot produce BAM totals.
+
+Set a business-specific target ROAS in the panel before performance verdicts
+are enabled. Missing tracking, insufficient history/sample, or a snapshot older
+than six hours blocks actionable recommendations. Recommendations never change
+ads or campaign budgets. Performance Max spend remains included in campaign
+totals, while individual-ad coverage is limited by Google's reporting resources.
+
+Validate with `npm run test:ads`, targeted ESLint, and `npm run build`. API tests
+mock Google requests and use SQLite in memory; they never access live accounts.
+
 ## Shopify multi-store webhooks
 Shopify orders are handled by `shopify-webhook.gs` in Google Apps Script, not by the Hostinger Node app.
 

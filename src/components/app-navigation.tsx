@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  Megaphone,
   Menu,
   Package,
   PackageX,
@@ -25,6 +26,7 @@ const navigationItems = [
   { href: "/receipts", label: "Računi", icon: FileText },
   { href: "/inventory", label: "Lager", icon: Warehouse },
   { href: "/stats", label: "Statistika", icon: BarChart3 },
+  { href: "/reklame", label: "Reklame", icon: Megaphone },
 ];
 
 export function AppNavigation() {

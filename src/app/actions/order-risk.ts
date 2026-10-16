@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { AUTH_COOKIE } from "@/lib/auth";
+import { isAuthenticated } from "@/lib/auth";
 import {
   setOrderRiskDecision,
   setOrderRiskDecisions,
@@ -40,7 +39,7 @@ function returnToOrders(formData: FormData, params: string) {
 }
 
 export async function setOrderRiskDecisionAction(formData: FormData) {
-  if ((await cookies()).get(AUTH_COOKIE)?.value !== "ok") redirect("/login");
+  if (!await isAuthenticated()) redirect("/login");
   const reference = parseReference(formData.get("order") ?? "");
   const decision = parseDecision(formData.get("decision"));
   if (!reference || !decision) redirect(returnToOrders(formData, "error=invalid-risk-decision"));
@@ -59,7 +58,7 @@ export async function setOrderRiskDecisionAction(formData: FormData) {
 }
 
 export async function approveAllOrderRisksAction(formData: FormData) {
-  if ((await cookies()).get(AUTH_COOKIE)?.value !== "ok") redirect("/login");
+  if (!await isAuthenticated()) redirect("/login");
   const values = formData.getAll("order");
   if (values.length === 0 || values.length > 1000) redirect(returnToOrders(formData, "error=invalid-risk-decision"));
   const references = values.map(parseReference);

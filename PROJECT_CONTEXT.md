@@ -269,6 +269,22 @@ Not fully mature yet:
 - Product ranking uses sold units and order count for the selected actual calendar date.
 - Meta Ads is read server-side from configured ad accounts with `META_ADS_ACCESS_TOKEN` and comma-separated `META_AD_ACCOUNT_IDS`; the token is never sent to the browser. EUR is converted to BAM at the fixed rate. Other currencies are converted through the free daily Frankfurter reference rate, while `META_ADS_TO_BAM_RATES_JSON` can override any rate when needed.
 
+### Google Ads dashboard
+- `Reklame` (`/reklame`) is available from both the mobile menu and desktop sidebar.
+- Google Ads is the first channel; Meta is a future addition to this panel.
+- Hourly campaign data supports the existing Sarajevo 08:00 workday/weekend cycles, plus calendar ranges.
+- The panel displays impressions, clicks/CTR, spend in EUR/KM, primary PURCHASE conversions, attributed revenue, and ROAS. ROAS is revenue divided by spend, not net profit or all store revenue.
+- Individual-ad recommendations use a separate mature 14-day window, business-configured target ROAS and minimum evidence. Missing/old data prevents confident keep/pause advice; the application never changes ads automatically.
+- Google Ads API credentials stay on the server. Reuse of the existing Sheets service account still requires Read-only permission on the Ads account and production access for its Cloud project. See `DEPLOY_HOSTINGER.md`.
+- `ads_snapshots` and `ads_settings` live in the existing persistent SQLite database. Sync runs hourly, preserves the last full snapshot on failure, and refreshes the latest 90 days for delayed conversions.
+- Tests: `npm run test:ads`.
+
+### Admin session security
+- Admin login issues an HMAC-signed, expiring 30-day session; plain `store-admin-session=ok` cookies are rejected.
+- Signing uses a domain-separated key derived from the existing `APP_PASSWORD`; missing password fails closed. Password changes invalidate sessions. Cookies are HttpOnly, SameSite=Lax and Secure in production.
+- Deploying this migration requires one fresh login. The separate statistics password gate remains unchanged.
+- All protected routes/actions must use `isAuthenticated()` or the shared session validator. Test with `npm run test:session` and `npm run test:order-export-flow`.
+
 ## Performance notes
 
 Hostinger shared hosting was noticeably slower than local.

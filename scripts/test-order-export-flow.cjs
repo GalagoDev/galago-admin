@@ -19,6 +19,9 @@ for (const extension of [".ts", ".tsx"]) {
 }
 
 const workday = require("../src/lib/order-workday.ts");
+const session = require("../src/lib/session.ts");
+const originalAppPassword = process.env.APP_PASSWORD;
+process.env.APP_PASSWORD = "local-export-flow-test-password";
 const { createOrderFingerprint } = require("../src/lib/order-fingerprint.ts");
 const { planOrderRiskDecisions } = require("../src/lib/order-risk-decisions.ts");
 const window = workday.getOperationalExportWindow(new Date("2026-10-16T05:08:00Z"));
@@ -58,7 +61,7 @@ const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "next/navigation") return { redirect };
   if (request === "next/cache") return { revalidatePath: () => {} };
-  if (request === "next/headers") return { cookies: async () => ({ get: () => authenticated ? { value: "ok" } : undefined }) };
+  if (request === "next/headers") return { cookies: async () => ({ get: () => authenticated ? { value: session.createSession() } : undefined }) };
   if (request === "@/components/order-list-page") return { OrderListPage: () => null };
   if (request === "@/lib/order-workday") return { ...workday, getOperationalExportWindow: () => window };
   if (request === "@/lib/google-sheets") return {
@@ -125,4 +128,7 @@ async function expectRedirect(run, location) {
   authenticated = false;
   await expectRedirect(() => actions.approveAllOrderRisksAction(form(selected)), "/login");
   console.log("Export review flow passed: redirect, exact cycle selection, multi-date approval, exclusion, native download and XLSX output. No live data accessed.");
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+})().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => {
+  if (originalAppPassword === undefined) delete process.env.APP_PASSWORD;
+  else process.env.APP_PASSWORD = originalAppPassword;
+});

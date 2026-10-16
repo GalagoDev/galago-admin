@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-
-const AUTH_COOKIE = "store-admin-session";
+import { AUTH_COOKIE, verifySession } from "@/lib/session";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,7 +9,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const isAuthed = request.cookies.get(AUTH_COOKIE)?.value === "ok";
+  const isAuthed = verifySession(request.cookies.get(AUTH_COOKIE)?.value);
 
   if (!isAuthed) {
     return NextResponse.redirect(new URL("/login", request.url));

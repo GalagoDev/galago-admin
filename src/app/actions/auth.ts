@@ -3,23 +3,21 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { AUTH_COOKIE } from "@/lib/auth";
+import { AUTH_COOKIE, createSession, SESSION_MAX_AGE_SECONDS, verifyAppPassword } from "@/lib/session";
 
 export async function loginAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
-  const expected = process.env.APP_PASSWORD ?? "change-me";
-
-  if (password !== expected) {
+  if (!verifyAppPassword(password)) {
     redirect("/login?error=1");
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(AUTH_COOKIE, "ok", {
+  cookieStore.set(AUTH_COOKIE, createSession(), {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: SESSION_MAX_AGE_SECONDS,
   });
 
   redirect("/");
