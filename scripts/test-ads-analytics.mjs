@@ -16,7 +16,7 @@ function snapshot(overrides = {}) {
   return {
     account: { id: "1234567890", name: "Galago", currency: "EUR", timeZone: "Europe/Sarajevo" },
     fetchedAt: now.toISOString(), fromDate: "2026-08-01", toDate: "2026-10-16",
-    campaigns: [hour()], ads: [ad()], purchaseTracking: { configured: true, actions: ["Kupovina"] }, ...overrides,
+    campaigns: [hour()], ads: [ad()], purchaseTracking: { configured: true, actions: ["Kupovina"], valueSettingsChecked: true, fixedValueActions: [] }, ...overrides,
   };
 }
 function report(overrides = {}, config = settings, selectedPeriod = period, at = now) {
@@ -293,4 +293,151 @@ test("observed purchases before the evaluation window allow reviewing an underpe
   assert.equal(result.ads[0].purchases, 0);
   assert.equal(result.ads[0].recommendation.decision, "review");
   assert.ok(!result.warnings.some((warning) => warning.includes("Postojanje cilja kupovine ne potvrđuje")));
+});
+
+
+test("fixed primary purchase values hide revenue and ROAS across every report surface", () => {
+  const result = report({ purchaseTracking: { configured: true, actions: ["Kupovina"], valueSettingsChecked: true, fixedValueActions: ["Kupovina"] } });
+  assert.equal(result.summary.purchases, 4);
+  assert.equal(result.summary.spendEur, 20);
+  close(result.summary.cpaBam, 20 * 1.95583 / 4, 1e-9);
+  for (const summary of [result.summary, ...result.campaigns, ...result.timeline, ...result.ads]) {
+    assert.equal(summary.revenueBam, null, "placeholder values are not sales revenue");
+    assert.equal(summary.roas, null, "do not derive ROAS from placeholder values");
+  }
+  assert.equal(result.ads[0].purchases, 4);
+  assert.equal(result.ads[0].recommendation.decision, "tracking");
+  assert.ok(result.ads[0].recommendation.reason.includes("fiksnu vrijednost"));
+  assert.ok(result.warnings.some((warning) => warning.includes("stvarne iznose i valute transakcija")));
+});
+
+test("fixed value tracking blocks decisions even when Google currently reports zero purchases", () => {
+  const result = report({
+    purchaseTracking: { configured: true, actions: ["Kupovina"], valueSettingsChecked: true, fixedValueActions: ["Kupovina"] },
+    campaigns: [hour({ purchases: 0, purchaseValue: 0, cost: 200, clicks: 300 })],
+    ads: [ad({ purchases: 0, purchaseValue: 0, cost: 200, clicks: 300 })],
+  });
+  assert.equal(result.summary.purchases, 0);
+  assert.equal(result.summary.revenueBam, null);
+  assert.equal(result.summary.roas, null);
+  assert.equal(result.ads[0].recommendation.decision, "tracking");
+  assert.ok(result.ads[0].recommendation.reason.includes("fiksnu vrijednost"));
+});
+
+test("a fixed-value primary goal makes mixed purchase revenue unreliable", () => {
+  const result = report({ purchaseTracking: { configured: true, actions: ["Web kupovina", "Uvoz kupovine"], valueSettingsChecked: true, fixedValueActions: ["Uvoz kupovine"] } });
+  assert.equal(result.summary.purchases, 4);
+  assert.equal(result.summary.revenueBam, null);
+  assert.equal(result.ads[0].recommendation.decision, "tracking");
+  assert.ok(result.warnings.some((warning) => warning.includes("Uvoz kupovine")));
+});
+
+test("legacy or unchecked value metadata cannot establish trustworthy purchase revenue", () => {
+  for (const purchaseTracking of [
+    { configured: true, actions: ["Kupovina"] },
+    { configured: true, actions: ["Kupovina"], valueSettingsChecked: false, fixedValueActions: [] },
+  ]) {
+    const result = report({ purchaseTracking });
+    assert.equal(result.summary.purchases, 4);
+    assert.equal(result.summary.spendEur, 20);
+    assert.equal(result.summary.revenueBam, null);
+    assert.equal(result.summary.roas, null);
+    assert.equal(result.ads[0].recommendation.decision, "tracking");
+    assert.ok(result.ads[0].recommendation.reason.includes("još nije provjerena"));
+    assert.ok(result.warnings.some((warning) => warning.includes("novo osvježavanje")));
+  }
+});
+
+test("checked dynamic value configuration allows ROAS while inactive ads retain their status", () => {
+  const dynamic = report({ purchaseTracking: { configured: true, actions: ["Kupovina"], valueSettingsChecked: true, fixedValueActions: [] } });
+  assert.equal(dynamic.summary.roas, 10);
+  assert.equal(dynamic.ads[0].recommendation.decision, "keep");
+  const inactive = report({ purchaseTracking: { configured: true, actions: ["Kupovina"], valueSettingsChecked: true, fixedValueActions: ["Kupovina"] }, ads: [ad({ status: "PAUSED" })] });
+  assert.equal(inactive.ads[0].recommendation.decision, "inactive");
+  assert.equal(inactive.ads[0].roas, null);
+});
+
+
+function checkedValuesFrom(date) {
+  return { configured: true, actions: ["Kupovina"], valueSettingsChecked: true, fixedValueActions: [], revenueValidFrom: date };
+}
+
+test("a selected range crossing the first eligible Sarajevo day keeps counts but hides all revenue", () => {
+  const result = report({ purchaseTracking: checkedValuesFrom("2026-10-02") });
+  assert.equal(result.summary.purchases, 4);
+  assert.equal(result.summary.spendEur, 20);
+  for (const summary of [result.summary, ...result.campaigns, ...result.timeline]) {
+    assert.equal(summary.revenueBam, null);
+    assert.equal(summary.roas, null);
+  }
+  assert.ok(result.warnings.some((warning) => warning.includes("02.10.2026. 00:00 (Sarajevo)")));
+  assert.ok(result.warnings.some((warning) => warning.includes("ne popravlja ranije vrijednosti")));
+});
+
+test("selected ranges beginning exactly at the eligible Sarajevo midnight can show revenue", () => {
+  const selected = buildAdsPeriod({ kind: "custom", from: "2026-10-02", to: "2026-10-12" }, now);
+  const result = report({ purchaseTracking: checkedValuesFrom("2026-10-02") }, settings, selected);
+  assert.equal(result.summary.roas, 10);
+  close(result.summary.revenueBam, 200 * 1.95583);
+  assert.equal(result.ads[0].purchases, 4);
+  assert.equal(result.ads[0].revenueBam, null, "the separate 14-day decision window still includes unverified history");
+  assert.equal(result.ads[0].roas, null);
+  assert.equal(result.ads[0].recommendation.decision, "tracking");
+  assert.ok(result.ads[0].recommendation.reason.includes("cijeli pouzdan period"));
+});
+
+test("recommendations resume when the entire 14-day window starts on the eligible date", () => {
+  const result = report({ purchaseTracking: checkedValuesFrom("2026-09-29") });
+  assert.equal(result.recommendationPeriod.from, "2026-09-29");
+  assert.equal(result.ads[0].roas, 10);
+  assert.equal(result.ads[0].recommendation.decision, "keep");
+  const nextDay = report({ purchaseTracking: checkedValuesFrom("2026-09-30") });
+  assert.equal(nextDay.ads[0].roas, null);
+  assert.equal(nextDay.ads[0].recommendation.decision, "tracking");
+});
+
+test("historical selected ranges do not block an independently eligible recommendation window", () => {
+  const selected = buildAdsPeriod({ kind: "custom", from: "2026-09-28", to: "2026-10-12" }, now);
+  const result = report({ purchaseTracking: checkedValuesFrom("2026-09-29") }, settings, selected);
+  assert.equal(result.summary.roas, null);
+  assert.equal(result.ads[0].roas, 10);
+  assert.equal(result.ads[0].recommendation.decision, "keep");
+});
+
+test("ad-window cutoff compares real account midnight against Sarajevo midnight", () => {
+  const tokyo = report({ account: { ...snapshot().account, timeZone: "Asia/Tokyo" }, purchaseTracking: checkedValuesFrom("2026-09-29") });
+  assert.equal(tokyo.recommendationPeriod.from, "2026-09-29");
+  assert.equal(tokyo.summary.roas, 10);
+  assert.equal(tokyo.ads[0].roas, null, "Tokyo midnight starts before the safe Sarajevo date");
+  assert.equal(tokyo.ads[0].recommendation.decision, "tracking");
+  const newYork = report({ account: { ...snapshot().account, timeZone: "America/New_York" }, purchaseTracking: checkedValuesFrom("2026-09-29") });
+  assert.equal(newYork.ads[0].roas, 10, "New York midnight is after the Sarajevo cutoff");
+  assert.equal(newYork.ads[0].recommendation.decision, "keep");
+});
+
+test("an invalid reliability date cannot unlock historic conversion values", () => {
+  const result = report({ purchaseTracking: checkedValuesFrom("2026-02-30") });
+  assert.equal(result.summary.purchases, 4);
+  assert.equal(result.summary.roas, null);
+  assert.equal(result.ads[0].roas, null);
+  assert.equal(result.ads[0].recommendation.decision, "tracking");
+  assert.ok(result.warnings.some((warning) => warning.includes("Datum početka pouzdanih vrijednosti kupovina nije ispravan")));
+});
+
+
+test("pre-cutover placeholder purchases cannot validate the updated purchase flow", () => {
+  const currentZero = hour({ purchases: 0, purchaseValue: 0 });
+  const oldPurchase = hour({ date: "2026-09-28", purchases: 1, purchaseValue: 1 });
+  const input = {
+    purchaseTracking: checkedValuesFrom("2026-09-29"),
+    campaigns: [oldPurchase, currentZero],
+    ads: [ad({ purchases: 0, purchaseValue: 0 })],
+  };
+  const oldOnly = report(input);
+  assert.equal(oldOnly.summary.purchases, 0);
+  assert.equal(oldOnly.summary.roas, 0, "keep Google's post-cutover reported zero while withholding decisions");
+  assert.equal(oldOnly.ads[0].recommendation.decision, "tracking");
+  assert.ok(oldOnly.ads[0].recommendation.reason.includes("Nema zabilježenih kupovina od 29.09.2026."));
+  const observedAtBoundary = report({ ...input, campaigns: [...input.campaigns, hour({ date: "2026-09-29", hour: 0, purchases: 0.25, purchaseValue: 20 })] });
+  assert.equal(observedAtBoundary.ads[0].recommendation.decision, "review", "a real reported purchase at the eligible boundary satisfies the observed-purchase gate");
 });

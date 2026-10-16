@@ -20,9 +20,15 @@ type Row = {
   campaign?: { id?: string; name?: string; status?: string; advertisingChannelType?: string };
   adGroup?: { id?: string; name?: string; status?: string };
   adGroupAd?: { status?: string; ad?: { id?: string; name?: string; type?: string } };
-  segments?: { date?: string; hour?: number };
+  segments?: { date?: string; hour?: number; conversionAction?: string };
   metrics?: { impressions?: string | number; clicks?: string | number; costMicros?: string | number; conversions?: number; conversionsValue?: number };
-  conversionAction?: { name?: string; primaryForGoal?: boolean };
+  conversionAction?: {
+    resourceName?: string;
+    name?: string;
+    status?: string;
+    primaryForGoal?: boolean;
+    valueSettings?: { alwaysUseDefaultValue?: boolean; defaultValue?: number; defaultCurrencyCode?: string };
+  };
 };
 
 export function getAdsConnection(): AdsDashboardData["connection"] {
@@ -158,9 +164,38 @@ function mergePurchases<T extends AdsCampaignHour | AdsAdDay>(base: T[], purchas
   return [...merged.values()];
 }
 
+function revenueValidFrom(): string | undefined {
+  const value = process.env.GOOGLE_ADS_REVENUE_VALID_FROM?.trim();
+  if (!value) return undefined;
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
+    throw new Error("Datum početka pouzdanog prihoda Google Ads mora biti ispravan datum YYYY-MM-DD.");
+  }
+  return value;
+}
+
+function purchaseTracking(actionRows: Row[], purchaseRows: Row[], validFrom?: string): AdsSnapshot["purchaseTracking"] {
+  // Custom goals can include secondary actions. Audit every contributing action,
+  // as well as active primary actions, before treating conversion value as sales.
+  const observedRows = purchaseRows.filter((row) => numeric(row.metrics?.conversions) !== 0 || numeric(row.metrics?.conversionsValue) !== 0);
+  const observedActions = new Set(observedRows.map((row) => row.segments?.conversionAction));
+  const knownActions = actionRows.flatMap((row) => row.conversionAction ? [row.conversionAction] : []);
+  const relevant = knownActions.filter((action) => (action.primaryForGoal === true && action.status === "ENABLED") || (action.resourceName !== undefined && observedActions.has(action.resourceName)));
+  const observedComplete = observedRows.every((row) => row.segments?.conversionAction && knownActions.some((action) => action.resourceName === row.segments?.conversionAction));
+  return {
+    configured: relevant.length > 0 || observedRows.length > 0,
+    actions: relevant.map((action) => action.name || "Kupovina"),
+    // Optional protobuf fields may be absent. An absent boolean is unverified.
+    valueSettingsChecked: relevant.length > 0 && observedComplete && relevant.every((action) => typeof action.valueSettings?.alwaysUseDefaultValue === "boolean"),
+    fixedValueActions: relevant.filter((action) => action.valueSettings?.alwaysUseDefaultValue === true).map((action) => action.name || "Kupovina"),
+    ...(validFrom ? { revenueValidFrom: validFrom } : {}),
+  };
+}
+
 export async function fetchGoogleAdsSnapshot(now = new Date()): Promise<AdsSnapshot> {
   const { customerId } = getAdsConnection();
   if (!customerId) throw new Error("Google Ads ID računa nije podešen.");
+  const validFrom = revenueValidFrom();
   const budget: SyncBudget = { deadline: Date.now() + SYNC_BUDGET_MS, signal: AbortSignal.timeout(SYNC_BUDGET_MS) };
   const token = await accessToken(budget);
   const customerRows = await search(customerId, token, "SELECT customer.id, customer.descriptive_name, customer.currency_code, customer.time_zone FROM customer", budget);
@@ -172,14 +207,14 @@ export async function fetchGoogleAdsSnapshot(now = new Date()): Promise<AdsSnaps
   const campaignFields = "campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, segments.date, segments.hour";
   const adFields = "campaign.id, campaign.name, campaign.status, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, ad_group_ad.status, segments.date";
   const costFields = "metrics.impressions, metrics.clicks, metrics.cost_micros";
-  const purchaseFields = "segments.conversion_action_category, metrics.conversions, metrics.conversions_value";
+  const purchaseFields = "segments.conversion_action, segments.conversion_action_category, metrics.conversions, metrics.conversions_value";
   // Cost metrics cannot be segmented by conversion category. Keep these requests separate.
   const requests = await Promise.allSettled([
     search(customerId, token, `SELECT ${campaignFields}, ${costFields} FROM campaign WHERE ${dates} AND campaign.status IN ('ENABLED', 'PAUSED', 'REMOVED')`, budget),
     search(customerId, token, `SELECT ${campaignFields}, ${purchaseFields} FROM campaign WHERE ${dates} AND segments.conversion_action_category = 'PURCHASE' AND campaign.status IN ('ENABLED', 'PAUSED', 'REMOVED')`, budget),
     search(customerId, token, `SELECT ${adFields}, ${costFields} FROM ad_group_ad WHERE ${dates} AND ad_group_ad.status IN ('ENABLED', 'PAUSED', 'REMOVED')`, budget),
     search(customerId, token, `SELECT ${adFields}, ${purchaseFields} FROM ad_group_ad WHERE ${dates} AND segments.conversion_action_category = 'PURCHASE' AND ad_group_ad.status IN ('ENABLED', 'PAUSED', 'REMOVED')`, budget),
-    search(customerId, token, "SELECT conversion_action.name, conversion_action.primary_for_goal FROM conversion_action WHERE conversion_action.category = 'PURCHASE' AND conversion_action.status = 'ENABLED'", budget),
+    search(customerId, token, "SELECT conversion_action.resource_name, conversion_action.name, conversion_action.status, conversion_action.primary_for_goal, conversion_action.value_settings.always_use_default_value, conversion_action.value_settings.default_value, conversion_action.value_settings.default_currency_code FROM conversion_action WHERE conversion_action.category = 'PURCHASE'", budget),
   ]);
   remainingMs(budget);
   const results = requests.map((result) => {
@@ -188,10 +223,9 @@ export async function fetchGoogleAdsSnapshot(now = new Date()): Promise<AdsSnaps
   });
   const campaigns = mergePurchases(results[0].map(campaignHour), results[1].map(campaignHour), (row) => `${row.campaignId}/${row.date}/${row.hour}`);
   const ads = mergePurchases(results[2].map(adDay), results[3].map(adDay), (row) => `${row.adGroupId}/${row.adId}/${row.date}`);
-  const actions = results[4].filter((row) => row.conversionAction?.primaryForGoal).map((row) => row.conversionAction?.name || "Kupovina");
   return {
     account: { id: customerId, name: customer.descriptiveName || "Google Ads", currency: customer.currencyCode, timeZone: customer.timeZone },
     fetchedAt: new Date().toISOString(), fromDate, toDate, campaigns, ads,
-    purchaseTracking: { configured: actions.length > 0 || campaigns.some((row) => row.purchases > 0), actions },
+    purchaseTracking: purchaseTracking(results[4], [...results[1], ...results[3]], validFrom),
   };
 }

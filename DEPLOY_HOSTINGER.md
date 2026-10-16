@@ -178,6 +178,21 @@ date; it is not all Shopify/Sheets revenue, courier-confirmed sales, or net prof
 ROAS divides attributed revenue by ad cost in the same currency. EUR/BAM uses
 1.95583; unsupported currencies cannot produce BAM totals.
 
+Purchase value settings are audited separately from purchase counts. Fixed values
+and snapshots without that audit cannot produce sales totals or ROAS. Changing a
+Google conversion action from fixed to dynamic values does not repair historical
+conversions. After such a correction, set `GOOGLE_ADS_REVENUE_VALID_FROM` to the
+first complete eligible Sarajevo calendar date (YYYY-MM-DD). Periods beginning
+before that date, including the independent recommendation window, keep revenue
+and ROAS unknown. This cutoff is a safeguard, not proof that purchase events fire
+or carry the correct value; verify a real purchase's amount and currency too.
+
+For Galago, Purchase was changed on 2026-10-16 from a fixed USD 1 to transaction
+values, with EUR 0 as fallback. Shopify Google & YouTube already maps Checkout
+completed to this action. Production cutoff is 2026-10-17. Google's integration
+sends discounted merchandise value excluding shipping and taxes; see its
+[Shopify event parameters](https://developers.google.com/tag-platform/gtagjs/reference/shopify-event-parameters#purchase).
+
 Set a business-specific target ROAS in the panel before performance verdicts
 are enabled. Missing tracking, insufficient history/sample, or a snapshot older
 than six hours blocks actionable recommendations. Recommendations never change

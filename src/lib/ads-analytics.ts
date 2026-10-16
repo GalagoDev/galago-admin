@@ -13,6 +13,7 @@ const formatters = new Map<string, Intl.DateTimeFormat>();
 
 type LocalParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 type Totals = AdsMetrics & { missingPurchaseValue: boolean };
+type PurchaseValueStatus = "dynamic" | "fixed" | "unknown" | "unverified-history";
 
 function localParts(timestamp: number, timeZone: string): LocalParts {
   let formatter = formatters.get(timeZone);
@@ -161,10 +162,10 @@ function addMetrics(total: Totals, row: AdsMetrics): void {
   if (!Number.isFinite(row.purchaseValue) || (row.purchases > 0 && row.purchaseValue <= 0)) total.missingPurchaseValue = true;
 }
 
-function summarize(total: Totals, currency: string, tracking: boolean): AdsSummary {
+function summarize(total: Totals, currency: string, tracking: boolean, purchaseValueStatus: PurchaseValueStatus): AdsSummary {
   const bamRate = currency === "EUR" ? BAM_PER_EUR : currency === "BAM" ? 1 : null;
   const spendBam = bamRate === null ? null : total.cost * bamRate;
-  const valueKnown = tracking && !total.missingPurchaseValue;
+  const valueKnown = tracking && purchaseValueStatus === "dynamic" && !total.missingPurchaseValue;
   const revenueBam = !valueKnown || bamRate === null ? null : total.purchaseValue * bamRate;
   return {
     impressions: total.impressions, clicks: total.clicks,
@@ -191,10 +192,19 @@ function checkedSettings(settings: AdsSettings): AdsSettings {
 }
 
 function recommend(
-  summary: AdsSummary, status: string, settings: AdsSettings, covered: boolean, fresh: boolean, hasObservedPurchases: boolean,
+  summary: AdsSummary, status: string, settings: AdsSettings, covered: boolean, fresh: boolean, hasObservedPurchases: boolean, purchaseValueStatus: PurchaseValueStatus, revenueValidFrom?: string,
 ): AdsRecommendation {
   if (["PAUSED", "REMOVED", "DISABLED"].includes(status.toUpperCase())) {
     return { decision: "inactive", label: "Neaktivan", reason: "Oglas je pauziran ili uklonjen. Prikazani rezultati su historijski." };
+  }
+  if (summary.purchases !== null && purchaseValueStatus === "fixed") {
+    return { decision: "tracking", label: "Provjeri vrijednost", reason: "Google Ads koristi fiksnu vrijednost kupovine. Za procjenu oglasa potrebno je slati stvarni iznos i valutu svake narudžbe; prihod i ROAS zasad nisu pouzdani." };
+  }
+  if (summary.purchases !== null && purchaseValueStatus === "unverified-history") {
+    return { decision: "tracking", label: "Sačekaj pouzdan period", reason: `Period procjene uključuje podatke prije ${readableDate(revenueValidFrom!)} (Sarajevo), za koje stvarni prihod nije potvrđen. Promjena postavki kupovine ne popravlja ranije vrijednosti; preporuke čekaju cijeli pouzdan period.` };
+  }
+  if (summary.purchases !== null && purchaseValueStatus === "unknown") {
+    return { decision: "tracking", label: "Provjeri vrijednost", reason: "Konfiguracija vrijednosti kupovina još nije provjerena. Osvježi podatke i provjeri da Google Ads prima stvarni iznos i valutu svake narudžbe prije procjene oglasa." };
   }
   if (!fresh) {
     return { decision: "wait", label: "Osvježi podatke", reason: "Podaci su stariji od šest sati ili vrijeme sinhronizacije nije poznato. Osvježi ih prije odluke o zadržavanju ili pauziranju oglasa." };
@@ -203,7 +213,7 @@ function recommend(
     return { decision: "tracking", label: "Provjeri praćenje", reason: "Google Ads nema potvrđenu konverziju kategorije kupovina. Bez nje nije moguće procijeniti prodaju i ROAS." };
   }
   if (!hasObservedPurchases) {
-    return { decision: "tracking", label: "Provjeri praćenje", reason: "Nema zabilježenih kupovina u cijeloj preuzetoj historiji računa. Provjeri da praćenje kupovina radi prije procjene zadržavanja ili pauziranja oglasa." };
+    return { decision: "tracking", label: "Provjeri praćenje", reason: `Nema zabilježenih kupovina ${revenueValidFrom ? `od ${readableDate(revenueValidFrom)} (Sarajevo), od kada se vrijednosti mogu procjenjivati` : "u cijeloj preuzetoj historiji računa"}. Provjeri da praćenje kupovina radi prije procjene zadržavanja ili pauziranja oglasa.` };
   }
   if (summary.roas === null && summary.purchases > 0) {
     return { decision: "tracking", label: "Provjeri vrijednost", reason: "Kupovine postoje, ali vrijednost kupovine ili potrošnja potrebna za ROAS nedostaje. Provjeri vrijednosti konverzija." };
@@ -242,17 +252,41 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
   const timeZone = snapshot.account.timeZone;
   const currency = snapshot.account.currency.toUpperCase();
   const tracking = snapshot.purchaseTracking.configured;
-  const hasObservedPurchases = snapshot.campaigns.some((row) => row.purchases > 0);
+  const fixedValueActions = snapshot.purchaseTracking.fixedValueActions ?? [];
+  const currentValueStatus: PurchaseValueStatus = fixedValueActions.length > 0 ? "fixed"
+    : snapshot.purchaseTracking.valueSettingsChecked === true ? "dynamic" : "unknown";
+  const revenueValidFrom = snapshot.purchaseTracking.revenueValidFrom;
+  let revenueCutoff: number | null = null;
+  let invalidRevenueCutoff = false;
+  if (revenueValidFrom !== undefined) {
+    try { revenueCutoff = atMidnight(revenueValidFrom, SARAJEVO); }
+    catch { invalidRevenueCutoff = true; }
+  }
+  const purchaseValueStatus: PurchaseValueStatus = invalidRevenueCutoff ? "unknown"
+    : currentValueStatus === "dynamic" && revenueCutoff !== null && start < revenueCutoff ? "unverified-history" : currentValueStatus;
+  // Old placeholder conversions cannot establish that the updated purchase flow works.
+  const hasObservedPurchases = snapshot.campaigns.some((row) => {
+    if (row.purchases <= 0) return false;
+    if (revenueCutoff === null) return true;
+    try {
+      if (!Number.isInteger(row.hour) || row.hour < 0 || row.hour > 23) return false;
+      const instants = hourInstants(row.date, row.hour, timeZone);
+      return instants.length > 0 && instants.every((instant) => instant >= revenueCutoff) && instants[0] <= timestamp;
+    } catch { return false; }
+  });
   const warnings = new Set<string>();
+  if (invalidRevenueCutoff) warnings.add("Datum početka pouzdanih vrijednosti kupovina nije ispravan. Prihod i ROAS čekaju ispravnu provjeru datuma.");
   const fetchedAt = Date.parse(snapshot.fetchedAt);
   const snapshotFresh = Number.isFinite(fetchedAt) && timestamp - fetchedAt <= 6 * HOUR_MS;
   if (!snapshotFresh) warnings.add("Podaci su stariji od šest sati ili vrijeme sinhronizacije nije poznato. Prikazan je posljednji poznati učinak, a preporuke čekaju osvježavanje.");
   if (snapshot.campaigns.some((campaign) => campaign.channel === "PERFORMANCE_MAX")) {
     warnings.add("Kod Performance Max kampanja lista pojedinačnih oglasa ne obuhvata sve oglase i grupe elemenata. Ukupni učinak tih kampanja prati se u pregledu kampanja.");
   }
-  if (currency !== "EUR" && currency !== "BAM") warnings.add(`Valuta računa je ${currency}. Preračun u EUR/KM nije dostupan; ROAS se računa iz prihoda i potrošnje u izvornoj valuti.`);
+  if (currency !== "EUR" && currency !== "BAM") warnings.add(`Valuta računa je ${currency}. Preračun u EUR/KM nije dostupan; ROAS se može računati u izvornoj valuti kada su vrijednosti kupovina pouzdane.`);
   if (!tracking) warnings.add("Nije potvrđeno praćenje kupovina u Google Ads. Prodaja i ROAS ostaju nepoznati; ukupne narudžbe trgovine se ne pripisuju reklamama.");
-  if (tracking && !hasObservedPurchases) warnings.add("U preuzetoj historiji nema zabilježenih kupovina. Postojanje cilja kupovine ne potvrđuje da praćenje radi; provjeri praćenje prije procjene oglasa. Prikazane nule su vrijednosti koje je prijavio Google.");
+  if (tracking && !hasObservedPurchases) warnings.add(`U preuzetoj historiji${revenueCutoff !== null ? ` od ${readableDate(revenueValidFrom!)} (Sarajevo)` : ""} nema zabilježenih kupovina. Postojanje cilja kupovine ne potvrđuje da praćenje radi; provjeri praćenje prije procjene oglasa. Prikazani broj kupovina potiče iz Google izvještaja.`);
+  if (tracking && purchaseValueStatus === "fixed") warnings.add(`Google Ads koristi fiksnu vrijednost za ciljeve kupovine: ${fixedValueActions.join(", ")}. Broj kupovina ostaje prikazan, ali prihod i ROAS čekaju stvarne iznose i valute transakcija.`);
+  if (tracking && purchaseValueStatus === "unknown") warnings.add("Konfiguracija vrijednosti kupovina još nije provjerena. Broj kupovina ostaje prikazan, a prihod i ROAS čekaju provjeru i novo osvježavanje Google Ads podataka.");
   warnings.add("Prikazani povrat je ROAS (prihod od pripisanih kupovina / potrošnja oglasa), a ne dobit. Marža, dostava, povrati i ostali troškovi nisu odbijeni.");
 
   const accountFirstDate = dateKey(localParts(start, timeZone));
@@ -311,6 +345,12 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
   const recommendationEndExclusive = shiftDate(accountToday, -settings.attributionLagDays);
   const recommendationFrom = shiftDate(recommendationEndExclusive, -14);
   const recommendationTo = shiftDate(recommendationEndExclusive, -1);
+  const recommendationValueStatus: PurchaseValueStatus = invalidRevenueCutoff ? "unknown"
+    : currentValueStatus === "dynamic" && revenueCutoff !== null && atMidnight(recommendationFrom, timeZone) < revenueCutoff ? "unverified-history" : currentValueStatus;
+  if (tracking && (purchaseValueStatus === "unverified-history" || recommendationValueStatus === "unverified-history")) {
+    warnings.add(`Prva dopuštena granica za procjenu prihoda je ${readableDate(revenueValidFrom!)} 00:00 (Sarajevo). Promjena konfiguracije ne popravlja ranije vrijednosti i sama ne potvrđuje slanje stvarnog iznosa kupovine; prihod i ROAS za periode koji počinju prije granice ostaju nepoznati.`);
+  }
+  if (tracking && recommendationValueStatus === "unverified-history") warnings.add("Četrnaestodnevni period procjene oglasa još uključuje neprovjerene vrijednosti kupovina. Preporuke čekaju cijeli period s pouzdanim prihodom.");
   const recommendationsCovered = snapshot.fromDate <= recommendationFrom && snapshot.toDate >= recommendationTo;
   if (!recommendationsCovered) warnings.add("Historija ne pokriva svih 14 dana procjene oglasa. Pouzdane preporuke čekaju potpunu sinhronizaciju.");
   const adTotals = new Map<string, { row: AdsAdDay; totals: Totals }>();
@@ -326,19 +366,19 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
     warnings.add("Dio oglasa u periodu procjene ima kupovine bez upotrebljivih vrijednosti; za njih se traži provjera praćenja.");
   }
   const campaignReports: AdsCampaignReport[] = [...campaigns.values()].sort((a, b) => b.totals.cost - a.totals.cost).map(({ row, totals }) => ({
-    ...summarize(totals, currency, tracking), id: row.campaignId, name: row.campaignName, status: row.status, channel: row.channel,
+    ...summarize(totals, currency, tracking, purchaseValueStatus), id: row.campaignId, name: row.campaignName, status: row.status, channel: row.channel,
   }));
   const adReports: AdsAdReport[] = [...adTotals.entries()].sort(([, a], [, b]) => b.totals.cost - a.totals.cost).map(([id, { row, totals }]) => {
-    const summary = summarize(totals, currency, tracking);
+    const summary = summarize(totals, currency, tracking, recommendationValueStatus);
     return {
       ...summary, id, name: row.adName || `Oglas ${row.adId}`, campaignName: row.campaignName,
       adGroupName: row.adGroupName, status: row.status, adType: row.adType,
-      recommendation: recommend(summary, row.status, settings, recommendationsCovered, snapshotFresh, hasObservedPurchases),
+      recommendation: recommend(summary, row.status, settings, recommendationsCovered, snapshotFresh, hasObservedPurchases, recommendationValueStatus, revenueValidFrom),
     };
   });
   return {
-    period, summary: summarize(total, currency, tracking), campaigns: campaignReports,
-    timeline: [...daily.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, totals]) => ({ date, ...summarize(totals, currency, tracking) })),
+    period, summary: summarize(total, currency, tracking, purchaseValueStatus), campaigns: campaignReports,
+    timeline: [...daily.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, totals]) => ({ date, ...summarize(totals, currency, tracking, purchaseValueStatus) })),
     ads: adReports,
     recommendationPeriod: {
       from: recommendationFrom, to: recommendationTo,

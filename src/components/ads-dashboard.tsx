@@ -281,6 +281,18 @@ export function AdsDashboard() {
   const stale = data?.sync.lastSuccessAt ? checkedAt - Date.parse(data.sync.lastSuccessAt) > 6 * 60 * 60 * 1000 : false;
   const busy = syncing || !!data?.sync.running;
   const displayError = error || syncError || data?.sync.error;
+  const fixedPurchaseValues = Boolean(data?.tracking?.fixedValueActions?.length);
+  const valueSettingsPending = Boolean(data?.tracking?.configured && data.tracking.valueSettingsChecked !== true);
+  const revenueDetail = fixedPurchaseValues
+    ? "Fiksna vrijednost kupovine; stvarna prodaja nije poznata"
+    : valueSettingsPending ? "Postavke vrijednosti čekaju provjeru pri osvježavanju"
+      : summary?.revenueBam == null ? "Vrijednost prodaje još nije dostupna"
+        : "Vrijednost kupovina pripisanih reklamama";
+  const roasDetail = fixedPurchaseValues
+    ? "Čeka stvarne iznose i valutu kupovina"
+    : valueSettingsPending ? "Osvježi podatke za provjeru vrijednosti"
+      : summary?.roas == null ? "Za izračun trebaju poznati prihod i potrošnja"
+        : data?.settings.targetRoas == null ? "Cilj postavi u postavkama" : `Tvoj cilj: ${roas(data.settings.targetRoas)}`;
 
   return <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60"><div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 pb-10 pt-4 sm:px-5 lg:max-w-[1480px] lg:gap-5 lg:px-8 lg:pt-8 2xl:px-10">
     <header className={`${panel} p-4 lg:p-6`}>
@@ -300,8 +312,8 @@ export function AdsDashboard() {
 
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-3" aria-label="Rezultati odabranog perioda" aria-busy={loading && !customInvalid}>
       <Metric label="Potrošnja reklama" value={money(summary?.spendBam)} detail={summary?.spendEur == null ? "Google Ads · iznos još nije dostupan" : `${money(summary.spendEur, "€")} · 1 € = 1,95583 KM`} />
-      <Metric label="Google prodaja" value={money(summary?.revenueBam)} detail="Vrijednost kupovina pripisanih reklamama" />
-      <Metric label="Povrat na potrošnju · ROAS" value={roas(summary?.roas)} detail={data?.settings.targetRoas == null ? "Cilj postavi u postavkama" : `Tvoj cilj: ${roas(data.settings.targetRoas)}`} highlight />
+      <Metric label="Google prodaja" value={money(summary?.revenueBam)} detail={revenueDetail} />
+      <Metric label="Povrat na potrošnju · ROAS" value={roas(summary?.roas)} detail={roasDetail} highlight={!fixedPurchaseValues && !valueSettingsPending && summary?.roas != null && data?.settings.targetRoas != null && summary.roas >= data.settings.targetRoas} />
       <Metric label="Kupovine" value={number(summary?.purchases)} detail={summary?.cpaBam == null ? "Google konverzije tipa kupovina" : `${money(summary.cpaBam)} po kupovini`} />
       <Metric label="Prikazi reklama" value={number(summary?.impressions)} detail="Koliko puta su se reklame prikazale" />
       <Metric label="Klikovi" value={number(summary?.clicks)} detail={`CTR ${summary?.ctr == null ? "—" : `${number(summary.ctr * 100)}%`} · CPC ${money(summary?.cpcBam)}`} />
@@ -313,7 +325,24 @@ export function AdsDashboard() {
 
     <details id="ads-settings" className={`${panel} group scroll-mt-20 p-4 lg:p-5`}><summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-sm font-medium text-neutral-200 [&::-webkit-details-marker]:hidden"><Settings2 className="h-4 w-4 text-neutral-500" aria-hidden="true" />Postavke i povezivanje<ChevronDown className="ml-auto h-4 w-4 text-neutral-500 transition group-open:rotate-180" aria-hidden="true" /></summary>
       {payload?.data.settings ? <SettingsForm settings={payload.data.settings} onSaved={() => setRefreshVersion((version) => version + 1)} /> : <p className="mt-4 text-xs text-neutral-500">Postavke će biti dostupne nakon učitavanja.</p>}
-      {payload?.data ? <div className="mt-5 border-t border-white/10 pt-4"><h3 className="text-xs font-medium text-neutral-300">Status povezivanja</h3><dl className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2"><div><dt className="text-neutral-500">Google Ads račun</dt><dd className="mt-1 text-neutral-300">{payload.data.account?.id || payload.data.connection.customerId || "Nije postavljen"}</dd></div><div><dt className="text-neutral-500">Praćenje kupovina</dt><dd className="mt-1 text-neutral-300">{payload.data.tracking ? payload.data.tracking.configured ? "Podešeno u Google Ads" : "Kupovine nisu podešene" : "Još nije provjereno"}</dd></div>{payload.data.account ? <><div><dt className="text-neutral-500">Valuta računa</dt><dd className="mt-1 text-neutral-300">{payload.data.account.currency}</dd></div><div><dt className="text-neutral-500">Vremenska zona računa</dt><dd className="mt-1 text-neutral-300">{payload.data.account.timeZone}</dd></div></> : null}</dl>{payload.data.tracking?.actions.length ? <p className="mt-3 break-words text-[11px] text-neutral-500">Praćene kupovine: {payload.data.tracking.actions.join(", ")}</p> : null}{payload.data.connection.missing.length ? <p className="mt-3 break-words text-[11px] leading-5 text-neutral-500">Za administratora povezivanja — nedostaje konfiguracija: {payload.data.connection.missing.join(", ")}. Pristupni podaci se postavljaju na serveru.</p> : null}<p className="mt-3 text-[11px] leading-5 text-neutral-500">Ovaj pregled čita rezultate reklama. Promjenu budžeta i statusa oglasa obavljaš u Google Ads računu.</p></div> : null}
+      {payload?.data ? <div className="mt-5 border-t border-white/10 pt-4">
+        <h3 className="text-xs font-medium text-neutral-300">Status povezivanja</h3>
+        <dl className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+          <div><dt className="text-neutral-500">Google Ads račun</dt><dd className="mt-1 text-neutral-300">{payload.data.account?.id || payload.data.connection.customerId || "Nije postavljen"}</dd></div>
+          <div><dt className="text-neutral-500">Cilj kupovine</dt><dd className="mt-1 text-neutral-300">{payload.data.tracking ? payload.data.tracking.configured ? "Pronađen u Google Ads" : "Kupovine nisu podešene" : "Još nije provjereno"}</dd></div>
+          <div><dt className="text-neutral-500">Vrijednosti kupovina</dt><dd className={`mt-1 leading-5 ${payload.data.tracking?.fixedValueActions?.length ? "text-amber-200" : "text-neutral-300"}`}>
+            {payload.data.tracking?.fixedValueActions?.length ? "Fiksna vrijednost — potreban je stvarni iznos narudžbe"
+              : payload.data.tracking?.valueSettingsChecked === true ? "Postavke pročitane; potvrdi iznos probnom kupovinom"
+                : "Postavke vrijednosti još nisu provjerene"}
+          </dd></div>
+          {payload.data.account ? <><div><dt className="text-neutral-500">Valuta računa</dt><dd className="mt-1 text-neutral-300">{payload.data.account.currency}</dd></div><div><dt className="text-neutral-500">Vremenska zona računa</dt><dd className="mt-1 text-neutral-300">{payload.data.account.timeZone}</dd></div></> : null}
+        </dl>
+        {payload.data.tracking?.actions.length ? <p className="mt-3 break-words text-[11px] text-neutral-500">Pronađeni ciljevi kupovine: {payload.data.tracking.actions.join(", ")}</p> : null}
+        {payload.data.tracking?.fixedValueActions?.length ? <p className="mt-3 text-xs leading-5 text-amber-100/85">Ciljevi s fiksnom vrijednošću: {payload.data.tracking.fixedValueActions.join(", ")}. Za svaku kupovinu treba slati stvarni iznos narudžbe i valutu te koristiti različite vrijednosti po konverziji. Potvrdi iznos probnom kupovinom. Promjena postavke ne ispravlja ranije vrijednosti konverzija; i njih treba provjeriti prije procjene historijskog ROAS-a. Dok je postavljena fiksna vrijednost, prodaja i ROAS ostaju nepoznati.</p> : null}
+        {payload.data.tracking?.configured ? <p className="mt-3 text-[11px] leading-5 text-neutral-500">Postojanje cilja kupovine ne potvrđuje da se kupovine i njihovi stvarni iznosi ispravno bilježe.</p> : null}
+        {payload.data.connection.missing.length ? <p className="mt-3 break-words text-[11px] leading-5 text-neutral-500">Za administratora povezivanja — nedostaje konfiguracija: {payload.data.connection.missing.join(", ")}. Pristupni podaci se postavljaju na serveru.</p> : null}
+        <p className="mt-3 text-[11px] leading-5 text-neutral-500">Ovaj pregled čita rezultate reklama. Promjenu budžeta i statusa oglasa obavljaš u Google Ads računu.</p>
+      </div> : null}
     </details>
   </div></main>;
 }

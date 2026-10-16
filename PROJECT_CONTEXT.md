@@ -278,6 +278,8 @@ Not fully mature yet:
 - Google Ads API credentials stay on the server. Reuse of the existing Sheets service account still requires Read-only permission on the Ads account and production access for its Cloud project. See `DEPLOY_HOSTINGER.md`.
 - `ads_snapshots` and `ads_settings` live in the existing persistent SQLite database. Sync runs hourly, preserves the last full snapshot on failure, and refreshes the latest 90 days for delayed conversions.
 - Tests: `npm run test:ads`.
+- On 2026-10-16 the service account was granted Read-only access to Ads account `3221742913` and Google Ads API was enabled in its existing Cloud project. Google's Explorer production-access application was rejected; the production panel correctly reports this external blocker. No payment was made.
+- Purchase action `7760086787` was corrected from fixed USD 1 to dynamic transaction values with EUR 0 fallback. Shopify's existing Checkout completed mapping points to Purchase. Set `GOOGLE_ADS_REVENUE_VALID_FROM=2026-10-17` to exclude historical fixed-value data from revenue/ROAS and recommendations. A real conversion's value/currency still needs verification after tracking starts producing data.
 
 ### Admin session security
 - Admin login issues an HMAC-signed, expiring 30-day session; plain `store-admin-session=ok` cookies are rejected.

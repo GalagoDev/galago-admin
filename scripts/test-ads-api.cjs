@@ -23,6 +23,7 @@ global.Date = class extends OriginalDate {
 const envKeys = [
   "APP_PASSWORD",
   "GOOGLE_ADS_CUSTOMER_ID", "GOOGLE_ADS_LOGIN_CUSTOMER_ID", "GOOGLE_ADS_SYNC_SECRET",
+  "GOOGLE_ADS_REVENUE_VALID_FROM",
   "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN",
   "GOOGLE_ADS_SERVICE_ACCOUNT_JSON", "GOOGLE_SERVICE_ACCOUNT_JSON",
   "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "GOOGLE_SERVICE_ACCOUNT_PATH",
@@ -31,6 +32,7 @@ const savedEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]
 for (const key of envKeys) delete process.env[key];
 process.env.APP_PASSWORD = "local-ads-test-password";
 const customerId = "3221742913";
+const purchaseResource = `customers/${customerId}/conversionActions/1`;
 const privateSentinel = "TEST-PRIVATE-CREDENTIAL-DO-NOT-RETURN";
 process.env.GOOGLE_ADS_CUSTOMER_ID = "322-174-2913";
 process.env.GOOGLE_ADS_SERVICE_ACCOUNT_JSON = JSON.stringify({
@@ -119,21 +121,26 @@ function request(route, { method = "POST", withOrigin = true, originValue = orig
   });
 }
 function campaign(id, date, hour, metrics, channel = "SEARCH") {
-  return { campaign: { id, name: `Campaign ${id}`, status: "ENABLED", advertisingChannelType: channel }, segments: { date, hour }, metrics };
+  return { campaign: { id, name: `Campaign ${id}`, status: "ENABLED", advertisingChannelType: channel }, segments: { date, hour, ...(metrics.conversions === undefined ? {} : { conversionAction: purchaseResource }) }, metrics };
 }
 function ad(id, date, metrics) {
-  return { campaign: { id: "1", name: "Campaign 1", status: "ENABLED" }, adGroup: { id: "11", name: "Ad group", status: "ENABLED" }, adGroupAd: { status: "ENABLED", ad: { id, name: `Ad ${id}`, type: "RESPONSIVE_SEARCH_AD" } }, segments: { date }, metrics };
+  return { campaign: { id: "1", name: "Campaign 1", status: "ENABLED" }, adGroup: { id: "11", name: "Ad group", status: "ENABLED" }, adGroupAd: { status: "ENABLED", ad: { id, name: `Ad ${id}`, type: "RESPONSIVE_SEARCH_AD" } }, segments: { date, ...(metrics.conversions === undefined ? {} : { conversionAction: purchaseResource }) }, metrics };
+}
+function purchaseAction(overrides = {}) {
+  return { resourceName: purchaseResource, name: "Purchase", status: "ENABLED", primaryForGoal: true, valueSettings: { alwaysUseDefaultValue: false, defaultValue: 0, defaultCurrencyCode: "EUR" }, ...overrides };
 }
 function goodResponse(call) {
   const { query, pageToken } = call;
   if (query.includes("FROM customer")) return Response.json({ results: [{ customer: { id: customerId, descriptiveName: "Test account", currencyCode: "EUR", timeZone: "Europe/Sarajevo" } }] });
   if (query.includes("FROM conversion_action")) {
     assert.match(query, /conversion_action\.category = 'PURCHASE'/);
-    return Response.json({ results: [{ conversionAction: { name: "Purchase", primaryForGoal: true } }, { conversionAction: { name: "Secondary purchase", primaryForGoal: false } }] });
+    for (const field of ["always_use_default_value", "default_value", "default_currency_code"]) assert.ok(query.includes(`conversion_action.value_settings.${field}`));
+    return Response.json({ results: [{ conversionAction: purchaseAction() }, { conversionAction: purchaseAction({ resourceName: `${purchaseResource}2`, name: "Secondary purchase", primaryForGoal: false }) }] });
   }
   const purchases = query.includes("metrics.conversions");
   if (purchases) {
     assert.match(query, /segments\.conversion_action_category = 'PURCHASE'/);
+    assert.match(query, /segments\.conversion_action,/, "reported actions must be checked even when custom goals include secondary actions");
     assert.doesNotMatch(query, /metrics\.(cost_micros|impressions|clicks)/, "purchase segmentation must not repeat cost metrics");
   } else {
     assert.match(query, /metrics\.cost_micros/);
@@ -190,7 +197,7 @@ async function testConnectionAndQueries() {
   assert.equal(snapshot.campaigns.reduce((sum, row) => sum + row.purchaseValue, 0), 110.25);
   assert.equal(snapshot.campaigns.find((row) => row.campaignId === "3").cost, 0, "conversion-only campaign rows must survive");
   assert.equal(snapshot.ads.find((row) => row.adId === "112").purchaseValue, 50, "conversion-only ad rows must survive");
-  assert.deepEqual(snapshot.purchaseTracking, { configured: true, actions: ["Purchase"] });
+  assert.deepEqual(snapshot.purchaseTracking, { configured: true, actions: ["Purchase"], valueSettingsChecked: true, fixedValueActions: [] });
   assert.equal(calls.filter((call) => call.pageToken).length, 1, "all pages must be fetched");
   assert.equal(calls.length, 7);
   assert.deepEqual(authCalls.at(-1).options.scopes, ["https://www.googleapis.com/auth/adwords"]);
@@ -413,6 +420,102 @@ async function testSafeFailuresAndCredentials() {
   assert.equal(empty.purchaseTracking.configured, false, "missing purchase tracking must not look like confirmed zero sales");
 }
 
+async function testPurchaseValueSafeguards(originalSnapshot) {
+  const period = analytics.buildAdsPeriod({ kind: "workday", date: "2026-10-16" });
+  const reportFor = (snapshot) => analytics.buildAdsReport(snapshot, period, analytics.defaultAdsSettings());
+  const useActions = (actions, changePurchaseRow) => {
+    responseFor = async (call) => {
+      if (call.query.includes("FROM conversion_action")) return Response.json({ results: actions.map((conversionAction) => ({ conversionAction })) });
+      const response = goodResponse(call);
+      if (!changePurchaseRow || !call.query.includes("metrics.conversions")) return response;
+      const payload = await response.json();
+      payload.results.forEach(changePurchaseRow);
+      return Response.json(payload);
+    };
+  };
+  const fixedValue = { alwaysUseDefaultValue: true, defaultValue: 1, defaultCurrencyCode: "USD" };
+  useActions([purchaseAction({ valueSettings: fixedValue })]);
+  const fixed = await client.fetchGoogleAdsSnapshot();
+  assert.equal(fixed.purchaseTracking.valueSettingsChecked, true);
+  assert.deepEqual(fixed.purchaseTracking.fixedValueActions, ["Purchase"]);
+  assert.equal(fixed.campaigns.reduce((sum, row) => sum + row.purchaseValue, 0), 110.25, "the raw snapshot remains intact for future audits");
+  const fixedReport = reportFor(fixed);
+  assert.equal(fixedReport.summary.spendEur, 7);
+  assert.equal(fixedReport.summary.purchases, 1.75);
+  for (const item of [fixedReport.summary, ...fixedReport.campaigns, ...fixedReport.timeline, ...fixedReport.ads]) {
+    assert.equal(item.revenueBam, null, "fixed conversion values must never become reported sales");
+    assert.equal(item.roas, null, "fixed conversion values must never produce ROAS");
+  }
+  assert.ok(fixedReport.ads.every((row) => row.recommendation.decision === "tracking"));
+  store.saveAdsSnapshot(fixed);
+  const fixedResponse = await statusOf(() => dashboardRoute.GET(request("/api/ads?kind=workday&date=2026-10-16", { method: "GET" })), 200);
+  const fixedData = await fixedResponse.json();
+  assert.deepEqual(fixedData.tracking.fixedValueActions, ["Purchase"]);
+  assert.equal(fixedData.report.summary.revenueBam, null);
+  assert.equal(fixedData.report.summary.purchases, 1.75);
+
+  // A positive fallback value alone is not a fixed-value configuration.
+  useActions([purchaseAction({ valueSettings: { ...fixedValue, alwaysUseDefaultValue: false } })]);
+  const dynamic = await client.fetchGoogleAdsSnapshot();
+  assert.deepEqual(dynamic.purchaseTracking.fixedValueActions, []);
+  assert.equal(dynamic.purchaseTracking.valueSettingsChecked, true);
+  assert.equal(reportFor(dynamic).summary.roas, 110.25 / 7);
+
+  const secondary = purchaseAction({ resourceName: `${purchaseResource}2`, name: "Custom goal purchase", primaryForGoal: false, valueSettings: fixedValue });
+  useActions([purchaseAction(), secondary]);
+  const irrelevantSecondary = await client.fetchGoogleAdsSnapshot();
+  assert.deepEqual(irrelevantSecondary.purchaseTracking.fixedValueActions, [], "an unused secondary goal does not suppress verified purchase values");
+  useActions([purchaseAction(), secondary], (row) => { row.segments.conversionAction = secondary.resourceName; });
+  const customGoal = await client.fetchGoogleAdsSnapshot();
+  assert.deepEqual(customGoal.purchaseTracking.fixedValueActions, ["Custom goal purchase"], "custom goals can include secondary actions in conversions");
+  assert.equal(reportFor(customGoal).summary.roas, null);
+
+  useActions([purchaseAction({ status: "REMOVED", valueSettings: fixedValue })]);
+  const removedAction = await client.fetchGoogleAdsSnapshot();
+  assert.deepEqual(removedAction.purchaseTracking.fixedValueActions, ["Purchase"], "historical conversion sources must be audited even after removal");
+  for (const valueSettings of [undefined, {}, { alwaysUseDefaultValue: "false" }]) {
+    useActions([purchaseAction({ valueSettings })]);
+    const unknown = await client.fetchGoogleAdsSnapshot();
+    assert.equal(unknown.purchaseTracking.valueSettingsChecked, false);
+    assert.equal(reportFor(unknown).summary.roas, null);
+  }
+  for (const source of [undefined, `customers/${customerId}/conversionActions/unknown`]) {
+    useActions([purchaseAction()], (row) => { row.segments.conversionAction = source; });
+    const unknown = await client.fetchGoogleAdsSnapshot();
+    assert.equal(unknown.purchaseTracking.valueSettingsChecked, false, "every observed purchase source must be resolved");
+    assert.equal(reportFor(unknown).summary.roas, null);
+  }
+  useActions([]);
+  const noActions = await client.fetchGoogleAdsSnapshot();
+  assert.equal(noActions.purchaseTracking.configured, true, "observed purchases survive missing action metadata");
+  assert.equal(noActions.purchaseTracking.valueSettingsChecked, false);
+  assert.equal(reportFor(noActions).summary.purchases, 1.75);
+  assert.equal(reportFor(noActions).summary.roas, null);
+
+  const legacy = { ...originalSnapshot, purchaseTracking: { configured: true, actions: ["Purchase"] } };
+  assert.equal(reportFor(legacy).summary.roas, null, "legacy snapshots cannot assume purchase values were audited");
+  assert.equal(reportFor(legacy).summary.purchases, 1.75);
+
+  responseFor = goodResponse;
+  for (const invalid of ["2026-02-31", "2026-13-01", "2026-2-01", "2026-10-17T00:00:00Z", privateSentinel]) {
+    process.env.GOOGLE_ADS_REVENUE_VALID_FROM = invalid;
+    const before = calls.length;
+    await rejectsSafely(() => client.fetchGoogleAdsSnapshot(), /YYYY-MM-DD/);
+    assert.equal(calls.length, before, "invalid revenue cutoff must fail before authentication or report requests");
+  }
+  process.env.GOOGLE_ADS_REVENUE_VALID_FROM = "2026-10-17";
+  const corrected = await client.fetchGoogleAdsSnapshot();
+  assert.equal(corrected.purchaseTracking.revenueValidFrom, "2026-10-17");
+  assert.equal(reportFor(corrected).summary.roas, null, "a current configuration fix does not repair historical default values");
+  assert.equal(reportFor(corrected).summary.purchases, 1.75);
+  assert.ok(reportFor(corrected).ads.every((row) => row.recommendation.decision === "tracking"));
+  process.env.GOOGLE_ADS_REVENUE_VALID_FROM = "2028-02-29";
+  assert.equal((await client.fetchGoogleAdsSnapshot()).purchaseTracking.revenueValidFrom, "2028-02-29", "calendar validation accepts real leap days");
+  delete process.env.GOOGLE_ADS_REVENUE_VALID_FROM;
+  assert.equal((await client.fetchGoogleAdsSnapshot()).purchaseTracking.revenueValidFrom, undefined, "other accounts are not assigned an unsolicited history cutoff");
+  store.saveAdsSnapshot(originalSnapshot);
+}
+
 async function testInactiveParentStatus() {
   const cases = [
     ["PAUSED", "ENABLED", "ENABLED", "PAUSED"],
@@ -470,12 +573,13 @@ async function testSyncDeadline() {
 (async () => {
   const snapshot = await testConnectionAndQueries();
   await testRoutesAndValidation(snapshot);
+  await testPurchaseValueSafeguards(snapshot);
   await testForwardedOrigins();
   await testSyncAndCooldown();
   await testSafeFailuresAndCredentials();
   await testInactiveParentStatus();
   await testSyncDeadline();
-  console.log("Ads API tests passed: access control, same-origin writes, validation, purchase-only reporting, pagination, hourly limits, secret-safe errors, snapshot retention and sync cooldowns. No live data accessed.");
+  console.log("Ads API tests passed: access control, same-origin writes, validation, purchase-only reporting, fixed/unknown value safeguards, historical revenue cutoff, pagination, hourly limits, secret-safe errors, snapshot retention and sync cooldowns. No live data accessed.");
 })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => {
   sqlite.close();
   global.Date = OriginalDate;

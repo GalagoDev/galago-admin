@@ -34,7 +34,16 @@ export type AdsSnapshot = {
   toDate: string;
   campaigns: AdsCampaignHour[];
   ads: AdsAdDay[];
-  purchaseTracking: { configured: boolean; actions: string[] };
+  purchaseTracking: {
+    configured: boolean;
+    actions: string[];
+    /** Absent on legacy snapshots: value configuration has not been checked. */
+    valueSettingsChecked?: boolean;
+    /** Purchase actions that override event revenue with a fixed default. */
+    fixedValueActions?: string[];
+    /** First Europe/Sarajevo calendar date eligible after a known tracking fix. */
+    revenueValidFrom?: string;
+  };
 };
 
 export type AdsSettings = {
