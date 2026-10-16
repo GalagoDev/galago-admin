@@ -191,7 +191,7 @@ function checkedSettings(settings: AdsSettings): AdsSettings {
 }
 
 function recommend(
-  summary: AdsSummary, status: string, settings: AdsSettings, covered: boolean, fresh: boolean,
+  summary: AdsSummary, status: string, settings: AdsSettings, covered: boolean, fresh: boolean, hasObservedPurchases: boolean,
 ): AdsRecommendation {
   if (["PAUSED", "REMOVED", "DISABLED"].includes(status.toUpperCase())) {
     return { decision: "inactive", label: "Neaktivan", reason: "Oglas je pauziran ili uklonjen. Prikazani rezultati su historijski." };
@@ -201,6 +201,9 @@ function recommend(
   }
   if (summary.purchases === null) {
     return { decision: "tracking", label: "Provjeri praćenje", reason: "Google Ads nema potvrđenu konverziju kategorije kupovina. Bez nje nije moguće procijeniti prodaju i ROAS." };
+  }
+  if (!hasObservedPurchases) {
+    return { decision: "tracking", label: "Provjeri praćenje", reason: "Nema zabilježenih kupovina u cijeloj preuzetoj historiji računa. Provjeri da praćenje kupovina radi prije procjene zadržavanja ili pauziranja oglasa." };
   }
   if (summary.roas === null && summary.purchases > 0) {
     return { decision: "tracking", label: "Provjeri vrijednost", reason: "Kupovine postoje, ali vrijednost kupovine ili potrošnja potrebna za ROAS nedostaje. Provjeri vrijednosti konverzija." };
@@ -239,6 +242,7 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
   const timeZone = snapshot.account.timeZone;
   const currency = snapshot.account.currency.toUpperCase();
   const tracking = snapshot.purchaseTracking.configured;
+  const hasObservedPurchases = snapshot.campaigns.some((row) => row.purchases > 0);
   const warnings = new Set<string>();
   const fetchedAt = Date.parse(snapshot.fetchedAt);
   const snapshotFresh = Number.isFinite(fetchedAt) && timestamp - fetchedAt <= 6 * HOUR_MS;
@@ -248,6 +252,7 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
   }
   if (currency !== "EUR" && currency !== "BAM") warnings.add(`Valuta računa je ${currency}. Preračun u EUR/KM nije dostupan; ROAS se računa iz prihoda i potrošnje u izvornoj valuti.`);
   if (!tracking) warnings.add("Nije potvrđeno praćenje kupovina u Google Ads. Prodaja i ROAS ostaju nepoznati; ukupne narudžbe trgovine se ne pripisuju reklamama.");
+  if (tracking && !hasObservedPurchases) warnings.add("U preuzetoj historiji nema zabilježenih kupovina. Postojanje cilja kupovine ne potvrđuje da praćenje radi; provjeri praćenje prije procjene oglasa. Prikazane nule su vrijednosti koje je prijavio Google.");
   warnings.add("Prikazani povrat je ROAS (prihod od pripisanih kupovina / potrošnja oglasa), a ne dobit. Marža, dostava, povrati i ostali troškovi nisu odbijeni.");
 
   const accountFirstDate = dateKey(localParts(start, timeZone));
@@ -328,7 +333,7 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
     return {
       ...summary, id, name: row.adName || `Oglas ${row.adId}`, campaignName: row.campaignName,
       adGroupName: row.adGroupName, status: row.status, adType: row.adType,
-      recommendation: recommend(summary, row.status, settings, recommendationsCovered, snapshotFresh),
+      recommendation: recommend(summary, row.status, settings, recommendationsCovered, snapshotFresh, hasObservedPurchases),
     };
   });
   return {

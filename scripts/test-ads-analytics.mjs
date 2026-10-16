@@ -85,11 +85,14 @@ test("default settings require an explicit business target", () => {
 });
 
 test("recommendations use purchase, spend and click gates conservatively", () => {
+  // Real purchases elsewhere in the account's history establish observed tracking,
+  // without adding purchases to this ad's 14-day evaluation window.
+  const observedHistory = [hour({ date: "2026-09-20", purchases: 1, purchaseValue: 20 })];
   assert.equal(report().ads[0].recommendation.decision, "keep");
   assert.equal(report({ ads: [ad({ purchases: 2 })] }).ads[0].recommendation.decision, "wait");
-  assert.equal(report({ ads: [ad({ purchaseValue: 0, purchases: 0 })] }).ads[0].recommendation.decision, "review");
-  assert.equal(report({ ads: [ad({ cost: 5, purchaseValue: 0, purchases: 0 })] }).ads[0].recommendation.decision, "wait");
-  assert.equal(report({ ads: [ad({ clicks: 29, purchaseValue: 0, purchases: 0 })] }).ads[0].recommendation.decision, "wait");
+  assert.equal(report({ campaigns: observedHistory, ads: [ad({ purchaseValue: 0, purchases: 0 })] }).ads[0].recommendation.decision, "review");
+  assert.equal(report({ campaigns: observedHistory, ads: [ad({ cost: 5, purchaseValue: 0, purchases: 0 })] }).ads[0].recommendation.decision, "wait");
+  assert.equal(report({ campaigns: observedHistory, ads: [ad({ clicks: 29, purchaseValue: 0, purchases: 0 })] }).ads[0].recommendation.decision, "wait");
   assert.equal(report({ ads: [ad({ purchases: 3, purchaseValue: 100 })] }).ads[0].recommendation.decision, "keep");
   assert.equal(report({ ads: [ad({ purchases: 3, purchaseValue: 99 })] }).ads[0].recommendation.decision, "review");
 });
@@ -262,4 +265,32 @@ test("Performance Max warns that the individual ad list has narrower coverage", 
   const result = report({ campaigns: [hour({ channel: "PERFORMANCE_MAX" })] });
   assert.equal(result.summary.spendEur, 20);
   assert.ok(result.warnings.some((warning) => warning.includes("Performance Max") && warning.includes("grupe elemenata")));
+});
+
+
+test("a configured purchase goal without any observed purchases cannot recommend pausing ads", () => {
+  const result = report({
+    campaigns: [hour({ cost: 200, clicks: 300, purchases: 0, purchaseValue: 0 })],
+    ads: [ad({ cost: 200, clicks: 300, purchases: 0, purchaseValue: 0 })],
+  });
+  assert.equal(result.summary.purchases, 0, "preserve the actual zero Google reports");
+  assert.equal(result.summary.revenueBam, 0);
+  assert.equal(result.summary.roas, 0);
+  assert.equal(result.ads[0].recommendation.decision, "tracking");
+  assert.equal(result.ads[0].recommendation.label, "Provjeri praćenje");
+  assert.ok(result.ads[0].recommendation.reason.includes("Nema zabilježenih kupovina"));
+  assert.ok(result.warnings.some((warning) => warning.includes("Postojanje cilja kupovine ne potvrđuje")));
+  const inactive = report({ campaigns: [], ads: [ad({ status: "PAUSED", purchases: 0, purchaseValue: 0 })] });
+  assert.equal(inactive.ads[0].recommendation.decision, "inactive");
+});
+
+test("observed purchases before the evaluation window allow reviewing an underperforming ad", () => {
+  const result = report({
+    campaigns: [hour({ date: "2026-09-20", purchases: 1, purchaseValue: 20 }), hour({ purchases: 0, purchaseValue: 0 })],
+    ads: [ad({ purchases: 0, purchaseValue: 0 })],
+  });
+  assert.equal(result.summary.purchases, 0);
+  assert.equal(result.ads[0].purchases, 0);
+  assert.equal(result.ads[0].recommendation.decision, "review");
+  assert.ok(!result.warnings.some((warning) => warning.includes("Postojanje cilja kupovine ne potvrđuje")));
 });
