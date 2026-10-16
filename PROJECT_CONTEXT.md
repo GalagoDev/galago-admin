@@ -192,6 +192,7 @@ This was already being implemented for order list pages.
 - `Ne šalji – duplikat` keeps the row permanently in `Orders`, writes a `duplicate:` status in hidden column `L`, and excludes only that order from `Na dostavi`, totals, and courier exports. The decision can be reversed from `Nove narudžbe`.
 - Courier export is blocked while any order in the export window has an unresolved duplicate/return warning; direct export URLs enforce the same check server-side.
 - The `Excel do 08:00` button always remains visible in the orders header, including on mobile and when warnings exist. Warnings must never replace or hide the export button; the export endpoint still enforces the review check.
+- Blocked exports redirect to `/orders?view=export` inside the admin UI, not a plain-text error page. This review lists the exact active 08:00 export selection (including rows from older date blocks), rather than only the newest workday block. Single/bulk decisions and refresh preserve this view; bulk approval can cover multiple dates in this view. The Excel link uses native browser navigation for file downloads.
 
 ### Customer reklamacije workflow
 - `Reklamacije` is an authenticated operational panel backed by persistent SQLite storage.

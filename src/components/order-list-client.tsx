@@ -46,11 +46,13 @@ function RiskDecisionButton({
   decision,
   children,
   tone,
+  riskView,
 }: {
   order: SheetOrderRow;
   decision: "approve" | "duplicate" | "restore";
   children: ReactNode;
   tone: "approve" | "duplicate" | "restore";
+  riskView?: "export";
 }) {
   const classes = tone === "approve"
     ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/15"
@@ -62,6 +64,7 @@ function RiskDecisionButton({
     <form action={setOrderRiskDecisionAction}>
       <input type="hidden" name="order" value={riskReference(order)} />
       <input type="hidden" name="decision" value={decision} />
+      <input type="hidden" name="view" value={riskView ?? ""} />
       <RiskSubmitButton classes={classes}>{children}</RiskSubmitButton>
     </form>
   );
@@ -83,7 +86,7 @@ function RiskBadge({ risk }: { risk: OrderRiskAssessment }) {
   return null;
 }
 
-function RiskDetails({ order, risk }: { order: SheetOrderRow; risk: OrderRiskAssessment }) {
+function RiskDetails({ order, risk, riskView }: { order: SheetOrderRow; risk: OrderRiskAssessment; riskView?: "export" }) {
   if (risk.level === "none" && !risk.excluded) return null;
 
   return (
@@ -100,12 +103,12 @@ function RiskDetails({ order, risk }: { order: SheetOrderRow; risk: OrderRiskAss
       <div className="mt-3 flex flex-wrap gap-2">
         {risk.unresolved ? (
           <>
-            <RiskDecisionButton order={order} decision="approve" tone="approve">Provjereno, pošalji</RiskDecisionButton>
-            <RiskDecisionButton order={order} decision="duplicate" tone="duplicate">Ne šalji – duplikat</RiskDecisionButton>
+            <RiskDecisionButton order={order} riskView={riskView} decision="approve" tone="approve">Provjereno, pošalji</RiskDecisionButton>
+            <RiskDecisionButton order={order} riskView={riskView} decision="duplicate" tone="duplicate">Ne šalji – duplikat</RiskDecisionButton>
           </>
         ) : null}
         {risk.excluded ? (
-          <RiskDecisionButton order={order} decision="restore" tone="restore">Vrati među narudžbe</RiskDecisionButton>
+          <RiskDecisionButton order={order} riskView={riskView} decision="restore" tone="restore">Vrati među narudžbe</RiskDecisionButton>
         ) : null}
       </div>
     </div>
@@ -181,12 +184,14 @@ export function OrderListClient({
   allowRestoreToTransit = false,
   searchPlaceholder = "Traži ime, telefon, proizvod, ZIP...",
   riskAssessments,
+  riskView,
 }: {
   orders: SheetOrderRow[];
   allowReturns?: boolean;
   allowRestoreToTransit?: boolean;
   searchPlaceholder?: string;
   riskAssessments?: Record<number, OrderRiskAssessment>;
+  riskView?: "export";
 }) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -246,6 +251,7 @@ export function OrderListClient({
             <div className="flex flex-wrap items-center gap-2">
               {ordersToApprove.length > 0 ? (
                 <form action={approveAllOrderRisksAction}>
+                  <input type="hidden" name="view" value={riskView ?? ""} />
                   {ordersToApprove.map((order) => (
                     <input key={order.sheetRowNumber} type="hidden" name="order" value={riskReference(order)} />
                   ))}
@@ -352,7 +358,7 @@ export function OrderListClient({
                     </div>
                     {allowReturns ? <ReturnOrderForm order={order} fullWidth /> : null}
                     {allowRestoreToTransit ? <RestoreOrderForm order={order} fullWidth /> : null}
-                    {risk ? <RiskDetails order={order} risk={risk} /> : null}
+                    {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
                   </div>
                 ) : null}
               </article>
@@ -390,7 +396,7 @@ export function OrderListClient({
                   <p className="break-words font-semibold text-white">{order.primalac || "Bez imena"}</p>
                   {risk ? <div className="mt-2"><RiskBadge risk={risk} /></div> : null}
                   <p className="mt-1 text-xs text-neutral-500">{order.dateLabel || "-"}</p>
-                  {risk ? <RiskDetails order={order} risk={risk} /> : null}
+                  {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
                 </div>
                 <p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p>
                 <div className="min-w-0">

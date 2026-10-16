@@ -30,7 +30,9 @@ export function SheetRefreshButton({ path }: { path: string }) {
       title="Osvježi podatke iz Google Sheetsa"
       onClick={() => {
         startTransition(() => {
-          router.replace(`${path}?refresh=${Date.now()}`);
+          const url = new URL(path, window.location.origin);
+          url.searchParams.set("refresh", String(Date.now()));
+          router.replace(`${url.pathname}${url.search}`);
         });
       }}
       className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-sky-300/15 bg-sky-300/[0.06] text-sky-200 transition hover:bg-sky-300/10 disabled:cursor-wait disabled:opacity-60"

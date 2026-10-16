@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { redirect } from "next/navigation";
 
 import { markLastExportedOrder } from "@/lib/google-orders";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow, type SheetOrderRow } from "@/lib/google-sheets";
@@ -61,12 +62,7 @@ export async function GET() {
 
   const unresolvedRisks = unresolvedOrderRisks(assessOrderRisks(orders, rows, returnedRows));
   if (unresolvedRisks.length > 0) {
-    const names = orders
-      .filter((order) => unresolvedRisks.some((risk) => risk.sheetRowNumber === order.sheetRowNumber))
-      .slice(0, 8)
-      .map((order) => order.primalac)
-      .join(", ");
-    return new Response(`Prvo provjeri moguće duple narudžbe: ${names}.`, { status: 409 });
+    redirect("/orders?view=export&exportError=review&refresh=1#risk-alerts");
   }
 
   const missingPostalCodes = orders.filter((order) => !normalizeTelegramPostalCode(order.grad));

@@ -29,6 +29,7 @@ export function OrderListPage({
   headerAction,
   summaryExtra,
   riskAssessments,
+  riskView,
 }: {
   title: string;
   subtitle: string;
@@ -43,6 +44,7 @@ export function OrderListPage({
   headerAction?: ReactNode;
   summaryExtra?: ReactNode;
   riskAssessments?: Record<number, OrderRiskAssessment>;
+  riskView?: "export";
 }) {
   const activeOrders = orders.filter((order) => !order.appStatus.startsWith("duplicate:"));
   const totalAmount = roundOrderAmount(
@@ -101,6 +103,7 @@ export function OrderListPage({
             allowRestoreToTransit={allowRestoreToTransit}
             searchPlaceholder={searchPlaceholder}
             riskAssessments={riskAssessments}
+            riskView={riskView}
           />
         </section>
       </div>

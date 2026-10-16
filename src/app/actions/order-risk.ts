@@ -35,33 +35,37 @@ function parseDecision(value: FormDataEntryValue | null): OrderRiskDecision | nu
   return value === "approve" || value === "duplicate" || value === "restore" ? value : null;
 }
 
+function returnToOrders(formData: FormData, params: string) {
+  return `/orders?${formData.get("view") === "export" ? "view=export&" : ""}${params}`;
+}
+
 export async function setOrderRiskDecisionAction(formData: FormData) {
   if ((await cookies()).get(AUTH_COOKIE)?.value !== "ok") redirect("/login");
   const reference = parseReference(formData.get("order") ?? "");
   const decision = parseDecision(formData.get("decision"));
-  if (!reference || !decision) redirect("/orders?error=invalid-risk-decision");
+  if (!reference || !decision) redirect(returnToOrders(formData, "error=invalid-risk-decision"));
 
   try {
     await setOrderRiskDecision(reference, decision);
   } catch (error) {
     console.error("Order risk decision failed", error);
-    redirect("/orders?refresh=1&error=risk-update-failed");
+    redirect(returnToOrders(formData, "refresh=1&error=risk-update-failed"));
   }
 
   revalidatePath("/");
   revalidatePath("/orders");
   revalidatePath("/in-transit");
-  redirect(`/orders?risk=${decision}`);
+  redirect(returnToOrders(formData, `risk=${decision}`));
 }
 
 export async function approveAllOrderRisksAction(formData: FormData) {
   if ((await cookies()).get(AUTH_COOKIE)?.value !== "ok") redirect("/login");
   const values = formData.getAll("order");
-  if (values.length === 0 || values.length > 1000) redirect("/orders?error=invalid-risk-decision");
+  if (values.length === 0 || values.length > 1000) redirect(returnToOrders(formData, "error=invalid-risk-decision"));
   const references = values.map(parseReference);
   if (references.some((reference) => !reference)
-    || new Set(references.map((reference) => reference?.dateLabel)).size !== 1) {
-    redirect("/orders?error=invalid-risk-decision");
+    || (formData.get("view") !== "export" && new Set(references.map((reference) => reference?.dateLabel)).size !== 1)) {
+    redirect(returnToOrders(formData, "error=invalid-risk-decision"));
   }
 
   let count: number;
@@ -70,11 +74,11 @@ export async function approveAllOrderRisksAction(formData: FormData) {
     count = result.count;
   } catch (error) {
     console.error("Bulk order risk decision failed", error);
-    redirect("/orders?refresh=1&error=risk-update-failed");
+    redirect(returnToOrders(formData, "refresh=1&error=risk-update-failed"));
   }
 
   revalidatePath("/");
   revalidatePath("/orders");
   revalidatePath("/in-transit");
-  redirect(`/orders?risk=approve-all&count=${count}`);
+  redirect(returnToOrders(formData, `risk=approve-all&count=${count}`));
 }

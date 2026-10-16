@@ -10,6 +10,7 @@
     "test:matching": "node --experimental-strip-types ./scripts/test-order-matching.mjs",
     "test:order-risk": "node --experimental-strip-types ./scripts/test-order-risk.mjs",
     "test:order-risk-decisions": "node --experimental-strip-types ./scripts/test-order-risk-decisions.mjs",
+    "test:order-export-flow": "node ./scripts/test-order-export-flow.cjs",
     "test:copied-orders": "node --experimental-strip-types ./scripts/test-copied-orders.mjs",
     "test:statistics": "node --experimental-strip-types ./scripts/test-inventory-statistics.mjs",
     "test:shopify-inventory": "node --experimental-strip-types ./scripts/test-shopify-inventory-matching.mjs",
