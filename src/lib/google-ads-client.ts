@@ -38,7 +38,7 @@ export function getAdsConnection(): AdsDashboardData["connection"] {
   const serviceAccount = Boolean(process.env.GOOGLE_ADS_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 || process.env.GOOGLE_SERVICE_ACCOUNT_PATH);
   const credentialMode = oauth ? "oauth" : serviceAccount ? "service-account" : null;
   const missing = [!customerId ? "Google Ads ID računa" : "", !credentialMode ? "Google pristup za aplikaciju" : ""].filter(Boolean);
-  return { configured: missing.length === 0, customerId, credentialMode, missing };
+  return { source: "api", configured: missing.length === 0, customerId, credentialMode, missing };
 }
 
 function credentials() {

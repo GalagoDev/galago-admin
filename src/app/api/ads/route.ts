@@ -1,5 +1,5 @@
 import { isAuthenticated } from "@/lib/auth";
-import { getAdsConnection } from "@/lib/google-ads-client";
+import { getAdsConnection } from "@/lib/ads-source";
 import { readAdsSettings, readAdsState } from "@/lib/ads-store";
 import { buildAdsPeriod, buildAdsReport } from "@/lib/ads-analytics";
 import type { AdsDashboardData } from "@/lib/ads-types";

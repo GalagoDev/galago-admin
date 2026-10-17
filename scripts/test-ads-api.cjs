@@ -24,6 +24,7 @@ const envKeys = [
   "APP_PASSWORD",
   "GOOGLE_ADS_CUSTOMER_ID", "GOOGLE_ADS_LOGIN_CUSTOMER_ID", "GOOGLE_ADS_SYNC_SECRET",
   "GOOGLE_ADS_REVENUE_VALID_FROM",
+  "GOOGLE_ADS_REPORT_SPREADSHEET_ID",
   "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN",
   "GOOGLE_ADS_SERVICE_ACCOUNT_JSON", "GOOGLE_SERVICE_ACCOUNT_JSON",
   "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "GOOGLE_SERVICE_ACCOUNT_PATH",
@@ -181,7 +182,7 @@ async function rejectsSafely(run, expected) {
 }
 
 async function testConnectionAndQueries() {
-  assert.deepEqual(client.getAdsConnection(), { configured: true, customerId, credentialMode: "service-account", missing: [] });
+  assert.deepEqual(client.getAdsConnection(), { source: "api", configured: true, customerId, credentialMode: "service-account", missing: [] });
   process.env.GOOGLE_ADS_CUSTOMER_ID = "bad-customer";
   assert.equal(client.getAdsConnection().configured, false);
   await rejectsSafely(() => client.fetchGoogleAdsSnapshot(), /ID računa/);

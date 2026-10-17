@@ -112,6 +112,7 @@ export type AdsReport = {
 
 export type AdsDashboardData = {
   connection: {
+    source: "api" | "sheets";
     configured: boolean;
     customerId: string | null;
     credentialMode: "service-account" | "oauth" | null;

@@ -1,15 +1,20 @@
 import "server-only";
 
-import { fetchGoogleAdsSnapshot, getAdsConnection } from "@/lib/google-ads-client";
-import { claimAdsSync, failAdsSync, saveAdsSnapshot } from "@/lib/ads-store";
+import { fetchAdsSnapshot, getAdsConnection } from "@/lib/ads-source";
+import { claimAdsSync, failAdsSync, readAdsState, saveAdsSnapshot } from "@/lib/ads-store";
 
 export async function syncGoogleAds(manual = false) {
   const connection = getAdsConnection();
   if (!connection.configured || !connection.customerId) return { ok: false, error: "Google Ads još nije povezan." };
   // A database lock prevents duplicate work across multiple Node workers.
-  if (!claimAdsSync(connection.customerId, manual ? 5 * 60_000 : 60 * 60_000)) return { ok: true, skipped: true };
+  if (!claimAdsSync(connection.customerId, manual ? 5 * 60_000 : connection.source === "sheets" ? 5 * 60_000 : 60 * 60_000)) return { ok: true, skipped: true };
   try {
-    saveAdsSnapshot(await fetchGoogleAdsSnapshot());
+    const snapshot = await fetchAdsSnapshot();
+    const previous = readAdsState(connection.customerId).snapshot;
+    if (previous && Date.parse(snapshot.fetchedAt) < Date.parse(previous.fetchedAt)) {
+      throw new Error("Izvoz je stariji od posljednjih sačuvanih podataka. Prethodni izvještaj ostaje sačuvan.");
+    }
+    saveAdsSnapshot(snapshot);
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Google Ads sinhronizacija nije uspjela.";

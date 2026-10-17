@@ -17,7 +17,7 @@
     "test:telegram-caption": "node --experimental-strip-types ./scripts/test-telegram-order-caption.mjs",
     "test:telegram-api-errors": "node --experimental-strip-types ./scripts/test-telegram-api-errors.mjs",
     "test:order-window": "node --experimental-strip-types ./scripts/test-order-window.mjs",
-    "test:ads": "node --experimental-strip-types ./scripts/test-ads-analytics.mjs && node ./scripts/test-ads-api.cjs",
+    "test:ads": "node --experimental-strip-types ./scripts/test-ads-analytics.mjs && node ./scripts/test-ads-api.cjs && node ./scripts/test-ads-sheets.cjs && node ./scripts/test-google-ads-sheet-export.cjs",
     "test:session": "node ./scripts/test-session.cjs",
     "start": "next start",
     "start:prod": "next start --hostname 0.0.0.0 --port 3000",
