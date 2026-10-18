@@ -26,7 +26,8 @@ const navigationItems = [
   { href: "/receipts", label: "Računi", icon: FileText },
   { href: "/inventory", label: "Lager", icon: Warehouse },
   { href: "/stats", label: "Statistika", icon: BarChart3 },
-  { href: "/reklame", label: "Reklame", icon: Megaphone },
+  // A fresh URL bypasses the temporary host's old, unpurged static HTML entry.
+  { href: "/reklame?view=live", label: "Reklame", icon: Megaphone },
 ];
 
 export function AppNavigation() {
@@ -36,9 +37,10 @@ export function AppNavigation() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const menuOpen = openPath === pathname;
-  const isActive = (href: string) => href === "/"
-    ? pathname === "/"
-    : pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => {
+    const path = href.split("?")[0];
+    return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
+  };
   const activeLabel = navigationItems.find((item) => isActive(item.href))?.label || "Pregled";
 
   useEffect(() => {
