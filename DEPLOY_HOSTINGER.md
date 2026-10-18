@@ -202,6 +202,41 @@ totals, while individual-ad coverage is limited by Google's reporting resources.
 Validate with `npm run test:ads`, targeted ESLint, and `npm run build`. API tests
 mock Google requests and use SQLite in memory; they never access live accounts.
 
+## Meta advertising reports
+
+The Meta tab on `/reklame` reads hourly ad-level Insights through the existing
+server-only `META_ADS_ACCESS_TOKEN` with `ads_read`. Set
+`META_REPORT_AD_ACCOUNT_IDS` to the account IDs intended for this advertising
+dashboard. It overrides `META_AD_ACCOUNT_IDS` only for this report; existing daily
+statistics keep their original account scope. Galago's reporting account is
+`1270654995072639` (USD, Europe/Sarajevo). The other existing account must not be
+included in Galago advertising totals by accident.
+
+The authenticated `/api/ads/meta` route accepts the same period filters as Google.
+Account IDs come exclusively from server configuration. Hourly ad rows are
+filtered to the Sarajevo 08:00 workday/weekend boundaries; totals, campaigns and
+individual ads all use those same rows. The client explicitly requests
+`action_report_time=conversion` and `use_unified_attribution_setting=true`.
+
+Purchase revenue uses `offsite_conversion.fb_pixel_purchase` only. Meta's
+`omni_purchase`, `purchase` and other purchase aliases are not added together.
+The UI labels these metrics as web purchases and web revenue. Messaging purchase
+events without monetary values are not invented as revenue. Values are whatever
+the Meta purchase integration reports; this adapter does not add shipping or
+attempt to infer Shopify order totals. It does not combine attribution with
+Google, whose model can credit some of the same purchases.
+
+EUR/BAM uses the fixed 1.95583 rate. Other account currencies use the date's
+reference conversion through the same Frankfurter service as daily statistics,
+or `META_ADS_TO_BAM_RATES_JSON` overrides. Unavailable rates or purchase values
+keep affected totals unknown. Requests are bounded and paginated; incomplete
+downloads do not become zero activity. Refresh uses a five-minute cache, with a
+one-minute minimum between manual reloads. Credentials stay on the server.
+
+Validate with `npm run test:meta-ads`, `npm run test:ads`, targeted ESLint and
+`npm run build`. Meta API tests use isolated fixtures and do not need live tokens.
+Live verification must compare the same account, dates and attribution in Meta.
+
 ## Shopify multi-store webhooks
 Shopify orders are handled by `shopify-webhook.gs` in Google Apps Script, not by the Hostinger Node app.
 

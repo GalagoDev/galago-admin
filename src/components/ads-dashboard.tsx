@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { ArrowDownRight, ArrowUpRight, Check, ChevronDown, Clock3, Info, Megaphone, RefreshCw, Settings2, TriangleAlert } from "lucide-react";
 
 import type { AdsDashboardData, AdsPeriodKind, AdsRecommendation, AdsReport, AdsSettings, AdsSummary } from "@/lib/ads-types";
+import { MetaAdsDashboard, type AdsPeriodSelection, type AdsPeriodSelectionProps } from "@/components/meta-ads-dashboard";
 
 const panel = "rounded-2xl border border-white/10 bg-[#111214] lg:rounded-xl";
 const input = "mt-1.5 h-11 w-full min-w-0 rounded-lg border border-white/15 bg-[#0b0c0e] px-3 text-sm text-white outline-none focus:border-sky-300/60 [color-scheme:dark]";
@@ -202,10 +203,20 @@ function SettingsForm({ settings, onSaved }: { settings: AdsSettings; onSaved: (
 }
 
 export function AdsDashboard() {
-  const [kind, setKind] = useState<AdsPeriodKind>("workday");
-  const [date, setDate] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [provider, setProvider] = useState<"google" | "meta">("google");
+  const [period, setPeriod] = useState<AdsPeriodSelection>({ kind: "workday", date: "", from: "", to: "" });
+
+  return provider === "meta"
+    ? <MetaAdsDashboard onGoogle={() => setProvider("google")} period={period} onPeriodChange={setPeriod} />
+    : <GoogleAdsDashboard onMeta={() => setProvider("meta")} period={period} onPeriodChange={setPeriod} />;
+}
+
+function GoogleAdsDashboard({ onMeta, period, onPeriodChange }: AdsPeriodSelectionProps & { onMeta: () => void }) {
+  const { kind, date, from, to } = period;
+  const setKind = (kind: AdsPeriodKind) => onPeriodChange((previous) => ({ ...previous, kind }));
+  const setDate = (date: string) => onPeriodChange((previous) => ({ ...previous, date }));
+  const setFrom = (from: string) => onPeriodChange((previous) => ({ ...previous, from }));
+  const setTo = (to: string) => onPeriodChange((previous) => ({ ...previous, to }));
   const [payload, setPayload] = useState<{ query: string; data: AdsDashboardData } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -298,7 +309,7 @@ export function AdsDashboard() {
   return <main className="min-h-screen bg-[#09090b] text-neutral-50 lg:pl-60"><div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 pb-10 pt-4 sm:px-5 lg:max-w-[1480px] lg:gap-5 lg:px-8 lg:pt-8 2xl:px-10">
     <header className={`${panel} p-4 lg:p-6`}>
       <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-medium uppercase tracking-[0.22em] text-neutral-500">Galago Admin</p><h1 className="mt-2 flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white"><Megaphone className="h-5 w-5 text-sky-300" aria-hidden="true" />Reklame</h1><p className="mt-2 text-xs leading-5 text-neutral-400 sm:text-sm">Vidi koliko ulažeš i koliko reklame donose.</p></div><button type="button" onClick={() => void sync()} disabled={busy || !data?.connection.configured} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 text-xs font-medium text-neutral-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40" title={sheetsSource ? "Uvezi posljednji dostupni izvoz iz Google Sheets" : "Preuzmi nove podatke iz Google Ads"}><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} aria-hidden="true" />{busy ? "Osvježavanje…" : "Osvježi"}</button></div>
-      <div className="mt-5 flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-2 rounded-lg border border-sky-300/25 bg-sky-300/10 px-3 py-2 text-xs font-semibold text-sky-100"><span className="h-1.5 w-1.5 rounded-full bg-sky-300" />Google Ads</span><span className="inline-flex items-center gap-2 rounded-lg border border-white/[0.06] px-3 py-2 text-xs text-neutral-500">Meta Ads<span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] uppercase">Kasnije</span></span></div>
+      <div role="group" aria-label="Platforma reklama" className="mt-5 flex flex-wrap items-center gap-2"><button type="button" aria-pressed="true" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sky-300/25 bg-sky-300/10 px-3 py-2 text-xs font-semibold text-sky-100"><span className="h-1.5 w-1.5 rounded-full bg-sky-300" />Google Ads</button><button type="button" aria-pressed="false" onClick={onMeta} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-neutral-400 transition hover:bg-white/[0.04] hover:text-white">Meta Ads</button></div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-white/[0.07] pt-3 text-[10px] leading-5 text-neutral-500"><span>{data ? data.connection.configured ? `${data.account?.name || "Google Ads račun"}${data.account?.id ? ` · ${data.account.id}` : ""}` : "Google Ads nije povezan" : loading ? "Učitavanje podataka…" : "Podaci nisu dostupni"}</span><span aria-live="polite">{sheetsSource ? "Posljednji izvoz iz Google Ads" : "Posljednja sinhronizacija"}: <span className={stale ? "text-amber-200" : "text-neutral-400"}>{dateTime(data?.sync.lastSuccessAt)}</span> · pregled se osvježava svake minute</span></div>
     </header>
 

@@ -4,6 +4,8 @@ import type {
   AdsPeriod, AdsPeriodKind, AdsRecommendation, AdsReport, AdsSettings, AdsSnapshot, AdsSummary,
 } from "./ads-types.ts";
 
+export { hourInstants as getAdsHourInstants, localParts as getAdsLocalParts };
+
 const SARAJEVO = "Europe/Sarajevo";
 const BAM_PER_EUR = 1.95583;
 const DAY_MS = 86_400_000;
