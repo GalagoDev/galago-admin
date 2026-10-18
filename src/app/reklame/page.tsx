@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 import { AdsDashboard } from "@/components/ads-dashboard";
 
@@ -7,6 +8,8 @@ export const metadata: Metadata = {
   description: "Potrošnja, prodaja i rezultati Google i Meta reklama.",
 };
 
-export default function AdsPage() {
+export default async function AdsPage() {
+  // Keep the admin shell out of shared CDN caches across deployments.
+  await connection();
   return <AdsDashboard />;
 }
