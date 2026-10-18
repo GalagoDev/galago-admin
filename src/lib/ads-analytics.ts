@@ -287,7 +287,6 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
   if (tracking && !hasObservedPurchases) warnings.add(`U preuzetoj historiji${revenueCutoff !== null ? ` od ${readableDate(revenueValidFrom!)} (Sarajevo)` : ""} nema zabilježenih kupovina. Postojanje cilja kupovine ne potvrđuje da praćenje radi; provjeri praćenje prije procjene oglasa. Prikazani broj kupovina potiče iz Google izvještaja.`);
   if (tracking && purchaseValueStatus === "fixed") warnings.add(`Google Ads koristi fiksnu vrijednost za ciljeve kupovine: ${fixedValueActions.join(", ")}. Broj kupovina ostaje prikazan, ali prihod i ROAS čekaju stvarne iznose i valute transakcija.`);
   if (tracking && purchaseValueStatus === "unknown") warnings.add("Konfiguracija vrijednosti kupovina još nije provjerena. Broj kupovina ostaje prikazan, a prihod i ROAS čekaju provjeru i novo osvježavanje Google Ads podataka.");
-  warnings.add("Prikazani povrat je ROAS (prihod od pripisanih kupovina / potrošnja oglasa), a ne dobit. Marža, dostava, povrati i ostali troškovi nisu odbijeni.");
 
   const accountFirstDate = dateKey(localParts(start, timeZone));
   const accountLastDate = dateKey(localParts(Math.max(start, effectiveEnd - 1), timeZone));
@@ -347,10 +346,6 @@ export function buildAdsReport(snapshot: AdsSnapshot, period: AdsPeriod, setting
   const recommendationTo = shiftDate(recommendationEndExclusive, -1);
   const recommendationValueStatus: PurchaseValueStatus = invalidRevenueCutoff ? "unknown"
     : currentValueStatus === "dynamic" && revenueCutoff !== null && atMidnight(recommendationFrom, timeZone) < revenueCutoff ? "unverified-history" : currentValueStatus;
-  if (tracking && (purchaseValueStatus === "unverified-history" || recommendationValueStatus === "unverified-history")) {
-    warnings.add(`Prva dopuštena granica za procjenu prihoda je ${readableDate(revenueValidFrom!)} 00:00 (Sarajevo). Promjena konfiguracije ne popravlja ranije vrijednosti i sama ne potvrđuje slanje stvarnog iznosa kupovine; prihod i ROAS za periode koji počinju prije granice ostaju nepoznati.`);
-  }
-  if (tracking && recommendationValueStatus === "unverified-history") warnings.add("Četrnaestodnevni period procjene oglasa još uključuje neprovjerene vrijednosti kupovina. Preporuke čekaju cijeli period s pouzdanim prihodom.");
   const recommendationsCovered = snapshot.fromDate <= recommendationFrom && snapshot.toDate >= recommendationTo;
   if (!recommendationsCovered) warnings.add("Historija ne pokriva svih 14 dana procjene oglasa. Pouzdane preporuke čekaju potpunu sinhronizaciju.");
   const adTotals = new Map<string, { row: AdsAdDay; totals: Totals }>();

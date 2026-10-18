@@ -370,8 +370,6 @@ test("a selected range crossing the first eligible Sarajevo day keeps counts but
     assert.equal(summary.revenueBam, null);
     assert.equal(summary.roas, null);
   }
-  assert.ok(result.warnings.some((warning) => warning.includes("02.10.2026. 00:00 (Sarajevo)")));
-  assert.ok(result.warnings.some((warning) => warning.includes("ne popravlja ranije vrijednosti")));
 });
 
 test("selected ranges beginning exactly at the eligible Sarajevo midnight can show revenue", () => {
