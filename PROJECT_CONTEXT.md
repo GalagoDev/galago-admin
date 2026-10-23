@@ -28,6 +28,24 @@ It is **not** intended to be the main place where a human manually types orders.
 
 ## Source of truth
 
+### Bedly Ananas integration (2026-10-23)
+
+- Ananas production uses the existing Galago merchant account. Bedly is a second catalog source restricted to two pillows; pajamas and blankets are excluded.
+- Bedly prices, descriptions and images come from the documented Shopify Ajax Product API at `bedly.ba`. Each fetch verifies BAM currency. No new Shopify credentials or permissions are needed for this public product data.
+- Bedly stock comes from the Administrator panel's `inventory_products`, not Shopify stock: SKU `16` is Bedly ergonomski jastuk; SKU `17` is Bedly cloud jastuk. Exact SKU/name matching is mandatory.
+- Cloud is a **set of two** sold at the Shopify product price (49 BAM at setup). Ananas stock is `floor(admin quantity / 2)`: 298 pillows = 149 sets. Staff record two physical pillows consumed per set in the existing inventory workflow. This feed does not itself import orders or deduct stock from Ananas sales.
+- Ergonomski is one pillow per sales unit (295 available at setup, regular 98 BAM / sale 49 BAM).
+- Bedly mapping IDs and external IDs use `bedly:` prefixes. Merchant SKUs are `BEDLY-16` and `BEDLY-17-SET2`. Stable internal EANs follow the existing `20` + variant suffix + check digit convention, not GS1 assignments.
+- Both Shopify weights are unset; the existing Ananas configured 1 kg package fallback is used until actual packed weights are supplied.
+- Existing scheduled reconciliations include both sources and continue Galago even if Bedly fails. Targeted runs accept `source: "bedly"`; authenticated status `?source=bedly` previews only these products and their saved links.
+- `ANANAS_BEDLY_ENABLED=false` disables Bedly fetching/sync. Never add Bedly to `getShopifyProductsForAnanas`: that function also powers the separate Galago → local Lager flow.
+
+### Bazzar integration — reviewed, not implemented
+
+- User requested documentation review only; do not activate Bazzar without a new implementation request.
+- XML can carry catalog, stock, regular and discounted prices. Await Bazzar's answers about BAM/PDV, required `vendor_price`, displayed selling prices, polling/listing cadence, discount end semantics and product removal/zero-stock handling.
+- Documentation: https://bazzar.ba/pages/xml-sync-documentation
+
 Main operational sheets:
 - `Orders` (the permanent order ledger and active `Na dostavi` source)
 - `Delivered orders` (created on first confirmed courier import)

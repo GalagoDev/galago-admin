@@ -66,6 +66,7 @@ export type AnanasDiscountScheduleResult = {
 };
 
 export type ShopifyProductWebhook = {
+  source_store?: "bedly";
   id: number;
   title: string;
   body_html?: string | null;

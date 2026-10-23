@@ -145,8 +145,8 @@ export function mapShopifyProductToAnanas(
     }
 
     return {
-      shopifyProductId: String(product.id),
-      shopifyVariantId: String(variant.id),
+      shopifyProductId: product.source_store ? `${product.source_store}:${product.id}` : String(product.id),
+      shopifyVariantId: product.source_store ? `${product.source_store}:${variant.id}` : String(variant.id),
       shopifyInventoryItemId: variant.inventory_item_id ? String(variant.inventory_item_id) : null,
       importProduct: errors.length
         ? null
@@ -164,7 +164,7 @@ export function mapShopifyProductToAnanas(
             vat,
             stockLevel,
             sku,
-            externalId: String(variant.id),
+            externalId: product.source_store ? `${product.source_store}:${variant.id}` : String(variant.id),
             productType: product.product_type?.trim() || null,
             category: product.product_type?.trim() || null,
             attributes,

@@ -32,6 +32,7 @@ import type {
   ShopifyProductWebhook,
 } from "@/lib/ananas-types";
 import { getShopifyProductsForAnanas } from "@/lib/shopify-admin";
+import { getBedlyProductsForAnanas } from "@/lib/bedly-ananas";
 
 function numberEnv(name: string, fallback: number) {
   const parsed = Number(process.env[name]);
@@ -367,10 +368,25 @@ export async function runFullAnanasReconciliation(
     syncPricesStock?: boolean;
     syncDiscounts?: boolean;
     discountDate?: string;
+    source?: "galago" | "bedly" | "all";
   } = {},
 ) {
-  const products = await getShopifyProductsForAnanas({ limitProducts });
-  return syncShopifyProducts(products, options);
+  const source = options.source || "all";
+  const results = [];
+  const failures: string[] = [];
+  // Finish each source independently: a Bedly outage must not stop Galago sync.
+  for (const store of source === "all" ? ["galago", "bedly"] : [source]) {
+    try {
+      const products = store === "galago"
+        ? await getShopifyProductsForAnanas({ limitProducts })
+        : (await getBedlyProductsForAnanas()).slice(0, limitProducts);
+      results.push({ source: store, ...await syncShopifyProducts(products, options) });
+    } catch (error) {
+      failures.push(`${store}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (failures.length) throw new Error(failures.join("; "));
+  return { sources: results };
 }
 
 function invoiceKey(invoice: unknown) {
@@ -390,17 +406,18 @@ export async function syncAnanasInvoices(input: { dateFrom: string; dateTo: stri
 
 export async function processPendingAnanasJobs(limit = 10) {
   const jobs = claimPendingAnanasJobs(limit);
-  const results: Array<{ id: number; status: "succeeded" | "failed"; error?: string }> = [];
+  const results: Array<{ id: number; status: "succeeded" | "failed"; error?: string; result?: unknown }> = [];
 
   for (const job of jobs) {
     try {
       const payload = JSON.parse(job.payload_json) as Record<string, unknown>;
+      let result: unknown;
       if (job.job_type === "product_upsert") {
         await syncShopifyProductWebhook(payload as unknown as ShopifyProductWebhook);
       } else if (job.job_type === "inventory_update") {
         await syncShopifyInventoryWebhook(payload as unknown as ShopifyInventoryWebhook);
       } else if (job.job_type === "full_reconcile") {
-        await runFullAnanasReconciliation(
+        result = await runFullAnanasReconciliation(
           typeof payload.limitProducts === "number" ? payload.limitProducts : undefined,
           {
             submitCatalog: payload.submitCatalog !== false,
@@ -408,13 +425,14 @@ export async function processPendingAnanasJobs(limit = 10) {
             syncPricesStock: payload.syncPricesStock !== false,
             syncDiscounts: payload.syncDiscounts !== false,
             discountDate: typeof payload.discountDate === "string" ? payload.discountDate : undefined,
+            source: payload.source === "galago" || payload.source === "bedly" ? payload.source : "all",
           },
         );
       } else if (job.job_type === "invoice_sync") {
         await syncAnanasInvoices(payload as { dateFrom: string; dateTo: string; type?: "FISCAL" | "NON_FISCAL" });
       }
       completeAnanasJob(job.id);
-      results.push({ id: job.id, status: "succeeded" });
+      results.push({ id: job.id, status: "succeeded", ...(result ? { result } : {}) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Ananas sync error";
       failAnanasJob(job.id, job.attempts + 1, message);

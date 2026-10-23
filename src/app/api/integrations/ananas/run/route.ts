@@ -24,12 +24,18 @@ export async function POST(request: Request) {
     dateTo?: string;
     type?: "FISCAL" | "NON_FISCAL";
     discountDate?: string;
+    source?: "galago" | "bedly" | "all";
   };
   const action = body.action || "process";
+  if (body.source && !["galago", "bedly", "all"].includes(body.source)) {
+    return Response.json({ ok: false, error: "Unsupported source" }, { status: 400 });
+  }
+  const source = body.source || "all";
   let jobId: number | null = null;
 
   if (action === "test-catalog") {
-    jobId = enqueueAnanasJob("full_reconcile", "test-catalog", {
+    jobId = enqueueAnanasJob("full_reconcile", `test-catalog:${source}`, {
+      source,
       limitProducts: 10,
       submitCatalog: true,
       refreshIds: true,
@@ -40,7 +46,8 @@ export async function POST(request: Request) {
     if (!body.discountDate || !/^\d{4}-\d{2}-\d{2}$/.test(body.discountDate)) {
       return Response.json({ ok: false, error: "discountDate must use YYYY-MM-DD" }, { status: 400 });
     }
-    jobId = enqueueAnanasJob("full_reconcile", `test-discounts:${body.discountDate}`, {
+    jobId = enqueueAnanasJob("full_reconcile", `test-discounts:${source}:${body.discountDate}`, {
+      source,
       limitProducts: 10,
       submitCatalog: false,
       refreshIds: true,
@@ -49,7 +56,8 @@ export async function POST(request: Request) {
       discountDate: body.discountDate,
     });
   } else if (action === "import-catalog") {
-    jobId = enqueueAnanasJob("full_reconcile", "import-catalog", {
+    jobId = enqueueAnanasJob("full_reconcile", `import-catalog:${source}`, {
+      source,
       ...(body.limitProducts ? { limitProducts: body.limitProducts } : {}),
       submitCatalog: true,
       refreshIds: false,
@@ -57,7 +65,8 @@ export async function POST(request: Request) {
       syncDiscounts: false,
     });
   } else if (action === "refresh-ids") {
-    jobId = enqueueAnanasJob("full_reconcile", "refresh-ids", {
+    jobId = enqueueAnanasJob("full_reconcile", `refresh-ids:${source}`, {
+      source,
       ...(body.limitProducts ? { limitProducts: body.limitProducts } : {}),
       submitCatalog: false,
       refreshIds: true,
@@ -65,7 +74,8 @@ export async function POST(request: Request) {
       syncDiscounts: false,
     });
   } else if (action === "prices-stock") {
-    jobId = enqueueAnanasJob("full_reconcile", "prices-stock", {
+    jobId = enqueueAnanasJob("full_reconcile", `prices-stock:${source}`, {
+      source,
       ...(body.limitProducts ? { limitProducts: body.limitProducts } : {}),
       submitCatalog: false,
       refreshIds: true,
@@ -73,7 +83,8 @@ export async function POST(request: Request) {
       syncDiscounts: false,
     });
   } else if (action === "discounts") {
-    jobId = enqueueAnanasJob("full_reconcile", "discounts", {
+    jobId = enqueueAnanasJob("full_reconcile", `discounts:${source}`, {
+      source,
       ...(body.limitProducts ? { limitProducts: body.limitProducts } : {}),
       submitCatalog: false,
       refreshIds: true,
@@ -81,7 +92,8 @@ export async function POST(request: Request) {
       syncDiscounts: true,
     });
   } else if (action === "reconcile") {
-    jobId = enqueueAnanasJob("full_reconcile", "all-products", {
+    jobId = enqueueAnanasJob("full_reconcile", `all-products:${source}`, {
+      source,
       ...(body.limitProducts ? { limitProducts: body.limitProducts } : {}),
     });
   } else if (action === "invoices") {
