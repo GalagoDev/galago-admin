@@ -3,6 +3,7 @@ import { verifyIntegrationSecret } from "@/lib/shopify-ananas-auth";
 import { getBedlyProductsForAnanas } from "@/lib/bedly-ananas";
 import { mapShopifyProductToAnanas } from "@/lib/ananas-mapping";
 import { getAnanasLinkByVariantId } from "@/lib/ananas-store";
+import { getBedlyOrderSyncStatus } from "@/lib/bedly-ananas-orders";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   if (new URL(request.url).searchParams.get("source") === "bedly") {
     try {
       const products = await getBedlyProductsForAnanas();
-      return Response.json({ ok: true, source: "bedly", inventorySource: "admin-lager", products: products.flatMap((product) =>
+      return Response.json({ ok: true, source: "bedly", inventorySource: "admin-lager", orderSync: getBedlyOrderSyncStatus(), products: products.flatMap((product) =>
         mapShopifyProductToAnanas(product, { vat: 17, defaultWeightKg: Number(process.env.ANANAS_DEFAULT_PACKAGE_WEIGHT_KG) || 1 })
           .map((item) => ({ ...item, link: getAnanasLinkByVariantId(item.shopifyVariantId) || null }))),
       });

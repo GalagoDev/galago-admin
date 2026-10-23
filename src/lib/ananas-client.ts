@@ -66,6 +66,7 @@ async function getAccessToken() {
       scope: "public_api/full_access",
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
   });
   const payload = await readJson(response);
   if (!response.ok) throw apiError("POST", path, response.status, payload);
@@ -93,6 +94,7 @@ async function ananasRequest<T>(method: string, path: string, body?: unknown) {
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
   });
   const payload = await readJson(response);
   if (!response.ok) {
@@ -216,6 +218,48 @@ export function getAnanasInvoices(dateFrom: string, dateTo: string, type?: "FISC
 
 export function getAnanasMerchantWarehouses() {
   return ananasRequest<unknown>("GET", "/order/api/v1/merchant-integration/merchant-warehouses");
+}
+
+export type AnanasOrderItem = {
+  productEan: string;
+  productSku: string;
+  quantity: number;
+};
+export type AnanasOrder = { id: string; createdDate: string; items: AnanasOrderItem[] };
+export type AnanasShipment = {
+  orderId: string;
+  suborderId: string;
+  status: string;
+  items: Array<{
+    productEan: string;
+    productSku: string;
+    orderedQuantity: number;
+    confirmedQuantity: number | null;
+    packedQuantity: number | null;
+  }>;
+};
+
+async function orderPages<T>(path: string, parameters: Record<string, string>) {
+  const rows: T[] = [];
+  for (let page = 0; page < 1000; page++) {
+    const query = new URLSearchParams({ ...parameters, page: String(page), size: "100" });
+    const result = await ananasRequest<{ content: T[]; last: boolean; number: number }>("GET", `${path}?${query}`);
+    if (!Array.isArray(result.content) || typeof result.last !== "boolean" || result.number !== page) {
+      throw new Error("Invalid Ananas order pagination; refusing an incomplete inventory snapshot");
+    }
+    rows.push(...result.content);
+    if (result.last) return rows;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("Ananas order pagination limit reached");
+}
+
+export function getAnanasOrders(dateFrom: string, dateTo: string) {
+  return orderPages<AnanasOrder>("/order/api/v1/merchant-integration/orders", { dateFrom, dateTo });
+}
+
+export function getAnanasOrderShipments(orderId: string) {
+  return orderPages<AnanasShipment>("/order/api/v1/merchant-integration/outbound-orders/shipments", { search: orderId });
 }
 
 export function resetAnanasTokenCache() {

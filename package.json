@@ -8,6 +8,7 @@
     "build": "next build --webpack",
     "test:ananas": "node --experimental-strip-types ./scripts/test-ananas-mapping.mjs",
     "test:bedly-ananas": "node ./scripts/test-bedly-ananas.cjs",
+    "test:bedly-orders": "node ./scripts/test-bedly-ananas-orders.cjs",
     "test:matching": "node --experimental-strip-types ./scripts/test-order-matching.mjs",
     "test:order-risk": "node --experimental-strip-types ./scripts/test-order-risk.mjs",
     "test:order-risk-decisions": "node --experimental-strip-types ./scripts/test-order-risk-decisions.mjs",

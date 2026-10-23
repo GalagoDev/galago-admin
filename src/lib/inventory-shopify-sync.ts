@@ -3,6 +3,7 @@ import "server-only";
 import { getDb } from "@/lib/db";
 import { matchShopifyInventory } from "@/lib/inventory-shopify-matching";
 import { getShopifyProductsForAnanas } from "@/lib/shopify-admin";
+import { BEDLY_ANANAS_PRODUCTS } from "@/lib/bedly-ananas";
 
 const DEFAULT_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -73,7 +74,8 @@ async function runInventoryShopifySync(): Promise<InventoryShopifySyncResult> {
     .all() as Array<{ normalized_alias: string; product_id: number }>;
   const shopifyProducts = await getShopifyProductsForAnanas();
   const matched = matchShopifyInventory(
-    products.map((product) => ({
+    // Bedly inventory is owned by Admin + the Ananas consumption ledger, not Shopify.
+    products.filter((product) => !BEDLY_ANANAS_PRODUCTS.some((bedly) => bedly.inventorySku === product.sku)).map((product) => ({
       id: product.id,
       sku: product.sku || "",
       name: product.name,

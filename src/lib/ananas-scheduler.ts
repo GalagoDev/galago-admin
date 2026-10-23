@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { runFullAnanasReconciliation, syncAnanasInvoices } from "@/lib/ananas-sync";
+import { syncBedlyAnanasOrders } from "@/lib/bedly-ananas-orders";
 
 type ScheduledAction = "prices-stock" | "discounts" | "refresh-ids" | "import-catalog" | "invoices";
 
@@ -114,6 +115,12 @@ async function tick() {
   if (globalThis.galagoAnanasSchedulerRunning) return;
   globalThis.galagoAnanasSchedulerRunning = true;
   try {
+    // Five-minute persistent cooldown inside sync; independent of nightly jobs.
+    try {
+      await syncBedlyAnanasOrders();
+    } catch (error) {
+      console.error("Bedly Ananas order inventory sync failed", error);
+    }
     const clock = sarajevoClock();
     for (const action of dueActions(clock)) {
       if (!claimRun(clock.date, action)) continue;

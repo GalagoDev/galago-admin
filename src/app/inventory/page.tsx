@@ -4,6 +4,7 @@ import { syncInventoryFromShopifyAction } from "@/app/actions/inventory";
 import { getInventoryOverview } from "@/lib/inventory";
 import { normalizeInventoryName } from "@/lib/inventory-import";
 import { refreshInventoryFromShopifyIfStale } from "@/lib/inventory-shopify-sync";
+import { getBedlyOrderSyncStatus } from "@/lib/bedly-ananas-orders";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -94,6 +95,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     console.error("Automatic Shopify Lager refresh failed", error);
   }
   const inventory = getInventoryOverview();
+  const bedlyOrders = getBedlyOrderSyncStatus();
   const query = String(params.q || "").trim();
   const normalizedQuery = normalizeInventoryName(query);
   const requestedStatus = String(params.status || "all");
@@ -142,6 +144,19 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <h1 className="mt-2 text-lg font-semibold text-white">Lager</h1>
               <p className="mt-1 text-sm text-neutral-400">{stockSourceLabel}</p>
+              <p className="mt-2 text-xs text-neutral-400">
+                Bedly Ananas: {bedlyOrders.enabled ? "automatsko skidanje potvrđenih narudžbi · Cloud −2 / Ergonomski −1" : "automatsko skidanje je pauzirano"}.
+                {bedlyOrders.state?.last_success_at ? ` Zadnja provjera: ${formatDateTime(bedlyOrders.state.last_success_at)}.` : ""}
+                {bedlyOrders.enabled ? " Ove prodaje nemojte ponovo ručno skidati s lagera." : ""}
+              </p>
+              {bedlyOrders.enabled && (bedlyOrders.stale || bedlyOrders.state?.last_error || bedlyOrders.negativeStock.length > 0) ? (
+                <p role="status" className="mt-2 text-xs text-amber-200">
+                  Bedly Ananas zahtijeva provjeru: {bedlyOrders.negativeStock.length > 0
+                    ? "negativno stanje lagera."
+                    : bedlyOrders.state?.last_error ? "zadnje preuzimanje narudžbi nije uspjelo; sistem će pokušati ponovo."
+                      : "čeka se uspješna provjera narudžbi."}
+                </p>
+              ) : null}
               {inventory.shopifySync?.lastSuccessAt ? (
                 <p className="mt-1 text-xs text-neutral-600">
                   Povezano {inventory.shopifySync.matchedProducts} od {inventory.shopifySync.catalogProducts} lager artikala

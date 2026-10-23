@@ -17,6 +17,7 @@ let inventory = [];
 const links = new Map();
 const calls = [];
 Module._load = function (request, parent, isMain) {
+  if (request === "@/lib/bedly-ananas-orders") return { syncBedlyAnanasOrders: async () => ({}), getBedlyOrderSyncStatus: () => ({}) };
   if (request === "@/lib/db") return { getDb: () => ({ prepare: () => ({ all: (sku) => inventory.filter((row) => row.sku === sku) }) }) };
   if (request === "@/lib/ananas-client") return {
     importAnanasProducts: async (products) => { calls.push({ type: "import", products }); return { id: "test-import" }; },

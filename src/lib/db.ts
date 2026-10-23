@@ -253,6 +253,37 @@ export function getDb() {
       PRIMARY KEY(run_date, action)
     );
 
+    CREATE TABLE IF NOT EXISTS bedly_ananas_order_state (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      activated_at TEXT NOT NULL,
+      last_attempt_at TEXT,
+      last_success_at TEXT,
+      last_error TEXT,
+      lease_owner TEXT,
+      lease_until INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS bedly_ananas_order_stock (
+      order_id TEXT NOT NULL,
+      inventory_sku TEXT NOT NULL,
+      inventory_product_id INTEGER NOT NULL,
+      applied_units INTEGER NOT NULL CHECK(applied_units >= 0),
+      dispatched INTEGER NOT NULL DEFAULT 0,
+      statuses TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(order_id, inventory_sku),
+      FOREIGN KEY(inventory_product_id) REFERENCES inventory_products(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS bedly_ananas_stock_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      inventory_sku TEXT NOT NULL,
+      deducted_units INTEGER NOT NULL,
+      quantity_after REAL NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS receipt_batches_collection_date_idx
       ON receipt_batches(collection_date, id DESC);
     CREATE INDEX IF NOT EXISTS receipt_recipients_batch_idx

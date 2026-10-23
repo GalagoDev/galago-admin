@@ -1,6 +1,7 @@
 import { enqueueAnanasJob, getAnanasSyncSummary } from "@/lib/ananas-store";
 import { processPendingAnanasJobs } from "@/lib/ananas-sync";
 import { verifyIntegrationSecret } from "@/lib/shopify-ananas-auth";
+import { syncBedlyAnanasOrders, getBedlyOrderSyncStatus } from "@/lib/bedly-ananas-orders";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,6 +32,13 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Unsupported source" }, { status: 400 });
   }
   const source = body.source || "all";
+  if (action === "bedly-orders") {
+    try {
+      return Response.json({ ok: true, result: await syncBedlyAnanasOrders(true), orderSync: getBedlyOrderSyncStatus() });
+    } catch (error) {
+      return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+    }
+  }
   let jobId: number | null = null;
 
   if (action === "test-catalog") {

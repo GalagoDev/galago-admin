@@ -33,6 +33,7 @@ import type {
 } from "@/lib/ananas-types";
 import { getShopifyProductsForAnanas } from "@/lib/shopify-admin";
 import { getBedlyProductsForAnanas } from "@/lib/bedly-ananas";
+import { syncBedlyAnanasOrders } from "@/lib/bedly-ananas-orders";
 
 function numberEnv(name: string, fallback: number) {
   const parsed = Number(process.env[name]);
@@ -377,6 +378,8 @@ export async function runFullAnanasReconciliation(
   // Finish each source independently: a Bedly outage must not stop Galago sync.
   for (const store of source === "all" ? ["galago", "bedly"] : [source]) {
     try {
+      // Account for confirmed marketplace sales before publishing Admin availability.
+      if (store === "bedly" && options.syncPricesStock !== false) await syncBedlyAnanasOrders(true);
       const products = store === "galago"
         ? await getShopifyProductsForAnanas({ limitProducts })
         : (await getBedlyProductsForAnanas()).slice(0, limitProducts);
