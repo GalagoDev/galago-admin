@@ -80,6 +80,7 @@ async function getShopifyAccessToken() {
       client_secret: settings.clientSecret,
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
   });
   const payload = (await response.json()) as { access_token?: string; expires_in?: number; error?: string };
   if (!response.ok || !payload.access_token) {
@@ -104,6 +105,7 @@ async function shopifyGraphQl<T>(query: string, variables: Record<string, unknow
     },
     body: JSON.stringify({ query, variables }),
     cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
   });
   const payload = (await response.json()) as GraphQlResponse<T>;
   if (!response.ok || payload.errors?.length || !payload.data) {
@@ -221,18 +223,35 @@ const VARIANTS_QUERY = `#graphql
 export async function getShopifyProductsForAnanas(options: { limitProducts?: number } = {}) {
   const nodes: VariantNode[] = [];
   let after: string | null = null;
+  const seenCursors = new Set<string>();
+  const seenVariants = new Set<string>();
 
   for (;;) {
     const data: VariantPage = await shopifyGraphQl<VariantPage>(VARIANTS_QUERY, {
       after,
       query: "product_status:active",
     });
-    nodes.push(...data.productVariants.nodes);
+    for (const node of data.productVariants.nodes) {
+      if (seenVariants.has(node.legacyResourceId)) throw new Error("Duplicate Shopify variant in paginated catalog");
+      seenVariants.add(node.legacyResourceId);
+      nodes.push(node);
+    }
     const grouped = groupVariants(nodes);
     if (options.limitProducts && grouped.length >= options.limitProducts) {
       return grouped.slice(0, options.limitProducts);
     }
     if (!data.productVariants.pageInfo.hasNextPage) return grouped;
-    after = data.productVariants.pageInfo.endCursor;
+    const next = data.productVariants.pageInfo.endCursor;
+    if (!next || seenCursors.has(next) || data.productVariants.nodes.length === 0) throw new Error("Incomplete Shopify catalog pagination");
+    seenCursors.add(next);
+    after = next;
   }
+}
+
+export async function getShopifyProductsForBazzar() {
+  if (shopifyConfig().domain !== "wktcnu-i5.myshopify.com") throw new Error("Bazzar source must be the Galago Shopify store");
+  const data = await shopifyGraphQl<{ shop: { currencyCode: string } }>("query BazzarCurrency { shop { currencyCode } }", {});
+  if (data.shop.currencyCode !== "BAM") throw new Error("Bazzar prices require Shopify currency BAM");
+  // Full catalog, including zero-stock products; never use a product limit here.
+  return getShopifyProductsForAnanas();
 }

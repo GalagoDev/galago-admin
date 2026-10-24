@@ -253,6 +253,18 @@ export function getDb() {
       PRIMARY KEY(run_date, action)
     );
 
+    CREATE TABLE IF NOT EXISTS bazzar_feed_state (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      last_attempt_at TEXT NOT NULL,
+      last_success_at TEXT,
+      last_error TEXT,
+      offer_count INTEGER NOT NULL DEFAULT 0,
+      in_stock_count INTEGER NOT NULL DEFAULT 0,
+      discount_count INTEGER NOT NULL DEFAULT 0,
+      warnings_json TEXT NOT NULL DEFAULT '[]',
+      payload_hash TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS bedly_ananas_order_state (
       id INTEGER PRIMARY KEY CHECK(id = 1),
       activated_at TEXT NOT NULL,

@@ -144,6 +144,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <h1 className="mt-2 text-lg font-semibold text-white">Lager</h1>
               <p className="mt-1 text-sm text-neutral-400">{stockSourceLabel}</p>
+              <Link href="/integrations/bazzar" className="mt-2 inline-block text-xs text-sky-300 hover:text-sky-200">Bazzar XML integracija →</Link>
               <p className="mt-2 text-xs text-neutral-400">
                 Bedly Ananas: {bedlyOrders.enabled ? "automatsko skidanje potvrđenih narudžbi · Cloud −2 / Ergonomski −1" : "automatsko skidanje je pauzirano"}.
                 {bedlyOrders.state?.last_success_at ? ` Zadnja provjera: ${formatDateTime(bedlyOrders.state.last_success_at)}.` : ""}
