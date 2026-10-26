@@ -6,6 +6,7 @@ import { google } from "googleapis";
 import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 import { invalidateSheetCache } from "@/lib/google-sheets";
 import { createOrderFingerprint, type OrderIdentity } from "@/lib/order-fingerprint";
+import { parseSheetOrderRows } from "@/lib/sheet-order-parser";
 
 const SOURCE_SHEET = "Orders";
 const DELIVERED_SHEET = "Delivered orders";
@@ -397,12 +398,12 @@ async function appendStatusRows(
   });
 }
 
-async function performMove(references: OrderMoveReference[], destination: StatusDestination) {
+async function performMove(references: OrderMoveReference[], destination: StatusDestination, skipChecked = false) {
   const { sheets, spreadsheetId } = getSheetsClient();
   const sheetId = await ensureStatusSheet(sheets, spreadsheetId, destination);
   await ensureSourceStatusColumn(sheets, spreadsheetId);
   const [sourceResponse, statusIdsResponse] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:L` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:P` }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: `'${destination}'!K:K` }),
   ]);
   const sourceRows = sourceResponse.data.values ?? [];
@@ -418,6 +419,7 @@ async function performMove(references: OrderMoveReference[], destination: Status
     const sourceRow = sourceRows[sourceIndex];
     if (!sourceRow) continue;
     if (String(sourceRow[SOURCE_STATUS_CELL_INDEX] ?? "").trim()) continue;
+    if (skipChecked && String(sourceRow[15] ?? "").toUpperCase() === "TRUE") continue;
     const identity = rawOrderIdentity(sourceRow);
     if (!identity.primalac && !identity.brojTelefona && !identity.artikal) continue;
     if (createOrderFingerprint(identity) !== reference.fingerprint) continue;
@@ -502,8 +504,8 @@ async function performRestoreReturn(reference: OrderMoveReference) {
   return { restored: 1, skipped: 0 };
 }
 
-function queuedMove(references: OrderMoveReference[], destination: StatusDestination) {
-  const operation = moveQueue.then(() => performMove(references, destination));
+function queuedMove(references: OrderMoveReference[], destination: StatusDestination, skipChecked = false) {
+  const operation = moveQueue.then(() => performMove(references, destination, skipChecked));
   moveQueue = operation.then(() => undefined, () => undefined);
   return operation;
 }
@@ -514,6 +516,21 @@ export function markOrdersDelivered(references: OrderMoveReference[]) {
 
 export function moveOrderToReturns(reference: OrderMoveReference) {
   return queuedMove([reference], RETURNS_SHEET);
+}
+
+export function moveOrdersToReturns(references: OrderMoveReference[]) {
+  return queuedMove(references, RETURNS_SHEET, true);
+}
+
+export async function readReturnImportOrders() {
+  const { sheets, spreadsheetId } = getSheetsClient();
+  const response = await sheets.spreadsheets.values.get({ spreadsheetId, range: "'Orders'!A:P" });
+  const values = response.data.values ?? [];
+  return parseSheetOrderRows(SOURCE_SHEET, values).map(order => ({
+    ...order,
+    // Transition validation uses raw amounts, not the display parser's amount fallback.
+    fingerprint: createOrderFingerprint(rawOrderIdentity(values[order.sheetRowNumber - 1])),
+  }));
 }
 
 export function restoreReturnToTransit(reference: OrderMoveReference) {

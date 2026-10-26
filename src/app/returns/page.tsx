@@ -1,5 +1,6 @@
 import { OrderListPage } from "@/components/order-list-page";
 import { ReturnOrderPicker } from "@/components/return-order-picker";
+import { ExpressOneReturnStatus } from "@/components/expressone-return-status";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
 
 export const dynamic = "force-dynamic";
@@ -83,6 +84,7 @@ export default async function ReturnsPage({
       searchPlaceholder="Traži među evidentiranim povratima..."
       workflow={(
         <>
+          <ExpressOneReturnStatus />
           {notice ? (
             <div className={`mt-5 rounded-lg border px-4 py-3 text-sm ${notice.tone === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-red-300/20 bg-red-300/10 text-red-100"}`}>
               {notice.text}

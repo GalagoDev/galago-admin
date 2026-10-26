@@ -209,6 +209,30 @@ export function getDb() {
     CREATE INDEX IF NOT EXISTS claim_incoming_claim ON claim_email_incoming(claim_id, received_at);
     CREATE INDEX IF NOT EXISTS claim_gmail_due ON claim_gmail_threads(next_check_at, lease_until);
 
+    CREATE TABLE IF NOT EXISTS expressone_scan (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      next_run_at INTEGER NOT NULL DEFAULT 0,
+      lease_until INTEGER NOT NULL DEFAULT 0,
+      lease_token TEXT NOT NULL DEFAULT '',
+      last_success_at INTEGER,
+      last_error TEXT,
+      last_added INTEGER NOT NULL DEFAULT 0,
+      last_messages INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS expressone_messages (
+      gmail_id TEXT PRIMARY KEY,
+      received_at INTEGER NOT NULL,
+      tracking TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS expressone_shipments (
+      tracking TEXT PRIMARY KEY,
+      event_json TEXT NOT NULL,
+      first_status_at TEXT NOT NULL,
+      resolution TEXT NOT NULL DEFAULT 'pending',
+      order_status_id TEXT,
+      last_error TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS inventory_imports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       original_name TEXT NOT NULL,

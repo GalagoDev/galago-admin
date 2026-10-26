@@ -1,5 +1,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    if (process.env.EXPRESSONE_RETURNS_SCHEDULER_ENABLED !== "false") {
+      const { startExpressOneScheduler } = await import("@/lib/expressone-returns");
+      startExpressOneScheduler();
+    }
     if (process.env.CLAIMS_MESSAGING_SCHEDULER_ENABLED !== "false") {
       const { startClaimMessagingScheduler } = await import("@/lib/claim-messaging-worker");
       startClaimMessagingScheduler();
