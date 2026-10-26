@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Settings2 } from "lucide-react";
-import { getClaimReplies } from "@/lib/claim-messaging-store";
+import { getClaimIncoming, getClaimReplies } from "@/lib/claim-messaging-store";
 
 import { ReklamacijaDeleteButton } from "@/components/reklamacija-delete-button";
 import { ReklamacijaStatusForm } from "@/components/reklamacija-status-form";
@@ -84,6 +84,7 @@ function statusPresentation(status: string) {
 function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
   const status = statusPresentation(claim.status);
   const replies = getClaimReplies(claim.id);
+  const incoming = getClaimIncoming(claim.id);
   const replyLabels: Record<string, string> = { queued: "Na čekanju", sending: "Šalje se", sent: "Poslano", failed: "Nije poslano", unknown: "Provjeriti u Gmailu" };
 
   return (
@@ -177,6 +178,14 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
           </div>
         ) : null}
 
+        {incoming.length > 0 && <section className="mt-5 border-t border-white/10 pt-4">
+          <h3 className="text-sm font-medium">Odgovori kupca</h3>
+          <ol className="mt-3 divide-y divide-white/10">{incoming.map(reply => <li key={reply.gmail_id} className="py-3">
+            <p className="break-all text-xs text-sky-200">{reply.sender} · {formatDateTime(reply.received_at)}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-neutral-200">{reply.body || "Email bez tekstualnog sadržaja."}</p>
+            {!!reply.attachment_count && <p className="mt-2 text-xs text-neutral-400">Prilozi u Gmailu: {reply.attachment_count}</p>}
+          </li>)}</ol>
+        </section>}
         {replies.length > 0 && <section className="mt-5 border-t border-white/10 pt-4">
           <h3 className="text-sm font-medium">Email odgovori</h3>
           <ol className="mt-3 divide-y divide-white/10">

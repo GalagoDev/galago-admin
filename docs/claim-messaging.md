@@ -36,7 +36,15 @@ Email replies are deduplicated by both update ID and chat/message ID. Plain text
 
 Gmail send calls are not automatically retried. Network/5xx uncertainty or an interrupted in-flight send is marked `unknown`; staff must inspect Gmail Sent before submitting another reply. Explicit provider rejection is `failed`. Only a returned Gmail message ID produces `sent` and a success acknowledgement. Outcomes and reply bodies are visible inside each collapsed complaint card.
 
-No inbound mailbox monitoring, automatic customer replies, historical replay or attachment email sending is enabled. Disable processing by setting `enabled: false`; this does not revoke OAuth access. Revoke access in the Google account when retiring the integration.
+## Customer email replies
+
+The separate "Povezi odgovore kupaca" action requests `gmail.readonly` in addition to existing send and identity scopes. This broader Google permission requires owner approval. Until that consent succeeds, `read_enabled` stays false and no read calls occur. Partial or failed consent preserves the previous connection. Public privacy disclosures describe the scope and forwarding to Telegram.
+
+The application never searches the whole mailbox. It tracks Gmail thread IDs returned by successful complaint sends, and backfills older sent messages by their stored IDs. Each tracked conversation is checked about every two hours, including closed complaints. A durable per-thread lease prevents concurrent checks across processes; a 30-second work budget and small batches spread catch-up work. The existing 15-second worker tick only checks local scheduling state between due Gmail polls. Errors retry after two hours and appear on the connection page. Restarting does not reset check times.
+
+Metadata is fetched only for tracked conversations. Full message bodies are fetched only for the complaint customer's email address; outgoing messages, unrelated senders, spam, trash and drafts are ignored. New incoming Gmail IDs and Telegram outbox jobs commit together. MIME text/plain is preferred, HTML is converted to inert text, and email attachments are not downloaded. Telegram receives up to 20,000 characters plus an authenticated Gmail link; the admin record retains up to 100,000 characters. Replying to the Telegram notification sends through the same claim and Gmail thread using In-Reply-To/References. Customer email addresses are never taken from arbitrary Telegram text.
+
+No automatic customer replies or attachment email sending is enabled. Disable processing by setting `enabled: false`; this does not revoke OAuth access. Revoke access in the Google account when retiring the integration.
 
 ## Verification
 

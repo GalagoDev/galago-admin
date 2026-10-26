@@ -186,6 +186,28 @@ export function getDb() {
     );
     CREATE INDEX IF NOT EXISTS claim_outbox_pending ON claim_telegram_outbox(status, available_at);
     CREATE INDEX IF NOT EXISTS claim_replies_status ON claim_email_replies(status, id);
+    CREATE TABLE IF NOT EXISTS claim_gmail_threads (
+      thread_id TEXT PRIMARY KEY,
+      claim_id TEXT NOT NULL REFERENCES customer_return_claims(id) ON DELETE CASCADE,
+      next_check_at INTEGER NOT NULL DEFAULT 0,
+      lease_until INTEGER NOT NULL DEFAULT 0,
+      checked_at TEXT,
+      last_error TEXT
+    );
+    CREATE TABLE IF NOT EXISTS claim_email_incoming (
+      gmail_id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
+      claim_id TEXT NOT NULL REFERENCES customer_return_claims(id) ON DELETE CASCADE,
+      sender TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      rfc_message_id TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+      attachment_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS claim_incoming_claim ON claim_email_incoming(claim_id, received_at);
+    CREATE INDEX IF NOT EXISTS claim_gmail_due ON claim_gmail_threads(next_check_at, lease_until);
 
     CREATE TABLE IF NOT EXISTS inventory_imports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -376,6 +398,10 @@ export function getDb() {
   `);
 
   ensureColumn(database, "documents", "extracted_text", "ALTER TABLE documents ADD COLUMN extracted_text TEXT");
+  ensureColumn(database, "claim_gmail_connection", "read_enabled", "ALTER TABLE claim_gmail_connection ADD COLUMN read_enabled INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(database, "claim_oauth_states", "read_requested", "ALTER TABLE claim_oauth_states ADD COLUMN read_requested INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(database, "claim_email_replies", "gmail_thread_id", "ALTER TABLE claim_email_replies ADD COLUMN gmail_thread_id TEXT");
+  ensureColumn(database, "claim_email_replies", "thread_lookup_at", "ALTER TABLE claim_email_replies ADD COLUMN thread_lookup_at INTEGER NOT NULL DEFAULT 0");
   ensureColumn(database, "orders", "document_id", "ALTER TABLE orders ADD COLUMN document_id INTEGER");
   ensureColumn(database, "receipt_recipients", "pdf_uploaded_at", "ALTER TABLE receipt_recipients ADD COLUMN pdf_uploaded_at TEXT");
   ensureColumn(database, "receipt_recipients", "link_expires_at", "ALTER TABLE receipt_recipients ADD COLUMN link_expires_at TEXT");

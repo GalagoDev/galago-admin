@@ -71,14 +71,21 @@ export function getClaimReplies(claimId: string) {
   return getDb().prepare(`SELECT id, claim_id, recipient, body, sender_name, status, last_error, created_at, sent_at
     FROM claim_email_replies WHERE claim_id = ? ORDER BY id DESC LIMIT 100`).all(claimId) as ClaimReply[];
 }
+export function getClaimIncoming(claimId: string) {
+  return getDb().prepare(`SELECT gmail_id, sender, body, received_at, attachment_count FROM claim_email_incoming
+    WHERE claim_id = ? ORDER BY received_at DESC LIMIT 100`).all(claimId) as
+    { gmail_id: string; sender: string; body: string; received_at: string; attachment_count: number }[];
+}
 export function getClaimMessagingStatus() {
   const config = getClaimMessagingConfig();
   const db = getDb();
-  const gmail = db.prepare("SELECT email, connected_at FROM claim_gmail_connection WHERE id = 1").get() as { email: string; connected_at: string } | undefined;
+  const gmail = db.prepare("SELECT email, connected_at, read_enabled FROM claim_gmail_connection WHERE id = 1").get() as { email: string; connected_at: string; read_enabled: number } | undefined;
+  const inbox = db.prepare(`SELECT MAX(checked_at) AS checked_at, SUM(last_error IS NOT NULL) AS errors FROM claim_gmail_threads`).get() as { checked_at: string | null; errors: number };
   const counts = db.prepare(`SELECT
     SUM(CASE WHEN status IN ('pending','sending') THEN 1 ELSE 0 END) AS pending,
     SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed FROM claim_telegram_outbox`).get() as { pending: number; failed: number };
   const last = db.prepare("SELECT created_at FROM claim_telegram_outbox WHERE status = 'sent' ORDER BY rowid DESC LIMIT 1").get() as { created_at: string } | undefined;
   return { enabled: !!config?.enabled, gmailReady: !!(config?.gmailClientId && config?.gmailClientSecret),
-    gmail: gmail?.email || null, pending: counts.pending || 0, failed: counts.failed || 0, lastSent: last?.created_at || null };
+    gmail: gmail?.email || null, readEnabled: !!gmail?.read_enabled, inboxCheckedAt: inbox.checked_at, inboxErrors: inbox.errors || 0,
+    pending: counts.pending || 0, failed: counts.failed || 0, lastSent: last?.created_at || null };
 }

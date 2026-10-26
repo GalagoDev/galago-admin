@@ -8,7 +8,8 @@ export async function POST(request: Request) {
   if (!(await requireAuth())) return new Response("Unauthorized", { status: 401 });
   if (!isSameOriginRequest(request)) return new Response("Forbidden", { status: 403 });
   try {
-    const { url, browser } = beginClaimGmailConnection();
+    const form = await request.formData();
+    const { url, browser } = beginClaimGmailConnection(form.get("readReplies") === "1");
     const response = NextResponse.redirect(url, 303);
     response.cookies.set(CLAIM_OAUTH_COOKIE, browser, { httpOnly: true, secure: true, sameSite: "lax", path: CLAIM_OAUTH_PATH, maxAge: 600 });
     response.headers.set("Cache-Control", "no-store");

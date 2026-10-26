@@ -4,6 +4,7 @@ import { getClaimMessagingConfig } from "@/lib/claim-messaging-config";
 import { queueClaimTelegram } from "@/lib/claim-messaging-store";
 import { ClaimEmailSendError, sendClaimEmail } from "@/lib/claim-gmail";
 import { resolveCustomerReturnFile } from "@/lib/reklamacije";
+import { pollClaimGmailReplies } from "@/lib/claim-gmail-inbox";
 
 type TelegramJob = { id: string; claim_id: string; chat_id: string; text: string; file_id: string | null;
   reply_to_id: number | null; attempts: number };
@@ -31,12 +32,13 @@ async function sendTelegram(job: TelegramJob) {
   return result.result.message_id;
 }
 
-function finishReply(job: EmailJob, status: string, error: string | null, gmailId: string | null = null) {
+function finishReply(job: EmailJob, status: string, error: string | null, gmailId: string | null = null, threadId: string | null = null) {
   const db = getDb();
   db.transaction(() => {
-    const updated = db.prepare(`UPDATE claim_email_replies SET status = ?, last_error = ?, gmail_id = ?,
-      sent_at = CASE WHEN ? = 'sent' THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?`).run(status, error, gmailId, status, job.id);
+    const updated = db.prepare(`UPDATE claim_email_replies SET status = ?, last_error = ?, gmail_id = ?, gmail_thread_id = ?,
+      sent_at = CASE WHEN ? = 'sent' THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?`).run(status, error, gmailId, threadId, status, job.id);
     if (!updated.changes) return;
+    if (threadId) db.prepare("INSERT OR IGNORE INTO claim_gmail_threads (thread_id, claim_id) VALUES (?, ?)").run(threadId, job.claim_id);
     queueClaimTelegram(job.claim_id, `reply:${job.id}:result`, status === "sent"
       ? `Email poslan na ${job.recipient}.\n${job.reference}` : `Email: ${error}`, job.message_id);
   })();
@@ -63,8 +65,8 @@ export async function runClaimMessaging() {
     })();
     if (!job) break;
     try {
-      const gmailId = await sendClaimEmail(job.recipient, job.reference, job.body, job.id);
-      finishReply(job, "sent", null, gmailId);
+      const sent = await sendClaimEmail(job.recipient, job.reference, job.body, job.id);
+      finishReply(job, "sent", null, sent.id, sent.threadId);
     } catch (error) {
       const known = error instanceof ClaimEmailSendError;
       finishReply(job, known && !error.uncertain ? "failed" : "unknown", known ? error.message : "Ishod nije potvrđen. Provjerite Poslano u Gmailu prije ponovnog odgovora.");
@@ -90,6 +92,7 @@ export async function runClaimMessaging() {
           "Telegram slanje nije uspjelo. Provjerite bota i članstvo u grupi.", job.id);
     }
   }
+  await pollClaimGmailReplies();
 }
 
 declare global { var galagoClaimsTimer: ReturnType<typeof setInterval> | undefined; var galagoClaimsRun: Promise<void> | undefined; }
