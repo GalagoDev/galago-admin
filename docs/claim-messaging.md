@@ -22,6 +22,10 @@ Configure the client ID/secret privately and open `/reklamacije/povezivanje`. Th
 
 Google external apps left in Testing can have short-lived refresh grants. Complete the appropriate Google publishing/verification requirements before treating this as unattended production email. Do not broaden the scopes to read the inbox to work around setup issues.
 
+Google requires public app information, privacy and terms links for production. The prepared static pages are `/galago-reklamacije.html`, `/galago-reklamacije-privatnost.html` and `/galago-reklamacije-uslovi.html`. Only these exact paths and their stylesheet bypass the login proxy. Obtain owner approval before publishing the policy pages or changing OAuth audience to Production. After switching, reconnect the same account with the same scopes to obtain a fresh offline grant; do not assume an existing Testing grant loses its expiry automatically.
+
+Live verification on 2026-10-26: OAuth connection succeeded and a synthetic complaint `GAL-20261026-F69582` was delivered to the private group. The owner's Telegram Reply was accepted by Gmail for `galagodoo@gmail.com` and recorded as sent. The synthetic complaint was marked finished, not deleted. No customer email was used for this test. OAuth remains in Testing until the production publishing step is completed.
+
 ## Delivery semantics
 
 New complaints and notification jobs commit in one SQLite transaction. Existing complaints are not replayed on activation. Attachments stay private and are uploaded directly to Telegram as original documents. The worker runs every 15 seconds and immediately after incoming requests. It retries Telegram failures with backoff up to ten attempts. A lost Telegram response may create a duplicate notification; it cannot duplicate an email reply.

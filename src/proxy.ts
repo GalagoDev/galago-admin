@@ -4,8 +4,9 @@ import { AUTH_COOKIE, verifySession } from "@/lib/session";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isClaimInfo = ["/galago-reklamacije.html", "/galago-reklamacije-privatnost.html", "/galago-reklamacije-uslovi.html", "/galago-reklamacije.css"].includes(pathname);
 
-  if (pathname.startsWith("/_next") || pathname === "/login" || pathname.startsWith("/favicon") || pathname.startsWith("/r/")) {
+  if (isClaimInfo || pathname.startsWith("/_next") || pathname === "/login" || pathname.startsWith("/favicon") || pathname.startsWith("/r/")) {
     return NextResponse.next();
   }
 

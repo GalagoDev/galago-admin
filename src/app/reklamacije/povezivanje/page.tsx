@@ -33,6 +33,11 @@ export default async function ClaimConnectionsPage({ searchParams }: { searchPar
             </button>
           </form>
           {!state.gmailReady && <p className="mt-3 text-sm text-amber-200">Google OAuth postavke još nisu dodane.</p>}
+          <nav aria-label="Informacije o Gmail povezivanju" className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-neutral-400">
+            <a href="/galago-reklamacije.html" className="underline underline-offset-4">O aplikaciji</a>
+            <a href="/galago-reklamacije-privatnost.html" className="underline underline-offset-4">Privatnost</a>
+            <a href="/galago-reklamacije-uslovi.html" className="underline underline-offset-4">Uslovi korištenja</a>
+          </nav>
         </section>
       </div>
     </main>

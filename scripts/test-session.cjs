@@ -107,6 +107,13 @@ async function expectRedirect(run, location) {
   for (const pathname of ["/login", "/favicon.ico", "/_next/static/example.js", "/r/public-label.pdf"]) {
     assert.equal(route(pathname).headers.get("x-middleware-next"), "1", "existing public route exceptions stay accessible");
   }
+  for (const pathname of ["/galago-reklamacije.html", "/galago-reklamacije-privatnost.html", "/galago-reklamacije-uslovi.html", "/galago-reklamacije.css"]) {
+    assert.equal(route(pathname).headers.get("x-middleware-next"), "1", "OAuth information pages are public");
+    assert.ok(fs.existsSync(path.join(root, "public", pathname.slice(1))));
+  }
+  for (const pathname of ["/reklamacije", "/reklamacije/povezivanje", "/galago-reklamacije.html/private", "/galago-reklamacije-secret.json"]) {
+    assert.equal(route(pathname).status, 307, "public information must not expose admin or similarly named private paths");
+  }
   cookieValues.delete(session.AUTH_COOKIE);
   assert.equal(await auth.isAuthenticated(), false);
   await expectRedirect(() => actions.loginAction(form("wrong")), "/login?error=1");
