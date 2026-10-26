@@ -20,6 +20,12 @@ const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE });
   try {
+    const serverHtml = await browser.newContext({ javaScriptEnabled: false });
+    await serverHtml.addCookies([{ name: "store-admin-session", value: cookie, url: base }]);
+    const unhydratedPage = await serverHtml.newPage();
+    await unhydratedPage.goto(`${base}/orders`);
+    assert.ok(await unhydratedPage.getByRole("button", { name: "Učitavam Excel" }).isDisabled(), "server HTML must not accept a click before its handler is ready");
+    await serverHtml.close();
     for (const width of [1440, 390, 320]) {
       const context = await browser.newContext({ viewport: { width, height: 900 }, acceptDownloads: true });
       await context.addCookies([{ name: "store-admin-session", value: cookie, url: base }]);

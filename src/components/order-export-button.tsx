@@ -1,11 +1,16 @@
 "use client";
 
 import { Download, LoaderCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const subscribeToHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 
 export function OrderExportButton({ label }: { label: string }) {
+  // Do not accept clicks on server-rendered HTML before the handler is hydrated.
+  const ready = useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
   const inFlight = useRef(false);
   const controller = useRef<AbortController | null>(null);
   const [pending, setPending] = useState(false);
@@ -83,14 +88,14 @@ export function OrderExportButton({ label }: { label: string }) {
       <button
         type="button"
         onClick={exportOrders}
-        disabled={pending}
-        aria-busy={pending}
-        aria-label={pending ? "Pripremam Excel" : label}
+        disabled={!ready || pending}
+        aria-busy={!ready || pending}
+        aria-label={!ready ? "Učitavam Excel" : pending ? "Pripremam Excel" : label}
         title={label}
         className="inline-flex h-10 w-44 max-w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-3 text-sm font-medium text-emerald-200 transition hover:bg-emerald-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 disabled:cursor-wait disabled:opacity-70"
       >
-        {pending ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4 shrink-0" aria-hidden="true" />}
-        <span className="whitespace-nowrap text-sm">{pending ? "Pripremam Excel…" : "Excel do 08:00"}</span>
+        {!ready || pending ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4 shrink-0" aria-hidden="true" />}
+        <span className="whitespace-nowrap text-sm">{!ready ? "Učitavam…" : pending ? "Pripremam Excel…" : "Excel do 08:00"}</span>
       </button>
       {error ? <p role="alert" className="order-last basis-full text-sm text-red-200 sm:max-w-72">{error}</p> : null}
       {download ? (
