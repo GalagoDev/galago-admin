@@ -132,6 +132,61 @@ export function getDb() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS claim_telegram_outbox (
+      id TEXT PRIMARY KEY,
+      claim_id TEXT NOT NULL REFERENCES customer_return_claims(id) ON DELETE CASCADE,
+      chat_id TEXT NOT NULL,
+      text TEXT NOT NULL,
+      file_id TEXT,
+      reply_to_id INTEGER,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      available_at INTEGER NOT NULL DEFAULT 0,
+      lease_until INTEGER NOT NULL DEFAULT 0,
+      message_id INTEGER,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS claim_telegram_messages (
+      chat_id TEXT NOT NULL,
+      message_id INTEGER NOT NULL,
+      claim_id TEXT NOT NULL REFERENCES customer_return_claims(id) ON DELETE CASCADE,
+      PRIMARY KEY(chat_id, message_id)
+    );
+    CREATE TABLE IF NOT EXISTS claim_email_replies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      update_id INTEGER NOT NULL UNIQUE,
+      chat_id TEXT NOT NULL,
+      message_id INTEGER NOT NULL,
+      claim_id TEXT NOT NULL REFERENCES customer_return_claims(id) ON DELETE CASCADE,
+      recipient TEXT NOT NULL,
+      body TEXT NOT NULL,
+      sender_id TEXT NOT NULL,
+      sender_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      started_at INTEGER,
+      sent_at TEXT,
+      gmail_id TEXT,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(chat_id, message_id)
+    );
+    CREATE TABLE IF NOT EXISTS claim_gmail_connection (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      email TEXT NOT NULL,
+      encrypted_token TEXT NOT NULL,
+      connected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS claim_oauth_states (
+      state_hash TEXT PRIMARY KEY,
+      browser_hash TEXT NOT NULL,
+      nonce TEXT NOT NULL,
+      verifier TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS claim_outbox_pending ON claim_telegram_outbox(status, available_at);
+    CREATE INDEX IF NOT EXISTS claim_replies_status ON claim_email_replies(status, id);
+
     CREATE TABLE IF NOT EXISTS inventory_imports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       original_name TEXT NOT NULL,

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { getDb } from "@/lib/db";
 import { ensureStorage } from "@/lib/storage";
+import { queueNewClaimNotification } from "@/lib/claim-messaging-store";
 
 export const CLAIM_STATUSES = ["new", "in_review", "approved", "rejected", "resolved"] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
@@ -243,6 +244,7 @@ export function createCustomerRequest(input: NewCustomerRequest) {
         file.sizeBytes,
       );
     }
+    queueNewClaimNotification(id, reference, input);
   });
 
   try {

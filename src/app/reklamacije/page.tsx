@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Settings2 } from "lucide-react";
+import { getClaimReplies } from "@/lib/claim-messaging-store";
 
 import { ReklamacijaDeleteButton } from "@/components/reklamacija-delete-button";
 import { ReklamacijaStatusForm } from "@/components/reklamacija-status-form";
@@ -81,6 +83,8 @@ function statusPresentation(status: string) {
 
 function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
   const status = statusPresentation(claim.status);
+  const replies = getClaimReplies(claim.id);
+  const replyLabels: Record<string, string> = { queued: "Na čekanju", sending: "Šalje se", sent: "Poslano", failed: "Nije poslano", unknown: "Provjeriti u Gmailu" };
 
   return (
     <details className="group rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] lg:rounded-lg">
@@ -173,6 +177,19 @@ function ClaimCard({ claim }: { claim: CustomerReturnClaim }) {
           </div>
         ) : null}
 
+        {replies.length > 0 && <section className="mt-5 border-t border-white/10 pt-4">
+          <h3 className="text-sm font-medium">Email odgovori</h3>
+          <ol className="mt-3 divide-y divide-white/10">
+            {replies.map((reply) => <li key={reply.id} className="py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="break-all text-neutral-400">{reply.sender_name} · {formatDateTime(reply.sent_at || reply.created_at)} · {reply.recipient}</span>
+                <span className={reply.status === "sent" ? "text-emerald-300" : "text-amber-200"}>{replyLabels[reply.status] || reply.status}</span>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-neutral-200">{reply.body}</p>
+              {reply.last_error && <p className="mt-2 text-xs text-red-300">{reply.last_error}</p>}
+            </li>)}
+          </ol>
+        </section>}
         {claim.files.length > 0 ? (
           <div className="mt-5 border-t border-white/8 pt-4">
           <p className="mb-3 text-xs text-neutral-500">Prilozi ({claim.files.length})</p>
@@ -230,6 +247,7 @@ export default async function ReklamacijePage({ searchParams }: { searchParams: 
               <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">Galago control panel</p>
               <p className="mt-2 text-lg font-semibold text-white">Reklamacije</p>
               <p className="mt-1 text-sm text-neutral-400">Podrška, reklamacije i zahtjevi za pravna lica</p>
+              <Link href="/reklamacije/povezivanje" className="mt-3 inline-flex items-center gap-2 text-sm text-sky-200 hover:text-sky-100"><Settings2 size={16} /> Telegram i Gmail</Link>
             </div>
             <Link href="/" aria-label="Nazad na pregled" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
               <ArrowIcon />

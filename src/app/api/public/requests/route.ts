@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import path from "node:path";
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
+import { kickClaimMessaging } from "@/lib/claim-messaging-worker";
 
 import {
   createCustomerRequest,
@@ -234,6 +235,7 @@ export async function POST(request: NextRequest) {
 
     recordCustomerRequestAttempt(ipHash);
     const claim = createCustomerRequest(input);
+    after(() => kickClaimMessaging());
     return json(origin, {
       ok: true,
       reference: claim.reference,
