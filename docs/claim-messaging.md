@@ -46,6 +46,8 @@ Metadata is fetched only for tracked conversations. Full message bodies are fetc
 
 No automatic customer replies or attachment email sending is enabled. Disable processing by setting `enabled: false`; this does not revoke OAuth access. Revoke access in the Google account when retiring the integration.
 
+Live incoming verification on 2026-10-26: after explicit owner approval, Google `gmail.readonly` was added and the encrypted grant renewed at 13:41 UTC. Both existing test threads were checked with no errors. A self-addressed Gmail Reply to synthetic claim `GAL-20261026-F69582` produced exactly one Telegram notification. Replying to that new notification was accepted by Gmail at 13:42 UTC in the same thread. The two-hour next-check timestamps persisted in SQLite. Only the owner's email address was used; no real customer was emailed. Google scope verification is still incomplete, separate from the working owner grant.
+
 ## Verification
 
 `npm run test:claims` exercises real isolated SQLite with mocked external APIs, authorization, OAuth state/replay/account checks, encryption, MIME injection rejection, attachment notifications, retry behavior, concurrent delivery and no duplicate emails. Also run `npm run lint` and `npm run build`.

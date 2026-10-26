@@ -62,7 +62,7 @@ export function recordClaimIncoming(thread: Thread, message: gmail_v1.Schema$Mes
       parsed.subject, parsed.body, parsed.rfcId, new Date(date).toISOString(), parsed.attachments).changes) return;
     const root = db.prepare("SELECT message_id FROM claim_telegram_outbox WHERE claim_id = ? AND id = ? AND status = 'sent'")
       .get(thread.claim_id, `claim:${thread.claim_id}:text:0`) as { message_id: number } | undefined;
-    const link = `https://mail.google.com/mail/u/${encodeURIComponent(config.gmailAddress)}/#all/${encodeURIComponent(thread.thread_id)}`;
+    const link = `https://mail.google.com/mail/?authuser=${encodeURIComponent(config.gmailAddress)}#all/${encodeURIComponent(thread.thread_id)}`;
     const body = parsed.body.slice(0, 20_000) || "[Email nema tekstualni sadrzaj.]";
     const text = `ODGOVOR KUPCA\n${claim.reference}\n${claim.customer_name} <${parsed.sender}>\n\n${body}`;
     const footer = `${parsed.body.length > 20_000 ? "\n[Ostatak poruke je u Gmailu.]" : ""}${parsed.attachments ? `\nPrilozi: ${parsed.attachments} (otvorite Gmail).` : ""}\n\n${link}\nOdgovor kupcu: Reply na ovu poruku.`;

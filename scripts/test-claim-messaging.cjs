@@ -146,6 +146,7 @@ const reply = (id) => db.prepare("SELECT * FROM claim_email_replies WHERE messag
   assert.ok(store.getClaimIncoming(c.id)[0].body.includes("Čćžšđ"));
   assert.ok(!store.getClaimIncoming(c.id)[0].body.includes("Duplicate HTML"));
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM claim_telegram_outbox WHERE id LIKE 'incoming:%'").get().n, 1);
+  assert.ok(db.prepare("SELECT text FROM claim_telegram_outbox WHERE id='incoming:customer-1:0'").get().text.includes("https://mail.google.com/mail/?authuser=galagodoo%40gmail.com#all/thread-1"));
   await inbox.pollClaimGmailReplies(); assert.equal(threadCalls, 1, "no Gmail polling before two hours");
   const oldSent = reply(10);
   gmailMessages.set(oldSent.gmail_id, { id: oldSent.gmail_id, threadId: "thread-1", labelIds: ["SENT"], payload: { headers: [{name:"From",value:config.gmailAddress}] } });
