@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Download } from "lucide-react";
 
 import { OrderListPage } from "@/components/order-list-page";
+import { OrderExportButton } from "@/components/order-export-button";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
 import { assessOrderRisks, unresolvedOrderRisks } from "@/lib/order-risk";
 import { getOperationalExportWindow, isOrderInOperationalExportWindow } from "@/lib/order-workday";
@@ -67,15 +67,7 @@ export default async function OrdersPage({
         </>
       }
       headerAction={
-        <a
-          href="/orders/export"
-          aria-label={`Preuzmi Excel: ${exportWindow.startLabel} 08:00 - ${exportWindow.endLabel} 08:00`}
-          title={`Preuzmi Excel: ${exportWindow.startLabel} 08:00 - ${exportWindow.endLabel} 08:00`}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-3 text-sm font-medium text-emerald-200 transition hover:bg-emerald-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
-        >
-          <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Excel do 08:00</span>
-        </a>
+        <OrderExportButton label={`Preuzmi Excel: ${exportWindow.startLabel} 08:00 - ${exportWindow.endLabel} 08:00`} />
       }
     />
   );

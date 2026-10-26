@@ -315,6 +315,10 @@ Not fully mature yet:
 
 ## Performance notes
 
+- The courier Excel button uses one guarded browser fetch with a visible busy state. Success keeps a download link to the same in-memory file; that link never re-reads or re-marks Sheets. JSON responses keep validation/upstream errors in the panel and send unresolved risks to the existing exact-cycle review view. Direct `/orders/export` navigation remains supported. Do not replace this control with a prefetched Next Link.
+- Concurrent fresh Sheets reads share their in-flight request. Mutations must still call `invalidateSheetCache` to discard older in-flight snapshots. Export retains fresh validation and waits for its final-row marker before returning the workbook; failures never silently skip that marker.
+- Export regressions: `npm run test:order-export-flow`, `npm run test:sheet-cache`; optional local-only Playwright checks are in `scripts/test-order-export-browser.cjs`.
+
 Hostinger shared hosting was noticeably slower than local.
 Known reasons:
 - live Google Sheets requests

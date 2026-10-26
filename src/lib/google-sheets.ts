@@ -297,7 +297,9 @@ export async function getSheetRowsByName(
   }
 
   const cacheKey = `${sheetName}:${options.activeOnly ? "active" : "all"}`;
-  if (options.fresh) invalidateSheetCache(sheetName);
+  // A refresh bypasses saved data, but shares a read already in progress.
+  // Mutations still invalidate both maps so pre-write requests cannot refill the cache.
+  if (options.fresh) sheetRowsCache.delete(cacheKey);
   const cached = getCachedSheetRows(cacheKey);
   if (cached) return cached;
 

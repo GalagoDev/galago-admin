@@ -61,7 +61,7 @@ export function OrderListPage({
               <p className="mt-2 text-lg font-semibold text-white">{title}</p>
               <p className="mt-1 text-sm text-neutral-400">{subtitle}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+            <div className={`flex flex-wrap items-center gap-2 sm:shrink-0 ${headerAction ? "sm:w-72 sm:justify-end" : ""}`}>
               {headerAction}
               {refreshPath ? <SheetRefreshButton path={refreshPath} /> : null}
               <Link

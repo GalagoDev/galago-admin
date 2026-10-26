@@ -459,13 +459,11 @@ export async function markLastExportedOrder(sheetRowNumber: number, marker: stri
   if (!Number.isInteger(sheetRowNumber) || sheetRowNumber < 2) throw new Error("Invalid exported order row.");
 
   const { sheets, spreadsheetId } = getSheetsClient();
-  const sheetId = await getOrdersSheetId(sheets, spreadsheetId);
+  const [sheetId, markerResponse] = await Promise.all([
+    getOrdersSheetId(sheets, spreadsheetId),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SHEET_NAME}'!N:N` }),
+  ]);
   await ensureOrderTrackingColumns(sheets, spreadsheetId, sheetId);
-
-  const markerResponse = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `'${SHEET_NAME}'!N:N`,
-  });
   const previousRows = (markerResponse.data.values ?? [])
     .map((row, index) => (String(row[0] ?? "").trim() === marker ? index + 1 : 0))
     .filter((rowNumber) => rowNumber >= 2 && rowNumber !== sheetRowNumber);

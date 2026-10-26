@@ -26,6 +26,8 @@ const { createOrderFingerprint } = require("../src/lib/order-fingerprint.ts");
 const { planOrderRiskDecisions } = require("../src/lib/order-risk-decisions.ts");
 const window = workday.getOperationalExportWindow(new Date("2026-10-16T05:08:00Z"));
 let authenticated = true;
+let readError = false;
+let markerError = false;
 const exportMarkers = [];
 
 function order(row, name, phone, dateLabel, receivedAt) {
@@ -65,14 +67,14 @@ Module._load = function (request, parent, isMain) {
   if (request === "@/components/order-list-page") return { OrderListPage: () => null };
   if (request === "@/lib/order-workday") return { ...workday, getOperationalExportWindow: () => window };
   if (request === "@/lib/google-sheets") return {
-    getOrdersSheetRows: async () => rows,
+    getOrdersSheetRows: async () => { if (readError) throw new Error("private upstream failure"); return rows; },
     getReturnedSheetRows: async () => [],
     isActiveOrderRow: (row) => !row.deliveredChecked && !/^(delivered|returned|duplicate):/.test(row.appStatus),
   };
   if (request === "@/lib/google-orders") return {
     setOrderRiskDecision: (reference, decision) => persist([reference], decision),
     setOrderRiskDecisions: persist,
-    markLastExportedOrder: async (...args) => exportMarkers.push(args),
+    markLastExportedOrder: async (...args) => { if (markerError) throw new Error("private marker failure"); exportMarkers.push(args); },
   };
   if (request === "@/lib/telegram-orders") return { normalizeTelegramPostalCode: (value) => /^\d{5}$/.test(value) ? value : "" };
   return originalLoad.call(this, request, parent, isMain);
@@ -93,9 +95,15 @@ async function expectRedirect(run, location) {
 
 (async () => {
   const { GET } = require("../src/app/orders/export/route.ts");
+  const get = (json = false) => GET(new Request("http://localhost/orders/export", { headers: json ? { Accept: "application/json" } : {} }));
   const Page = require("../src/app/orders/page.tsx").default;
   const actions = require("../src/app/actions/order-risk.ts");
-  await expectRedirect(GET, "/orders?view=export&exportError=review&refresh=1#risk-alerts");
+  const blocked = await get();
+  assert.equal(blocked.status, 303);
+  assert.equal(blocked.headers.get("Location"), "/orders?view=export&exportError=review&refresh=1#risk-alerts");
+  const blockedJson = await get(true);
+  assert.equal(blockedJson.status, 409);
+  assert.deepEqual(await blockedJson.json(), { redirect: blocked.headers.get("Location") });
   assert.equal(exportMarkers.length, 0, "blocked export must not mark any order as exported");
 
   const normal = await Page({ searchParams: Promise.resolve({}) });
@@ -104,14 +112,14 @@ async function expectRedirect(run, location) {
   assert.deepEqual(review.props.orders.map((row) => row.sheetRowNumber), [6, 7, 11]);
   assert.equal(review.props.riskView, "export");
   assert.equal(review.props.refreshPath, "/orders?view=export");
-  assert.equal(review.props.headerAction.type, "a", "download must use native navigation, not a Next Link prefetch/RSC request");
-  assert.equal(review.props.headerAction.props.href, "/orders/export");
+  assert.equal(review.props.headerAction.type.name, "OrderExportButton", "use the guarded client download control, never a prefetched Next Link");
+  assert.match(review.props.headerAction.props.label, /15\/10\/2026 08:00 - 16\/10\/2026 08:00/);
   assert.equal(Object.values(review.props.riskAssessments).filter((risk) => risk.unresolved).length, 2);
 
   const selected = [rows[2], rows[4]];
   await expectRedirect(() => actions.approveAllOrderRisksAction(form(selected)), "/orders?view=export&risk=approve-all&count=2");
   assert.ok(selected.every((row) => row.riskReview === `approved:${row.fingerprint}`));
-  const response = await GET();
+  const response = await get(true);
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Disposition"), /IMPORT-ELKO-2026-10-16.xlsx/);
   const workbook = XLSX.read(Buffer.from(await response.arrayBuffer()), { type: "buffer" });
@@ -121,13 +129,35 @@ async function expectRedirect(run, location) {
   assert.equal(exportMarkers.length, 1);
   assert.equal(exportMarkers[0][0], 11, "preserve sheet order and mark the last selected row");
 
+  rows[1].grad = "Sarajevo";
+  const invalidZip = await get(true);
+  assert.equal(invalidZip.status, 422);
+  assert.match((await invalidZip.json()).error, /Nedostaje ZIP/);
+  assert.equal(exportMarkers.length, 1);
+  rows[1].grad = "71000";
+  readError = true;
+  const failedRead = await get(true);
+  assert.equal(failedRead.status, 503);
+  assert.match(failedRead.headers.get("Cache-Control"), /no-store/);
+  assert.doesNotMatch(await failedRead.text(), /private upstream/);
+  readError = false;
+  markerError = true;
+  const failedMarker = await get(true);
+  assert.equal(failedMarker.status, 503);
+  assert.match((await failedMarker.json()).error, /upis oznake/);
+  assert.equal(exportMarkers.length, 1);
+  markerError = false;
+
   await expectRedirect(() => actions.setOrderRiskDecisionAction(form([rows[2]], "duplicate")), "/orders?view=export&risk=duplicate");
   const afterExclusion = await Page({ searchParams: Promise.resolve({ view: "export" }) });
   assert.deepEqual(afterExclusion.props.orders.map((row) => row.sheetRowNumber), [6, 11]);
   await expectRedirect(() => actions.setOrderRiskDecisionAction(form([], "approve")), "/orders?view=export&error=invalid-risk-decision");
   authenticated = false;
   await expectRedirect(() => actions.approveAllOrderRisksAction(form(selected)), "/login");
-  console.log("Export review flow passed: redirect, exact cycle selection, multi-date approval, exclusion, native download and XLSX output. No live data accessed.");
+  const saved = rows.splice(0);
+  assert.equal((await get(true)).status, 404);
+  rows.push(...saved);
+  console.log("Export flow passed: structured errors, review redirect, exact cycle, multi-date approval, exclusion, download control and XLSX output. No live data accessed.");
 })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => {
   if (originalAppPassword === undefined) delete process.env.APP_PASSWORD;
   else process.env.APP_PASSWORD = originalAppPassword;

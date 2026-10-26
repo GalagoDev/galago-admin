@@ -1,5 +1,4 @@
 import * as XLSX from "xlsx";
-import { redirect } from "next/navigation";
 
 import { markLastExportedOrder } from "@/lib/google-orders";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow, type SheetOrderRow } from "@/lib/google-sheets";
@@ -46,7 +45,16 @@ function toExportRow(order: SheetOrderRow) {
   ];
 }
 
-export async function GET() {
+const RESPONSE_HEADERS = { "Cache-Control": "private, no-store", Vary: "Accept" };
+const REVIEW_PATH = "/orders?view=export&exportError=review&refresh=1#risk-alerts";
+
+function exportError(request: Request, error: string, status: number) {
+  return request.headers.get("Accept")?.includes("application/json")
+    ? Response.json({ error }, { status, headers: RESPONSE_HEADERS })
+    : new Response(error, { status, headers: RESPONSE_HEADERS });
+}
+
+async function createExport(request: Request) {
   const window = getOperationalExportWindow();
   const [rows, returnedRows] = await Promise.all([
     getOrdersSheetRows({ fresh: true }),
@@ -57,18 +65,20 @@ export async function GET() {
     .filter((row) => isOrderInOperationalExportWindow(row, window));
 
   if (orders.length === 0) {
-    return new Response(`Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, { status: 404 });
+    return exportError(request, `Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, 404);
   }
 
   const unresolvedRisks = unresolvedOrderRisks(assessOrderRisks(orders, rows, returnedRows));
   if (unresolvedRisks.length > 0) {
-    redirect("/orders?view=export&exportError=review&refresh=1#risk-alerts");
+    return request.headers.get("Accept")?.includes("application/json")
+      ? Response.json({ redirect: REVIEW_PATH }, { status: 409, headers: RESPONSE_HEADERS })
+      : new Response(null, { status: 303, headers: { ...RESPONSE_HEADERS, Location: REVIEW_PATH } });
   }
 
   const missingPostalCodes = orders.filter((order) => !normalizeTelegramPostalCode(order.grad));
   if (missingPostalCodes.length > 0) {
     const names = missingPostalCodes.slice(0, 8).map((order) => order.primalac).join(", ");
-    return new Response(`Nedostaje ZIP za: ${names}. Ispravi Grad u Orders sheetu pa ponovi export.`, { status: 422 });
+    return exportError(request, `Nedostaje ZIP za: ${names}. Ispravi Grad u Orders sheetu pa ponovi export.`, 422);
   }
 
   const worksheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...orders.map(toExportRow)]);
@@ -104,9 +114,27 @@ export async function GET() {
 
   return new Response(new Uint8Array(output), {
     headers: {
-      "Cache-Control": "no-store",
+      ...RESPONSE_HEADERS,
       "Content-Disposition": `attachment; filename="IMPORT-ELKO-${filenameDate}.xlsx"`,
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
   });
+}
+
+export async function GET(request: Request) {
+  const startedAt = Date.now();
+  try {
+    const response = await createExport(request);
+    console.info("Order export response", { status: response.status, durationMs: Date.now() - startedAt });
+    return response;
+  } catch (error) {
+    // Google errors can contain credentials and sheet data; log only safe diagnostics.
+    const failure = error as { code?: string | number; response?: { status?: number } } | null;
+    console.error("Order export failed", {
+      status: failure?.response?.status,
+      code: failure?.code,
+      durationMs: Date.now() - startedAt,
+    });
+    return exportError(request, "Excel nije preuzet jer priprema ili upis oznake u Google Sheets nije uspio. Pokušajte ponovo.", 503);
+  }
 }
