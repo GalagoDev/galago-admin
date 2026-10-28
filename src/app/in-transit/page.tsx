@@ -27,7 +27,8 @@ export default async function InTransitPage({
   searchParams: Promise<{ delivered?: string; returned?: string; skipped?: string; error?: string; refresh?: string; view?: string; sync?: string; courierError?: string }>;
 }) {
   const params = await searchParams;
-  const [source] = await Promise.allSettled([getOrdersSheetRows({ fresh: Boolean(params.delivered || params.returned || params.refresh) })]);
+  // The background courier worker can update Sheets outside this page's cache instance.
+  const [source] = await Promise.allSettled([getOrdersSheetRows({ fresh: true })]);
   const unavailable = source.status === "rejected";
   const allOrders = source.status === "fulfilled" ? source.value : [];
   const { states, links } = courierTrackingSnapshot(allOrders);
