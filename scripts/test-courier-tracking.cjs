@@ -64,6 +64,7 @@ global.fetch=async(url,input)=>{httpCalls++;assert.equal(url,"https://expressone
  const calls=httpCalls;await worker.runCourierTrackingSync();assert.equal(httpCalls,calls,"only one due scan runs");
  responses.set("12345679",data("12345679",["Potvrda dostave"]));store.requestCourierTrackingSync(true);await worker.runCourierTrackingSync();
  assert.equal(delivered,1);assert.equal(source[0].appStatus,"delivered:verified");
+ assert.equal(store.courierTrackingSnapshot(source,Date.now()+3*86400000).states[3].category,"delivered","verified historical delivery does not expire into an unknown status");
  source[0].appStatus="";store.requestCourierTrackingSync(true);await worker.runCourierTrackingSync();assert.equal(delivered,1,"old delivery is not reapplied after restore");
  const r=order({sheetRowNumber:6,sourceId:"new",brojPaketa:"1"});store.linkCourierOrder(r,["12345680"],"manual");source=[r];responses.set("12345680",data("12345680",["Fakturisano","Povrat pošiljaocu"]));
  store.requestCourierTrackingSync();await worker.runCourierTrackingSync();assert.equal(returned,1);

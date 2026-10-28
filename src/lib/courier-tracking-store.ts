@@ -41,11 +41,12 @@ export function courierTrackingSnapshot(orders: SheetOrderRow[], now = Date.now(
     const state: CourierOrderState = { key, category: "review", reason: "Nema povezanog broja posiljke.", checkedAt: 0,
       expectedPackages: courierPackageCount(order), parcels: [] };
     if (link) {
+      const archived = Boolean(link.applied_status_id && link.applied_status_id === order.appStatus);
       state.parcels = (byOrder.get(key) || []).map(id => {
         const parcel = parcels.get(id);
         let data: CourierParcelData | null = null;
         try { data = parcel?.data_json ? JSON.parse(parcel.data_json) as CourierParcelData : null; } catch { /* Invalid stored data stays unconfirmed. */ }
-        const valid = parcel && data && !parcel.last_error && now - parcel.checked_at <= COURIER_MAX_AGE;
+        const valid = parcel && data && !parcel.last_error && (archived || now - parcel.checked_at <= COURIER_MAX_AGE);
         return { tracking: id, category: valid && data ? classifyCourierParcel(data) : "review", checkedAt: parcel?.checked_at || 0,
           lastStatus: data?.traces[0]?.status || "Status nije potvrden" };
       });
