@@ -85,7 +85,7 @@ export async function runCourierTrackingSync() {
     db.prepare(`UPDATE courier_tracking_sync SET next_run_at=CASE WHEN requested_at>? THEN 0 ELSE ? END,
       last_success_at=?,last_error=?,checked_count=?,lease_until=0,lease_token='' WHERE id=1 AND lease_token=?`)
       .run(started, failures ? Date.now() + 60 * 60_000 : nextCourierTrackingScan(Date.now()), Date.now(),
-        failures ? `${failures} paketa nije provjereno. Njihov status je izdvojen za provjeru.` : null, checked, token);
+        failures ? `${failures} paketa nije osvježeno. Narudžbe ostaju u ukupnom pregledu.` : null, checked, token);
   } catch {
     db.prepare(`UPDATE courier_tracking_sync SET next_run_at=?,last_error=?,checked_count=?,lease_until=0,lease_token=''
       WHERE id=1 AND lease_token=?`).run(Date.now() + 60 * 60_000,

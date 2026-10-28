@@ -1,16 +1,20 @@
 # Express One delivery reconciliation
 
-`/in-transit` and the dashboard now count only orders whose linked parcels have
-fresh, confirmed physical courier events. Other open Orders rows remain visible
-under Najavljene, Djelimicne or Za provjeru; they are never silently dropped.
-Known delivered/returned source rows have their own outcome views.
+`/in-transit` and the dashboard show one combined list and COD total for every
+active Orders row, including orders awaiting dispatch, registered shipments,
+partially completed orders and orders without tracking links. Courier categories
+are internal sync state, never filters for the list or its financial total.
+Only delivered, returned, duplicate or checked-off source rows are excluded.
+Legacy `view` query parameters do not split the list. Tracking does not create
+a manual review task in this overview.
 
 The tracking client uses the same public JSON tracking endpoint as Express One's
 Track & Trace page: `POST https://expressone.ba/api/track` with `shipmentNumber`.
 There are no courier passwords or browser cookies on the server. Responses are
 schema-checked, tied to the requested parcel number and sorted by scan date/time.
 This website endpoint is not a contracted integration and can change. An error,
-unknown response or data older than 36 hours is shown as unconfirmed, not active.
+unknown response or data older than 36 hours stays internally unconfirmed and
+cannot archive an order. The open order remains included in the overview.
 
 Every parcel must be known before an order can be archived as delivered or
 returned. `RETS` takes precedence over a later sender-delivery or invoice scan.
@@ -30,8 +34,8 @@ suppresses the old tracking link until a new parcel number is linked.
 The worker runs daily at 07:15 Europe/Sarajevo, after the existing 07:00 carrier
 email scan. It also runs when an administrator clicks Provjeri statuse or links
 parcel numbers. New sender-verified carrier emails can discover unique links;
-orders with no courier evidence stay unconfirmed until all tracking numbers are
-linked. Existing audited links are not overwritten by email matching. There is
+orders with no courier evidence stay open and included in the overview until
+their outcome is confirmed. Existing audited links are not overwritten by email matching. There is
 no claim that every newly registered courier shipment produces an email.
 
 Requests are sequential, spaced 500 ms, timeout after 20 seconds and use the
