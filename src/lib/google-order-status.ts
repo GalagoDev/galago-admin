@@ -7,6 +7,7 @@ import { getGoogleServiceAccountCredentials } from "@/lib/google-auth";
 import { invalidateSheetCache } from "@/lib/google-sheets";
 import { createOrderFingerprint, type OrderIdentity } from "@/lib/order-fingerprint";
 import { parseSheetOrderRows } from "@/lib/sheet-order-parser";
+import { suppressCourierOrder } from "@/lib/courier-tracking-store";
 
 const SOURCE_SHEET = "Orders";
 const DELIVERED_SHEET = "Delivered orders";
@@ -35,6 +36,8 @@ export type OrderMoveReference = {
   sheetRowNumber: number;
   fingerprint: string;
   dateLabel: string;
+  sourceId?: string;
+  receivedAt?: string;
 };
 
 type StatusDestination = typeof DELIVERED_SHEET | typeof RETURNS_SHEET;
@@ -132,8 +135,11 @@ function dateLabelForRow(rows: unknown[][], rowIndex: number) {
 }
 
 function transitionId(destination: StatusDestination, reference: OrderMoveReference) {
+  const identity = reference.receivedAt !== undefined || reference.sourceId !== undefined
+    ? `${reference.dateLabel}\u001f${reference.fingerprint}\u001f${reference.sourceId || ""}\u001f${reference.receivedAt || ""}`
+    : `${reference.sheetRowNumber}\u001f${reference.dateLabel}\u001f${reference.fingerprint}`;
   return createHash("sha256")
-    .update(`${SOURCE_SHEET}\u001f${destination}\u001f${reference.sheetRowNumber}\u001f${reference.dateLabel}\u001f${reference.fingerprint}`)
+    .update(`${SOURCE_SHEET}\u001f${destination}\u001f${identity}`)
     .digest("hex")
     .slice(0, 32);
 }
@@ -420,6 +426,8 @@ async function performMove(references: OrderMoveReference[], destination: Status
     if (!sourceRow) continue;
     if (String(sourceRow[SOURCE_STATUS_CELL_INDEX] ?? "").trim()) continue;
     if (skipChecked && String(sourceRow[15] ?? "").toUpperCase() === "TRUE") continue;
+    if (reference.sourceId !== undefined && String(sourceRow[10] ?? "").trim() !== reference.sourceId) continue;
+    if (reference.receivedAt !== undefined && String(sourceRow[12] ?? "").trim() !== reference.receivedAt) continue;
     const identity = rawOrderIdentity(sourceRow);
     if (!identity.primalac && !identity.brojTelefona && !identity.artikal) continue;
     if (createOrderFingerprint(identity) !== reference.fingerprint) continue;
@@ -440,6 +448,17 @@ async function performMove(references: OrderMoveReference[], destination: Status
   await appendStatusRows(sheets, spreadsheetId, destination, sheetId, newRows);
 
   if (valid.length > 0) {
+    const fresh = (await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:P` })).data.values ?? [];
+    for (const entry of valid) {
+      const matches = fresh.map((row, index) => ({ row, index })).filter(({ row, index }) =>
+        index > 0 && createOrderFingerprint(rawOrderIdentity(row)) === entry.reference.fingerprint &&
+        dateLabelForRow(fresh, index) === entry.reference.dateLabel &&
+        (entry.reference.sourceId === undefined || String(row[10] ?? "").trim() === entry.reference.sourceId) &&
+        (entry.reference.receivedAt === undefined || String(row[12] ?? "").trim() === entry.reference.receivedAt));
+      if (matches.length !== 1 || String(matches[0].row[11] ?? "").trim() ||
+        (skipChecked && String(matches[0].row[15] ?? "").toUpperCase() === "TRUE")) throw new Error("Source order changed during transition; retry required.");
+      entry.reference = { ...entry.reference, sheetRowNumber: matches[0].index + 1 };
+    }
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
       requestBody: {
@@ -461,7 +480,7 @@ async function performRestoreReturn(reference: OrderMoveReference) {
   const { sheets, spreadsheetId } = getSheetsClient();
   await ensureSourceStatusColumn(sheets, spreadsheetId);
   const [sourceResponse, returnsResponse] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:L` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SOURCE_SHEET}'!A:P` }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: `'${RETURNS_SHEET}'!A:K` }),
   ]);
   const sourceRows = sourceResponse.data.values ?? [];
@@ -473,12 +492,14 @@ async function performRestoreReturn(reference: OrderMoveReference) {
   const statusId = String(returnRow[10] ?? "").trim();
   if (!/^[a-f0-9]{32}$/.test(statusId)) return { restored: 0, skipped: 1 };
   const returnIdentity = rawOrderIdentity(returnRow);
-  if (createOrderFingerprint(returnIdentity) !== reference.fingerprint) return { restored: 0, skipped: 1 };
+  const rawFingerprint = createOrderFingerprint(returnIdentity);
+  const displayFingerprint = parseSheetOrderRows(RETURNS_SHEET, returnRows).find(o => o.sheetRowNumber === reference.sheetRowNumber)?.fingerprint;
+  if (rawFingerprint !== reference.fingerprint && displayFingerprint !== reference.fingerprint) return { restored: 0, skipped: 1 };
   if (dateLabelForRow(returnRows, returnIndex) !== reference.dateLabel) return { restored: 0, skipped: 1 };
 
   const sourceIndex = sourceRows.findIndex((row) => String(row[SOURCE_STATUS_CELL_INDEX] ?? "").trim() === `returned:${statusId}`);
   if (sourceIndex === -1) return { restored: 0, skipped: 1 };
-  if (createOrderFingerprint(rawOrderIdentity(sourceRows[sourceIndex])) !== reference.fingerprint) {
+  if (createOrderFingerprint(rawOrderIdentity(sourceRows[sourceIndex])) !== rawFingerprint) {
     return { restored: 0, skipped: 1 };
   }
 
@@ -491,6 +512,7 @@ async function performRestoreReturn(reference: OrderMoveReference) {
           range: `'${SOURCE_SHEET}'!L${sourceIndex + 1}`,
           values: [[""]],
         },
+        { range: `'${SOURCE_SHEET}'!P${sourceIndex + 1}`, values: [[false]] },
         {
           range: `'${RETURNS_SHEET}'!K${reference.sheetRowNumber}`,
           values: [[`restored:${statusId}`]],
@@ -498,6 +520,9 @@ async function performRestoreReturn(reference: OrderMoveReference) {
       ],
     },
   });
+
+  const sourceOrder = parseSheetOrderRows(SOURCE_SHEET, sourceRows).find(o => o.sheetRowNumber === sourceIndex + 1);
+  if (sourceOrder) suppressCourierOrder(sourceOrder);
 
   invalidateSheetCache(SOURCE_SHEET);
   invalidateSheetCache(RETURNS_SHEET);
@@ -512,6 +537,10 @@ function queuedMove(references: OrderMoveReference[], destination: StatusDestina
 
 export function markOrdersDelivered(references: OrderMoveReference[]) {
   return queuedMove(references, DELIVERED_SHEET);
+}
+
+export function markCourierOrdersDelivered(references: OrderMoveReference[]) {
+  return queuedMove(references, DELIVERED_SHEET, true);
 }
 
 export function moveOrderToReturns(reference: OrderMoveReference) {

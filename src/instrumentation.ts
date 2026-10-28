@@ -1,5 +1,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    if (process.env.COURIER_TRACKING_SCHEDULER_ENABLED !== "false" && process.env.NEXT_PHASE !== "phase-production-build") {
+      const { startCourierTrackingScheduler } = await import("@/lib/courier-tracking-worker");
+      startCourierTrackingScheduler();
+    }
     if (process.env.EXPRESSONE_RETURNS_SCHEDULER_ENABLED !== "false") {
       const { startExpressOneScheduler } = await import("@/lib/expressone-returns");
       startExpressOneScheduler();

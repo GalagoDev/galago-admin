@@ -11,6 +11,8 @@ import { formatPostalLocation } from "@/lib/bih-postal";
 import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 import type { OrderRiskAssessment } from "@/lib/order-risk";
+import type { CourierOrderState } from "@/lib/courier-status";
+import { CourierOrderDetails } from "@/components/courier-order-details";
 
 const PAGE_SIZE = 25;
 
@@ -185,6 +187,7 @@ export function OrderListClient({
   searchPlaceholder = "Traži ime, telefon, proizvod, ZIP...",
   riskAssessments,
   riskView,
+  courierStates,
 }: {
   orders: SheetOrderRow[];
   allowReturns?: boolean;
@@ -192,6 +195,7 @@ export function OrderListClient({
   searchPlaceholder?: string;
   riskAssessments?: Record<number, OrderRiskAssessment>;
   riskView?: "export";
+  courierStates?: Record<number, CourierOrderState>;
 }) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -338,6 +342,7 @@ export function OrderListClient({
                     </span>
                   </div>
                 </button>
+                {courierStates?.[order.sheetRowNumber] ? <CourierOrderDetails state={courierStates[order.sheetRowNumber]} canLink={!order.appStatus && !order.deliveredChecked} /> : null}
 
                 {expanded ? (
                   <div className="mt-3 grid gap-1.5 text-[13px] text-neutral-300">
@@ -396,6 +401,7 @@ export function OrderListClient({
                   <p className="break-words font-semibold text-white">{order.primalac || "Bez imena"}</p>
                   {risk ? <div className="mt-2"><RiskBadge risk={risk} /></div> : null}
                   <p className="mt-1 text-xs text-neutral-500">{order.dateLabel || "-"}</p>
+                  {courierStates?.[order.sheetRowNumber] ? <CourierOrderDetails state={courierStates[order.sheetRowNumber]} canLink={!order.appStatus && !order.deliveredChecked} /> : null}
                   {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
                 </div>
                 <p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p>

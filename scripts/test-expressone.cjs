@@ -63,6 +63,7 @@ function message(id, tracking = "001-12345678", status = "Povrat pošiljaocu", s
 }
 function order(extra = {}) {
   return { sheetRowNumber: 3, fingerprint: "raw-fingerprint", dateLabel: "20/10/2026", primalac: "Kupac Test", brojTelefona: "38761123456",
+    grad: "71000", adresa: "Test bb", brojPaketa: "1", otkupnina: "89", vrijednostPosiljke: "89", dop: "1", zamjena: "0", sourceId: "telegram:test",
     artikal: "Tanzi", appStatus: "", deliveredChecked: false, receivedAt: "2026-10-20T12:00:00Z", ...extra };
 }
 function due() { db.prepare("UPDATE expressone_scan SET next_run_at = 0, lease_until = 0").run(); }
@@ -122,6 +123,10 @@ const scan = () => db.prepare("SELECT * FROM expressone_scan WHERE id = 1").get(
   skipMove = false; due(); await worker.runExpressOneScan(); assert.equal(scan().last_error, null); assert.equal(moves, 2);
   // Manual restore of an already processed shipment never reapplies the old return.
   orders[0].appStatus = ""; orders[0].deliveredChecked = false; due(); await worker.runExpressOneScan(); assert.equal(moves, 2);
+  orders = [order({ brojPaketa: "2", sourceId: "multiple" })];
+  messages.set("partial-return", message("partial-return", "001-12345683"));
+  due(); await worker.runExpressOneScan(); assert.equal(moves, 2, "one return email must not close a multi-parcel order");
+  assert.equal(db.prepare("SELECT resolution FROM expressone_shipments WHERE tracking='001-12345683'").get().resolution, "review");
   // Exercise the real Sheets transition separately from the mocked Gmail worker.
   const originalLoad = Module._load;
   const header = ["Primalac", "Broj telefona", "Grad", "Adresa", "Artikal", "Broj paketa", "Otkupnina", "Vrijednost posiljke", "DOP", "Zamjena"];
@@ -132,7 +137,7 @@ const scan = () => db.prepare("SELECT * FROM expressone_scan WHERE id = 1").get(
   const label = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Sarajevo" }).format(today);
   const source = [header, [label], ["Test Kupac", "38761123456", "71000", "Test bb", "Tanzi", "1", "", "89", "1", "0", "telegram:test", "", "", "", "", false]];
   const returned = [[...header, "Status ID"], [label], ...Array.from({ length: 10 }, () => [])];
-  let failSourceWrite = false;
+  let failSourceWrite = false, insertDuringAppend = false;
   const sheets = { spreadsheets: {
     get: async () => ({ data: { sheets: [
       { properties: { title: "Orders", sheetId: 1, gridProperties: { columnCount: 16 } } },
@@ -151,12 +156,15 @@ const scan = () => db.prepare("SELECT * FROM expressone_scan WHERE id = 1").get(
       update: async ({ range, requestBody }) => {
         const match = /^'Povrati'!A(\d+):K\d+$/.exec(range);
         if (match) requestBody.values.forEach((row, i) => { returned[Number(match[1]) - 1 + i] = row; });
+        if (match && Number(match[1]) > 1 && insertDuringAppend) { source.splice(2, 0, []); insertDuringAppend = false; }
         return { data: {} };
       },
       batchUpdate: async ({ requestBody }) => {
         if (failSourceWrite) { failSourceWrite = false; throw Error("simulated source write failure"); }
         for (const update of requestBody.data) {
           const match = /^'Orders'!([LP])(\d+)$/.exec(update.range);
+          const archive = /^'Povrati'!K(\d+)$/.exec(update.range);
+          if (archive) { returned[Number(archive[1]) - 1][10] = update.values[0][0]; continue; }
           assert.ok(match); source[Number(match[2]) - 1][match[1] === "L" ? 11 : 15] = update.values[0][0];
         }
         return { data: {} };
@@ -188,6 +196,18 @@ const scan = () => db.prepare("SELECT * FROM expressone_scan WHERE id = 1").get(
   assert.match(source[2][11], /^returned:[a-f0-9]{32}$/); assert.equal(source[2][15], true);
   assert.equal(source.length, 3, "source rows remain intact");
   assert.equal((await transitions.moveOrdersToReturns([reference])).moved, 0);
+  const { parseSheetOrderRows } = require("../src/lib/sheet-order-parser.ts");
+  const returnReference = parseSheetOrderRows("Povrati", returned)[0];
+  assert.equal((await transitions.restoreReturnToTransit(returnReference)).restored, 1);
+  assert.equal(source[2][11], ""); assert.equal(source[2][15], false, "restoring also clears the delivered checkbox");
+  source[2][10] = "telegram:shift"; source[2][12] = "2026-10-28T12:00:00Z";
+  const [shiftedReference] = await transitions.readReturnImportOrders();
+  assert.equal(shiftedReference.appStatus, "");
+  assert.equal(shiftedReference.deliveredChecked, false);
+  insertDuringAppend = true;
+  assert.equal((await transitions.moveOrdersToReturns([shiftedReference])).moved, 1);
+  assert.equal(source[2][11], undefined, "a newly inserted row is never marked by stale row position");
+  assert.match(source[3][11], /^returned:/); assert.equal(source[3][15], true);
   db.close(); fs.rmSync(tmp, { recursive: true, force: true });
   console.log("Express One: parser, matching, DST, daily lease, deduplication, quota retry, review and recovery tests passed.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

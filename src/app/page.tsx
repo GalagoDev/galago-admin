@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
-import { getActiveOrdersSheetRows, getOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
+import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
+import { courierTrackingSnapshot } from "@/lib/courier-tracking-store";
 import { getInventoryOverview } from "@/lib/inventory";
 import { parseOrderAmount } from "@/lib/order-amount";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
@@ -81,11 +82,14 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const inventory = getInventoryOverview();
-  const [activeRows, ordersRows, returnedRows] = await Promise.all([
-    getActiveOrdersSheetRows().catch(() => []),
-    getOrdersSheetRows().catch(() => []),
-    getReturnedSheetRows().catch(() => []),
+  const [ordersResult, returnedResult] = await Promise.allSettled([
+    getOrdersSheetRows(),
+    getReturnedSheetRows(),
   ]);
+  const ordersRows = ordersResult.status === "fulfilled" ? ordersResult.value : [];
+  const returnedRows = returnedResult.status === "fulfilled" ? returnedResult.value : [];
+  const { states: courierStates } = courierTrackingSnapshot(ordersRows);
+  const activeRows = ordersRows.filter(row => isActiveOrderRow(row) && courierStates[row.sheetRowNumber]?.category === "active");
 
   const totalUndelivered = activeRows.length;
   const totalUndeliveredKm = activeRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0);
@@ -130,8 +134,8 @@ export default async function Home({
     },
     {
       title: "Na dostavi",
-      value: String(totalUndelivered),
-      meta: `${totalUndeliveredKm} KM aktivno`,
+      value: ordersResult.status === "fulfilled" ? String(totalUndelivered) : "-",
+      meta: ordersResult.status === "fulfilled" ? `${totalUndeliveredKm} KM potvrđeno` : "Status nije potvrđen",
       href: "/in-transit",
       tone: "bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.08))] border-emerald-300/20",
       glow: "shadow-[0_20px_50px_rgba(16,185,129,0.08)]",
@@ -202,7 +206,7 @@ export default async function Home({
             <div className="flex items-center justify-between gap-4 px-1 pb-3">
               <div>
                 <p className="text-lg font-semibold text-white">Na dostavi</p>
-                <p className="mt-1 text-sm text-neutral-500">Najstarije aktivne pošiljke</p>
+                <p className="mt-1 text-sm text-neutral-500">Potvrđene aktivne pošiljke</p>
               </div>
               <Link
                 href="/in-transit"
@@ -216,7 +220,7 @@ export default async function Home({
             <div className="flex flex-col gap-2.5">
               {oldestUndelivered.length === 0 ? (
                 <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-neutral-500">
-                  Nema aktivnih pošiljki na dostavi.
+                  {ordersResult.status === "fulfilled" ? "Nema potvrđenih aktivnih pošiljki. Nepovezane narudžbe su u Za provjeru." : "Podaci trenutno nisu dostupni."}
                 </div>
               ) : (
                 oldestUndelivered.map((row) => (

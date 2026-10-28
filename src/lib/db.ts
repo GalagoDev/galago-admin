@@ -233,6 +233,37 @@ export function getDb() {
       last_error TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS courier_order_links (
+      order_key TEXT PRIMARY KEY,
+      expected_packages INTEGER NOT NULL,
+      provenance TEXT NOT NULL,
+      linked_at INTEGER NOT NULL,
+      applied_status_id TEXT,
+      suppressed INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS courier_parcels (
+      tracking TEXT PRIMARY KEY,
+      data_json TEXT,
+      checked_at INTEGER NOT NULL DEFAULT 0,
+      next_check_at INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT
+    );
+    CREATE TABLE IF NOT EXISTS courier_order_parcels (
+      order_key TEXT NOT NULL REFERENCES courier_order_links(order_key) ON DELETE CASCADE,
+      tracking TEXT NOT NULL UNIQUE REFERENCES courier_parcels(tracking),
+      PRIMARY KEY(order_key, tracking)
+    );
+    CREATE TABLE IF NOT EXISTS courier_tracking_sync (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      next_run_at INTEGER NOT NULL DEFAULT 0,
+      requested_at INTEGER NOT NULL DEFAULT 0,
+      lease_until INTEGER NOT NULL DEFAULT 0,
+      lease_token TEXT NOT NULL DEFAULT '',
+      last_success_at INTEGER,
+      last_error TEXT,
+      checked_count INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS inventory_imports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       original_name TEXT NOT NULL,

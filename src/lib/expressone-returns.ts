@@ -4,6 +4,8 @@ import { getDb } from "@/lib/db";
 import { claimGmailReader } from "@/lib/claim-gmail";
 import { moveOrdersToReturns, readReturnImportOrders } from "@/lib/google-order-status";
 import { EXPRESSONE_SENDER, matchExpressOneReturn, nextExpressOneScan, parseExpressOneMessage, type ExpressOneEvent } from "@/lib/expressone-parser";
+import { courierOrderKey, courierPackageCount } from "@/lib/courier-status";
+import { courierTrackingSnapshot } from "@/lib/courier-tracking-store";
 
 type Shipment = { tracking: string; event_json: string; first_status_at: string; resolution: string; order_status_id: string | null; last_error: string | null };
 type Scan = { next_run_at: number; last_success_at: number | null; last_error: string | null; last_added: number; last_messages: number };
@@ -86,6 +88,7 @@ export async function runExpressOneScan(now = Date.now()) {
     const returns = shipments.filter(s => (JSON.parse(s.event_json) as ExpressOneEvent).status === "povrat posiljaocu");
     if (returns.length) {
       const orders = await readReturnImportOrders();
+      const courier = courierTrackingSnapshot(orders);
       const pending: Array<{ shipment: Shipment; order: (typeof orders)[number] }> = [];
       for (const shipment of returns) {
         const event = JSON.parse(shipment.event_json) as ExpressOneEvent;
@@ -95,7 +98,15 @@ export async function runExpressOneScan(now = Date.now()) {
         } else if (match.alreadyReturned) {
           db.prepare("UPDATE expressone_shipments SET resolution = 'applied', order_status_id = ?, last_error = NULL WHERE tracking = ?")
             .run(match.order.appStatus.slice("returned:".length), shipment.tracking);
-        } else pending.push({ shipment, order: match.order });
+        } else {
+          const link = courier.links.get(courierOrderKey(match.order));
+          const state = courier.states[match.order.sheetRowNumber];
+          // An email describes one parcel; a whole multi-parcel order needs all parcel statuses.
+          if ((link && state.category !== "returned") || (!link && courierPackageCount(match.order) > 1)) {
+            db.prepare("UPDATE expressone_shipments SET resolution = 'review', last_error = ? WHERE tracking = ?")
+              .run("Potrebna je potvrda svih paketa narudzbe u Express One pregledu.", shipment.tracking);
+          } else pending.push({ shipment, order: match.order });
+        }
       }
       if (pending.length) {
         if (!ownsLease()) throw new Error("scan-interrupted");
