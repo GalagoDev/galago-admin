@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
-import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
+import { getOrdersSheetRows, getReturnedSheetRows } from "@/lib/google-sheets";
+import { courierTrackingSnapshot } from "@/lib/courier-tracking-store";
+import { deliveryOverview } from "@/lib/delivery-overview";
 import { getInventoryOverview } from "@/lib/inventory";
-import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
+import { parseOrderAmount } from "@/lib/order-amount";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
 export const dynamic = "force-dynamic";
@@ -87,10 +89,11 @@ export default async function Home({
   ]);
   const ordersRows = ordersResult.status === "fulfilled" ? ordersResult.value : [];
   const returnedRows = returnedResult.status === "fulfilled" ? returnedResult.value : [];
-  const activeRows = ordersRows.filter(isActiveOrderRow);
+  const overview = deliveryOverview(ordersRows, courierTrackingSnapshot(ordersRows).states);
+  const activeRows = overview.included;
 
   const totalUndelivered = activeRows.length;
-  const totalUndeliveredKm = roundOrderAmount(activeRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0));
+  const totalUndeliveredKm = overview.amount;
   const totalReturnedKm = returnedRows.reduce((sum, row) => sum + parseOrderAmount(row.otkupnina), 0);
   const oldestUndelivered = [...activeRows]
     .sort((a, b) => parseDateLabel(a.dateLabel) - parseDateLabel(b.dateLabel))
@@ -133,7 +136,7 @@ export default async function Home({
     {
       title: "Na dostavi",
       value: ordersResult.status === "fulfilled" ? String(totalUndelivered) : "-",
-      meta: ordersResult.status === "fulfilled" ? `${totalUndeliveredKm} KM ukupno` : "Podaci nisu dostupni",
+      meta: ordersResult.status === "fulfilled" ? `${new Intl.NumberFormat("bs-BA", { maximumFractionDigits: 2 }).format(totalUndeliveredKm)} KM procjena` : "Podaci nisu dostupni",
       href: "/in-transit",
       tone: "bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.08))] border-emerald-300/20",
       glow: "shadow-[0_20px_50px_rgba(16,185,129,0.08)]",

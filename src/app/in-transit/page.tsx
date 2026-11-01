@@ -1,8 +1,10 @@
 import { OrderListPage } from "@/components/order-list-page";
 import { DeliveryReconciliation } from "@/components/delivery-reconciliation";
 import { RefreshCw } from "lucide-react";
-import { getOrdersSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
-import { getCourierSyncStatus } from "@/lib/courier-tracking-store";
+import { getOrdersSheetRows } from "@/lib/google-sheets";
+import { courierTrackingSnapshot, getCourierSyncStatus } from "@/lib/courier-tracking-store";
+import { deliveryOverview } from "@/lib/delivery-overview";
+import { OrderListClient } from "@/components/order-list-client";
 import { refreshCourierStatusesAction } from "@/app/actions/courier";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +31,8 @@ export default async function InTransitPage({
   const [source] = await Promise.allSettled([getOrdersSheetRows({ fresh: true })]);
   const unavailable = source.status === "rejected";
   const allOrders = source.status === "fulfilled" ? source.value : [];
-  const orders = allOrders.filter(isActiveOrderRow);
+  const overview = deliveryOverview(allOrders, courierTrackingSnapshot(allOrders).states);
+  const orders = overview.included;
   const sync = getCourierSyncStatus();
   const date = (value: number) => new Intl.DateTimeFormat("bs-BA", { timeZone: "Europe/Sarajevo", dateStyle: "short", timeStyle: "short" }).format(value);
   const courierErrors: Record<string, string> = {
@@ -42,8 +45,9 @@ export default async function InTransitPage({
   return (
     <OrderListPage
       title="Na dostavi"
-      subtitle="Sve nedostavljene narudžbe, uključujući one koje čekaju slanje"
+      subtitle="Aktivne pošiljke i nove narudžbe koje čekaju slanje"
       orders={orders}
+      summaryLabels={{ count: "Narudžbe u procjeni", amount: "Procijenjena otkupnina" }}
       summaryUnavailable={unavailable}
       refreshPath="/in-transit"
       headerAction={<form action={refreshCourierStatusesAction}><button type="submit" title="Provjeri Express One statuse"
@@ -52,6 +56,7 @@ export default async function InTransitPage({
       workflow={(
         <>
           <div className="mt-3 text-xs text-neutral-400">
+            <p>Procjena uključuje nove narudžbe do 14 dana i starije pošiljke s potvrđenim aktivnim statusom. Iznos nije obračun uplata pošte.</p>
             {sync?.running ? <p>Provjera Express One statusa je u toku.</p> : params.sync && sync?.next_run_at === 0 ? <p>Provjera je zakazana.</p> : null}
             <p>{sync?.last_success_at ? `Zadnja provjera: ${date(sync.last_success_at)}` : "Još nema završene provjere"} · Dnevno u 07:15</p>
             {sync?.next_run_at ? <p className="mt-1">Sljedeća provjera: {date(sync.next_run_at)}</p> : null}
@@ -67,6 +72,10 @@ export default async function InTransitPage({
           <details className="mt-4 border-y border-white/10 py-3"><summary className="cursor-pointer text-sm text-neutral-300">Uvezi izvještaj dostavljenih pošiljki</summary><DeliveryReconciliation /></details>
         </>
       )}
+      afterList={overview.uncertain.length ? <details className="mt-5 border-y border-white/10 py-4">
+        <summary className="cursor-pointer text-sm text-neutral-300">Stariji zapisi bez potvrde: {overview.uncertain.length} · {new Intl.NumberFormat("bs-BA", { maximumFractionDigits: 2 }).format(overview.uncertainAmount)} KM izvan procjene</summary>
+        <div className="mt-4"><OrderListClient orders={overview.uncertain} allowReturns /></div>
+      </details> : undefined}
     />
   );
 }

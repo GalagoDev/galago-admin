@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { getDb } from "@/lib/db";
 import { fetchCourierTracking } from "@/lib/courier-tracking-client";
 import { courierOrderKey } from "@/lib/courier-status";
-import { courierTrackingSnapshot, linkCourierOrder, recordCourierParcel } from "@/lib/courier-tracking-store";
+import { courierTrackingSnapshot, linkCourierOrder, migrateLegacyCourierLinks, recordCourierParcel } from "@/lib/courier-tracking-store";
 import { markCourierOrdersDelivered, moveOrdersToReturns, readReturnImportOrders } from "@/lib/google-order-status";
 import { matchExpressOneReturn, nextExpressOneScan, type ExpressOneEvent } from "@/lib/expressone-parser";
 
@@ -41,6 +41,7 @@ export async function runCourierTrackingSync() {
   let checked = 0, failures = 0;
   try {
     let orders = await readReturnImportOrders();
+    migrateLegacyCourierLinks(orders);
     discoverEmailTracking(orders);
     const snapshot = courierTrackingSnapshot(orders);
     const activeKeys = new Set(orders.filter(o => !o.appStatus && !o.deliveredChecked).map(courierOrderKey));

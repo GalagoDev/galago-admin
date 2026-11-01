@@ -1,12 +1,14 @@
 # Express One delivery reconciliation
 
-`/in-transit` and the dashboard show one combined list and COD total for every
-active Orders row, including orders awaiting dispatch, registered shipments,
-partially completed orders and orders without tracking links. Courier categories
-are internal sync state, never filters for the list or its financial total.
-Only delivered, returned, duplicate or checked-off source rows are excluded.
-Legacy `view` query parameters do not split the list. Tracking does not create
-a manual review task in this overview.
+`/in-transit` and the dashboard show the same explicitly labelled estimate:
+open orders in the last 14 Sarajevo calendar days (including the upcoming
+Monday date block) plus older orders with fresh physical courier activity.
+Verified delivered/returned shipments are excluded immediately, even while
+their Sheets archive is pending. Older unconfirmed/label-only records remain
+in Sheets and a collapsed list with their own count and amount, outside the
+estimate. Age never sets delivery/return status or deletes an order. The amount
+is expected COD, not carrier remittances owed; no payout ledger is available.
+Legacy `view` query parameters do not change this calculation.
 
 The tracking client uses the same public JSON tracking endpoint as Express One's
 Track & Trace page: `POST https://expressone.ba/api/track` with `shipmentNumber`.
@@ -25,7 +27,10 @@ A mixture of delivered and unscanned parcels remains partial. Completed parcels
 are not included in the remaining-package counter for an active order.
 
 SQLite stores explicit order-to-parcel links, parcel histories and a leased sync
-job. The stable order key contains product/contact identity, date block, source
+job. The version-2 key normalizes decimal formatting (139, 139.00, 139,00),
+without normalizing genuine amount changes. Legacy exact identities migrate
+transactionally, preserving parcel uniqueness and restored/archive flags.
+The stable order key contains product/contact identity, date block, source
 ID and received timestamp, never customer name alone. Copied or edited orders
 do not inherit a previous shipment's outcome. Identical ambiguous rows stay for
 review. Manually restoring a return clears the source delivery checkbox and

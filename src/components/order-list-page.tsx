@@ -33,6 +33,8 @@ export function OrderListPage({
   riskView,
   courierStates,
   summaryUnavailable = false,
+  summaryLabels,
+  afterList,
 }: {
   title: string;
   subtitle: string;
@@ -50,6 +52,8 @@ export function OrderListPage({
   riskView?: "export";
   courierStates?: Record<number, CourierOrderState>;
   summaryUnavailable?: boolean;
+  summaryLabels?: { count: string; amount: string };
+  afterList?: ReactNode;
 }) {
   const activeOrders = orders.filter((order) => !order.appStatus.startsWith("duplicate:"));
   const totalAmount = roundOrderAmount(
@@ -82,12 +86,12 @@ export function OrderListPage({
 
         <section className={`mt-5 grid grid-cols-2 gap-3 ${summaryExtra ? "lg:max-w-5xl lg:grid-cols-3" : "lg:max-w-2xl"}`}>
           <article className="rounded-[1.5rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(56,189,248,0.22),rgba(56,189,248,0.08))] px-4 py-4 shadow-[0_20px_50px_rgba(56,189,248,0.08)] lg:rounded-lg">
-            <p className="text-[12px] font-medium leading-4 text-neutral-200">Ukupno narudžbi</p>
+            <p className="text-[12px] font-medium leading-4 text-neutral-200">{summaryLabels?.count || "Ukupno narudžbi"}</p>
             <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{summaryUnavailable ? "-" : activeOrders.length}</p>
           </article>
           <article className="rounded-[1.5rem] border border-emerald-300/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.08))] px-4 py-4 shadow-[0_20px_50px_rgba(16,185,129,0.08)] lg:rounded-lg">
-            <p className="text-[12px] font-medium leading-4 text-neutral-200">Ukupno KM</p>
-            <p className="mt-4 text-[30px] font-semibold leading-none tracking-tight text-white">{summaryUnavailable ? "-" : `${totalAmount} KM`}</p>
+            <p className="text-[12px] font-medium leading-4 text-neutral-200">{summaryLabels?.amount || "Ukupno KM"}</p>
+            <p className="mt-4 break-words text-[24px] font-semibold leading-tight tracking-normal text-white lg:text-[30px]">{summaryUnavailable ? "-" : `${new Intl.NumberFormat("bs-BA", { maximumFractionDigits: 2 }).format(totalAmount)} KM`}</p>
           </article>
           {summaryExtra}
         </section>
@@ -112,6 +116,7 @@ export function OrderListPage({
             courierStates={courierStates}
           />
         </section>
+        {afterList}
       </div>
     </main>
   );

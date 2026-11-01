@@ -13,6 +13,13 @@ export type CourierOrderState = {
 export const COURIER_MAX_AGE = 36 * 60 * 60_000;
 
 export function courierOrderKey(order: SheetOrderRow) {
+  const numeric = (value: string) => /^-?\d+(?:[.,]\d{1,2})?$/.test(value.trim())
+    ? String(Number(value.trim().replace(",", "."))) : value.trim();
+  const identity = { ...order, brojPaketa: numeric(order.brojPaketa), otkupnina: numeric(order.otkupnina),
+    vrijednostPosiljke: numeric(order.vrijednostPosiljke), dop: numeric(order.dop), zamjena: numeric(order.zamjena) };
+  return createHash("sha256").update(["v2", createOrderFingerprint(identity), order.dateLabel, order.receivedAt || "", order.sourceId || ""].join("\u001f")).digest("hex");
+}
+export function legacyCourierOrderKey(order: SheetOrderRow) {
   return createHash("sha256").update([createOrderFingerprint(order), order.dateLabel, order.receivedAt || "", order.sourceId || ""].join("\u001f")).digest("hex");
 }
 export function courierPackageCount(order: SheetOrderRow) {

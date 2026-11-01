@@ -39,6 +39,19 @@ global.fetch=async(url,input)=>{httpCalls++;assert.equal(url,"https://expressone
  assert.throws(()=>client.parseCourierTrackingResponse({ShipmentNumber:"7000187654321",ShippingDate:"28.10.2026",Traces:{Trace:[{ScanDate:"28.10.2026",ScanTime:"10:00:00",StatusDescription:"Potvrda dostave"}]}},"12345678"),/identity/);
  assert.throws(()=>client.parseCourierTrackingResponse({error:"error"},"12345678"));
  const o=order();store.linkCourierOrder(o,["12345678","12345679"],"audit");
+ assert.equal(status.courierOrderKey(o),status.courierOrderKey(order({brojPaketa:"2.00",otkupnina:"100,00",vrijednostPosiljke:"100.00",dop:"1.00",zamjena:"0,00"})),"format-only changes preserve tracking identity");
+ assert.notEqual(status.courierOrderKey(o),status.courierOrderKey(order({otkupnina:"101"})),"real amount edits do not inherit a shipment");
+ const legacyOrder=order({sourceId:"legacy",brojPaketa:"1",sheetRowNumber:9});
+ const oldKey=status.legacyCourierOrderKey(legacyOrder),newKey=status.courierOrderKey(legacyOrder);
+ db.prepare("INSERT INTO courier_order_links (order_key,expected_packages,provenance,linked_at,suppressed,applied_status_id) VALUES (?,1,'audit',?,1,'returned:old')").run(oldKey,now);
+ db.prepare("INSERT INTO courier_parcels (tracking) VALUES ('99999999')").run();
+ db.prepare("INSERT INTO courier_order_parcels (order_key,tracking) VALUES (?,'99999999')").run(oldKey);
+ store.migrateLegacyCourierLinks([legacyOrder,{...legacyOrder,sheetRowNumber:10}]);
+ assert.ok(db.prepare("SELECT 1 FROM courier_order_links WHERE order_key=?").get(oldKey),"ambiguous duplicate migration is refused");
+ store.migrateLegacyCourierLinks([legacyOrder]);store.migrateLegacyCourierLinks([legacyOrder]);
+ assert.equal(db.prepare("SELECT order_key FROM courier_order_parcels WHERE tracking='99999999'").get().order_key,newKey);
+ assert.equal(db.prepare("SELECT suppressed FROM courier_order_links WHERE order_key=?").get(newKey).suppressed,1,"migration preserves restore protection");
+ assert.equal(db.prepare("SELECT applied_status_id FROM courier_order_links WHERE order_key=?").get(newKey).applied_status_id,"returned:old");
  assert.equal(state(o).category,"review","unfetched parcels are not active");
  store.recordCourierParcel(data("12345678",["Potvrda dostave"]),now+86400000);
  store.recordCourierParcel(data("12345679",["Definicija podataka"]),now+86400000);
@@ -49,6 +62,7 @@ global.fetch=async(url,input)=>{httpCalls++;assert.equal(url,"https://expressone
  assert.equal(state(o).category,"review","stale data cannot claim delivery");
  store.recordCourierParcel(data("12345679",["Potvrda dostave"]),now+86400000);
  assert.equal(state(o).category,"delivered");
+ assert.equal(state(order({otkupnina:"100.00",brojPaketa:"2,00"})).category,"delivered","changing number display cannot drop a verified delivery");
  assert.equal(state(order({dateLabel:"29/10/2026",receivedAt:"2026-10-28T11:00:00Z"})).category,"review","copied order must not inherit the previous parcel");
  assert.equal(state(order({sheetRowNumber:30})).category,"delivered","row sorting preserves the same order identity");
  const dup=store.courierTrackingSnapshot([o,order({sheetRowNumber:4})]);assert.equal(dup.states[3].category,"review");assert.equal(dup.states[4].category,"review");

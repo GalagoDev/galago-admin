@@ -1,10 +1,27 @@
 import { getDb } from "@/lib/db";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 import { aggregateCourierParcels, classifyCourierParcel, COURIER_MAX_AGE, courierOrderKey, courierPackageCount,
-  normalizeCourierTracking, type CourierOrderState, type CourierParcelData } from "@/lib/courier-status";
+  legacyCourierOrderKey, normalizeCourierTracking, type CourierOrderState, type CourierParcelData } from "@/lib/courier-status";
 
 type Link = { order_key: string; expected_packages: number; provenance: string; linked_at: number; suppressed: number; applied_status_id: string | null };
 type Parcel = { tracking: string; data_json: string | null; checked_at: number; next_check_at: number; last_error: string | null };
+
+export function migrateLegacyCourierLinks(orders: SheetOrderRow[]) {
+  const db = getDb(), counts = new Map<string, number>();
+  for (const order of orders) { const key = courierOrderKey(order); counts.set(key, (counts.get(key) || 0) + 1); }
+  db.transaction(() => {
+    for (const order of orders) {
+      const key = courierOrderKey(order), legacy = legacyCourierOrderKey(order);
+      if (counts.get(key) !== 1 || db.prepare("SELECT 1 FROM courier_order_links WHERE order_key=?").get(key)) continue;
+      const link = db.prepare("SELECT * FROM courier_order_links WHERE order_key=?").get(legacy) as Link | undefined;
+      if (!link) continue;
+      db.prepare(`INSERT INTO courier_order_links (order_key,expected_packages,provenance,linked_at,suppressed,applied_status_id)
+        VALUES (?,?,?,?,?,?)`).run(key, link.expected_packages, link.provenance, link.linked_at, link.suppressed, link.applied_status_id);
+      db.prepare("UPDATE courier_order_parcels SET order_key=? WHERE order_key=?").run(key, legacy);
+      db.prepare("DELETE FROM courier_order_links WHERE order_key=?").run(legacy);
+    }
+  })();
+}
 
 export function linkCourierOrder(order: SheetOrderRow, tracking: string[], provenance: string, allowIncomplete = false) {
   const db = getDb(), key = courierOrderKey(order), expected = courierPackageCount(order);
@@ -80,5 +97,5 @@ export function getCourierSyncStatus() {
   return status ? { ...status, running: status.lease_until > Date.now() } : undefined;
 }
 export function suppressCourierOrder(order: SheetOrderRow) {
-  getDb().prepare("UPDATE courier_order_links SET suppressed=1 WHERE order_key=?").run(courierOrderKey(order));
+  getDb().prepare("UPDATE courier_order_links SET suppressed=1 WHERE order_key IN (?,?)").run(courierOrderKey(order), legacyCourierOrderKey(order));
 }
