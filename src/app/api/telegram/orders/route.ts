@@ -16,6 +16,7 @@ import {
   saveTelegramOrderDraft,
 } from "@/lib/telegram-order-drafts";
 import { formatTelegramOrderPreview, type TelegramOrderDraft } from "@/lib/telegram-orders";
+import { isUsableOrderPhone } from "@/lib/order-phone";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,6 +30,8 @@ type TelegramMessage = {
   photo?: Array<{
     file_id: string;
     file_size?: number;
+    width?: number;
+    height?: number;
   }>;
   document?: {
     file_id: string;
@@ -177,7 +180,9 @@ function getMessageImageFileId(message: TelegramMessage) {
     };
   }
 
-  const photo = [...(message.photo || [])].sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
+  const photo = [...(message.photo || [])].sort((a, b) =>
+    (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0)
+    || (b.file_size || 0) - (a.file_size || 0))[0];
   if (!photo?.file_id) return null;
 
   return {
@@ -378,6 +383,9 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
 
     const sheetOrderId = `telegram:${draft.chatId}:${draft.messageId}`;
     try {
+      if (!isUsableOrderPhone(draft.order.brojTelefona)) {
+        throw new Error("Broj telefona nije potpun. Pošalji narudžbu ponovo s cijelim brojem telefona.");
+      }
       await appendOrderToOrdersSheet(draft.order, { sourceId: sheetOrderId });
       saveTelegramConfirmedOrder({
         chatId: draft.chatId,

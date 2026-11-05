@@ -1,4 +1,5 @@
 import { detectPostalFromText } from "@/lib/bih-postal";
+import { isUsableOrderPhone, normalizeOrderPhone, phoneCandidatesFromText } from "@/lib/order-phone";
 
 export type ParsedOrder = {
   customerName: string | null;
@@ -30,18 +31,9 @@ function splitLines(rawText: string) {
     .filter(Boolean);
 }
 
-function normalizePhone(text: string) {
-  const digits = text.replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("387")) return digits;
-  if (digits.startsWith("0")) return `387${digits.slice(1)}`;
-  if (digits.startsWith("6")) return `387${digits}`;
-  return digits;
-}
-
 function findPhone(text: string) {
-  const match = text.match(/(\+?387[\d\s\/-]{6,}|06[\d\s\/-]{6,})/i);
-  return match ? normalizePhone(match[1]) : null;
+  const candidates = phoneCandidatesFromText(text);
+  return candidates.length === 1 && isUsableOrderPhone(candidates[0]) ? normalizeOrderPhone(candidates[0]) : null;
 }
 
 function findAmount(text: string) {

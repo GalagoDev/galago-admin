@@ -19,6 +19,7 @@
     "test:statistics": "node --experimental-strip-types ./scripts/test-inventory-statistics.mjs",
     "test:shopify-inventory": "node --experimental-strip-types ./scripts/test-shopify-inventory-matching.mjs",
     "test:telegram-caption": "node --experimental-strip-types ./scripts/test-telegram-order-caption.mjs",
+    "test:order-phone": "node ./scripts/test-order-phone.cjs",
     "test:telegram-api-errors": "node --experimental-strip-types ./scripts/test-telegram-api-errors.mjs",
     "test:order-window": "node --experimental-strip-types ./scripts/test-order-window.mjs",
     "test:ads": "node --experimental-strip-types ./scripts/test-ads-analytics.mjs && node ./scripts/test-ads-api.cjs && node ./scripts/test-ads-sheets.cjs && node ./scripts/test-google-ads-sheet-export.cjs",

@@ -1,4 +1,5 @@
 import { BIH_POSTAL_CODES, detectPostalFromText, normalizeBosnianText } from "./bih-postal.ts";
+import { isUsableOrderPhone, normalizeOrderPhone, phoneCandidatesFromText } from "./order-phone.ts";
 
 export type TelegramOrderDraft = {
   primalac: string;
@@ -35,18 +36,11 @@ function splitSegments(rawText: string) {
     .filter(Boolean);
 }
 
-export function normalizePhone(text: string) {
-  const digits = String(text || "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("387")) return digits;
-  if (digits.startsWith("0")) return `387${digits.slice(1)}`;
-  if (digits.startsWith("6")) return `387${digits}`;
-  return digits;
-}
+export const normalizePhone = normalizeOrderPhone;
 
 function findPhone(text: string) {
-  const match = text.match(/(\+?387[\d\s/-]{6,}|06[\d\s/-]{6,})/i);
-  return match ? normalizePhone(match[1] || "") : "";
+  const candidates = phoneCandidatesFromText(text);
+  return candidates.length === 1 && isUsableOrderPhone(candidates[0]) ? normalizePhone(candidates[0]) : "";
 }
 
 function escapeRegExp(value: string) {
@@ -102,6 +96,14 @@ export function getTelegramArticleOverrideText(value: string) {
   const lines = String(value || "")
     .split(/\n+/)
     .map(stripTelegramPackageCount)
+    .filter((line) => {
+      const phones = phoneCandidatesFromText(line);
+      if (phones.length !== 1) return true;
+      const remainder = line.replace(phones[0], "")
+        .replace(/^(?:broj\s+)?(?:telefon(?:a)?|tel|mobitel|mob)\b/i, "")
+        .replace(/[\s():.\-]/g, "");
+      return remainder.length > 0;
+    })
     .filter(Boolean);
   const lastLine = lines.at(-1) || "";
   const lastLineResult = parseTelegramArticleAndAmount(lastLine);

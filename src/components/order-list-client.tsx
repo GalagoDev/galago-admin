@@ -3,18 +3,24 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckCheck, LoaderCircle } from "lucide-react";
+import { CheckCheck, LoaderCircle, TriangleAlert } from "lucide-react";
 
 import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
 import { approveAllOrderRisksAction, setOrderRiskDecisionAction } from "@/app/actions/order-risk";
 import { formatPostalLocation } from "@/lib/bih-postal";
 import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
+import { isUsableOrderPhone } from "@/lib/order-phone";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 import type { OrderRiskAssessment } from "@/lib/order-risk";
 import type { CourierOrderState } from "@/lib/courier-status";
 import { CourierOrderDetails } from "@/components/courier-order-details";
 
 const PAGE_SIZE = 25;
+
+function PhoneWarning({ phone }: { phone: string }) {
+  if (isUsableOrderPhone(phone) && !/^3870/.test(phone.replace(/\D/g, ""))) return null;
+  return <span className="mt-1 inline-flex items-center gap-1 text-xs text-amber-200"><TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Provjeri telefon</span>;
+}
 
 function RiskSubmitButton({ children, classes, bulk = false }: { children: ReactNode; classes: string; bulk?: boolean }) {
   const { pending } = useFormStatus();
@@ -349,6 +355,7 @@ export function OrderListClient({
                     <p><span className="text-neutral-500">Grad:</span> {formatPostalLocation(order.grad)}</p>
                     <p><span className="text-neutral-500">Adresa:</span> {order.adresa || "-"}</p>
                     <p><span className="text-neutral-500">Telefon:</span> {order.brojTelefona || "-"}</p>
+                    <PhoneWarning phone={order.brojTelefona} />
                     <div className="mt-1 flex items-center justify-between gap-3 text-[12px]">
                       <span className="text-neutral-500">Otkupnina</span>
                       <span className="font-medium text-white">{order.otkupnina || "-"}</span>
@@ -404,7 +411,7 @@ export function OrderListClient({
                   {courierStates?.[order.sheetRowNumber] ? <CourierOrderDetails state={courierStates[order.sheetRowNumber]} canLink={!order.appStatus && !order.deliveredChecked} /> : null}
                   {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
                 </div>
-                <p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p>
+                <div className="min-w-0"><p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p><PhoneWarning phone={order.brojTelefona} /></div>
                 <div className="min-w-0">
                   <p className="break-words font-medium text-white">{formatPostalLocation(order.grad)}</p>
                   <p className="mt-1 break-words text-xs leading-5 text-neutral-500">{order.adresa || "-"}</p>

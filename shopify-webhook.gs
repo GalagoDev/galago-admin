@@ -15,11 +15,8 @@ const SHEET_NAME = 'Orders';
 const BLOCK_EMPTY_ROWS = 5;
 const TOTAL_COLUMNS = 10;
 const INTERNAL_ID_COLUMN = 11; // K
-const APP_STATUS_COLUMN = 12; // L
 const RECEIVED_AT_COLUMN = 13; // M
-const EXPORT_MARKER_COLUMN = 14; // N
 const DELIVERED_CHECKBOX_COLUMN = 16; // P
-const INTERNAL_HEADERS = ['Source ID', 'App status', 'Received at', 'Export marker'];
 const SPREADSHEET_ID = '1P99qsJa4HzruxVCB3BHLTpZ5Jvb1jiTVvjf6IuRho9s';
 const DEFAULT_SHOPIFY_STORE_KEY = 'galago';
 
@@ -129,7 +126,6 @@ function ensureOrdersSheetLayout() {
   if (!sheet) throw new Error(`Sheet not found: ${SHEET_NAME}`);
 
   sheet.getRange(1, 1, 1, HEADER.length).setValues([HEADER]);
-  sheet.getRange(1, INTERNAL_ID_COLUMN, 1, INTERNAL_HEADERS.length).setValues([INTERNAL_HEADERS]);
   sheet.getRange(1, 1, 1, HEADER.length)
     .setFontWeight('bold')
     .setFontSize(10)
@@ -138,7 +134,6 @@ function ensureOrdersSheetLayout() {
     .setHorizontalAlignment('center');
 
   sheet.setFrozenRows(1);
-  sheet.hideColumns(INTERNAL_ID_COLUMN, EXPORT_MARKER_COLUMN - INTERNAL_ID_COLUMN + 1);
 }
 
 function insertOrdersTodayBlock() {
@@ -225,6 +220,7 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
 
   const insertRow = findAppendRowInBlock_(sheet, dateRow);
 
+  sheet.getRange(insertRow, 2).setNumberFormat('@');
   sheet.getRange(insertRow, 1, 1, TOTAL_COLUMNS).setValues([[ 
     order.primalac,
     order.brojTelefona,
@@ -237,6 +233,7 @@ function appendOrderToOrdersSheet_(order, shopifyOrderId) {
     order.dop,
     order.zamjena,
   ]]);
+  sheet.getRange(insertRow, 2).setNote(`Shopify original (${order.phoneSource}): ${order.phoneOriginal || '-'}`);
 
   sheet.getRange(insertRow, INTERNAL_ID_COLUMN).setValue(shopifyOrderId);
   sheet.getRange(insertRow, RECEIVED_AT_COLUMN).setValue(new Date().toISOString());
@@ -340,13 +337,14 @@ function mapShopifyOrder_(order) {
 
   const primalac = buildCustomerName_(shipping, billing, customer, order);
 
-  const brojTelefona = normalizePhone_(
-    shipping.phone ||
-    billing.phone ||
-    customer.phone ||
-    order.phone ||
-    ''
-  );
+  const phone = [
+    ['shipping_address.phone', shipping.phone],
+    ['phone', order.phone],
+    ['billing_address.phone', billing.phone],
+    ['customer.phone', customer.phone],
+  ].find(entry => String(entry[1] == null ? '' : entry[1]).trim());
+  const phoneOriginal = phone ? String(phone[1]).trim() : '';
+  const brojTelefona = normalizePhone_(phoneOriginal);
 
   const cityRaw = shipping.city || billing.city || '';
   const zipRaw = shipping.zip || billing.zip || '';
@@ -379,6 +377,8 @@ function mapShopifyOrder_(order) {
   return {
     primalac,
     brojTelefona,
+    phoneOriginal,
+    phoneSource: phone ? phone[0] : 'missing',
     grad,
     adresa,
     artikal: combinedProducts,
@@ -478,11 +478,15 @@ function buildCustomerName_(shipping, billing, customer, order) {
 }
 
 function normalizePhone_(value) {
-  const digits = String(value || '').replace(/\D/g, '');
+  const raw = String(value == null ? '' : value).normalize('NFKC').trim();
+  let digits = raw.replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.startsWith('387')) return digits;
+  const international = raw.startsWith('+') || digits.startsWith('00');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('387')) return `387${digits.slice(3).replace(/^0/, '')}`;
+  if (international) return digits;
   if (digits.startsWith('0')) return `387${digits.slice(1)}`;
-  if (digits.startsWith('6')) return `387${digits}`;
+  if (/^[3-6]\d{7,8}$/.test(digits)) return `387${digits}`;
   return digits;
 }
 

@@ -5,12 +5,12 @@ import { z } from "zod";
 import {
   bosniaPostalCodes,
   getTelegramArticleOverrideText,
-  normalizePhone,
   parseTelegramArticleAndAmount,
   parseTelegramPackageCount,
   resolveTelegramPostalCode,
   type TelegramOrderDraft,
 } from "@/lib/telegram-orders";
+import { phoneCandidatesFromText, resolveOrderPhone, verifyImagePhone } from "@/lib/order-phone";
 
 const DEFAULT_MODEL = "gpt-5.6-luna";
 const API_TIMEOUT_MS = 45_000;
@@ -18,7 +18,7 @@ const API_TIMEOUT_MS = 45_000;
 const telegramOrderSchema = z
   .object({
     primalac: z.string().describe("Customer full name. Empty string if not visible."),
-    brojTelefona: z.string().describe("Customer phone number, preferably normalized to Bosnia format 387..."),
+    brojTelefona: z.string().describe("Copy the complete phone exactly as written, including all final digits. Do not normalize, shorten, correct or guess. Empty if unreadable."),
     grad: z.string().describe("Bosnia ZIP/postal code only when known; otherwise the visible city/place."),
     adresa: z.string().describe("Shipping street/address, without city/ZIP when separable."),
     artikal: z.string().describe("Product name from the last user-provided item text, without its trailing price."),
@@ -48,6 +48,7 @@ function normalizeDraft(
   order: z.infer<typeof telegramOrderSchema>,
   artikalOverride: string,
   sourceText: string,
+  image: boolean,
 ): TelegramOrderDraft {
   const override = parseTelegramArticleAndAmount(artikalOverride);
   const extracted = parseTelegramArticleAndAmount(order.artikal);
@@ -62,7 +63,7 @@ function normalizeDraft(
 
   return {
     primalac: cleanup(order.primalac),
-    brojTelefona: normalizePhone(order.brojTelefona),
+    brojTelefona: resolveOrderPhone(sourceText, order.brojTelefona, image),
     grad,
     adresa: cleanup(order.adresa),
     artikal: override.artikal || extracted.artikal,
@@ -129,7 +130,7 @@ Return only the structured JSON fields. Do not include explanations.
 Rules:
 - Intake language is Bosnian/Croatian/Serbian; preserve names and addresses in Latin script.
 - Primalac is the customer full name, not page/admin labels unless it is also the customer name.
-- Broj telefona must be normalized to digits only. Bosnia mobile examples: 061417206 -> 38761417206, +387 61 417 206 -> 38761417206.
+- Copy Broj telefona EXACTLY as written, digit by digit, including the last digit. Do not normalize country prefixes, shorten to a standard length, correct, or guess missing digits. Bosnia numbers may have 9 OR 10 digits including the initial zero. The app handles normalization. If unclear or missing, return an empty string.
 - Grad should be a five-digit ZIP/postal code when known. Common mappings: ${postalHints()}.
 - If a city/place is visible but you do not know its ZIP reliably, return the visible city/place in Grad. The app resolves it through its Bosnia postal directory.
 - Adresa is the street/place/address only, without ZIP/city when separable.
@@ -197,8 +198,23 @@ async function extractWithOpenAI(input: {
     if (!raw) throw new Error("OpenAI nije vratio narudžbu.");
 
     const parsed = telegramOrderSchema.parse(JSON.parse(raw));
-    const order = normalizeDraft(parsed, artikalOverride, sourceText);
+    const order = normalizeDraft(parsed, artikalOverride, sourceText, Boolean(input.imageBytes));
     assertUsableOrder(order);
+    if (input.imageBytes && input.mimeType && !phoneCandidatesFromText(sourceText).length) {
+      // Read independently, without showing the first reading, so a plausible wrong digit is not silently accepted.
+      const verification = await client.chat.completions.create({
+        model,
+        reasoning_effort: "none",
+        max_completion_tokens: 150,
+        messages: [{ role: "user", content: [
+          { type: "text", text: "Read ONLY the customer's delivery phone number in this image. Transcribe every digit exactly as printed, including the last digit. Do not normalize or correct it. It can have 9 or 10 digits with a leading zero. Return an empty string if any digit is unclear or there are multiple possible customer phone numbers." },
+          { type: "image_url", image_url: { url: imageDataUrl(input.imageBytes, input.mimeType), detail: "high" } },
+        ] }],
+        response_format: zodResponseFormat(z.object({ phone: z.string() }).strict(), "phone_check"),
+      }, { timeout: API_TIMEOUT_MS });
+      const checked = z.object({ phone: z.string() }).parse(JSON.parse(verification.choices[0]?.message?.content || "{}"));
+      verifyImagePhone(parsed.brojTelefona, checked.phone);
+    }
     return order;
   } catch (error) {
     throw new Error(openAIErrorMessage(error));
