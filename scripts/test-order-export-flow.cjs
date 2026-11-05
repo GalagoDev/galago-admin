@@ -28,6 +28,7 @@ const window = workday.getOperationalExportWindow(new Date("2026-10-16T05:08:00Z
 let authenticated = true;
 let readError = false;
 let markerError = false;
+let carrierReturns = [];
 const exportMarkers = [];
 
 function order(row, name, phone, dateLabel, receivedAt) {
@@ -62,6 +63,7 @@ async function persist(references, decision) {
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "next/navigation") return { redirect };
+  if (request === "@/lib/expressone-returns") return { getExpressOneReturnRiskContacts: () => carrierReturns };
   if (request === "next/cache") return { revalidatePath: () => {} };
   if (request === "next/headers") return { cookies: async () => ({ get: () => authenticated ? { value: session.createSession() } : undefined }) };
   if (request === "@/components/order-list-page") return { OrderListPage: () => null };
@@ -147,6 +149,17 @@ async function expectRedirect(run, location) {
   assert.match((await failedMarker.json()).error, /upis oznake/);
   assert.equal(exportMarkers.length, 1);
   markerError = false;
+
+  carrierReturns = [{ tracking: "001-87654321", primalac: "Different Name", brojTelefona: "00387 61 333333" }];
+  const carrierReview = await Page({ searchParams: Promise.resolve({ view: "export" }) });
+  assert.equal(carrierReview.props.riskAssessments[6].carrierReturnCount, 1);
+  assert.equal(carrierReview.props.riskAssessments[6].unresolved, true);
+  assert.equal((await get(true)).status, 409, "unmatched carrier returns require review before export too");
+  assert.equal(exportMarkers.length, 1);
+  await expectRedirect(() => actions.setOrderRiskDecisionAction(form([rows[1]], "approve")), "/orders?view=export&risk=approve");
+  assert.equal((await get(true)).status, 200, "manual approval keeps the Excel download available");
+  assert.equal(rows[1].appStatus, "", "the warning does not change delivery status");
+  carrierReturns = [];
 
   await expectRedirect(() => actions.setOrderRiskDecisionAction(form([rows[2]], "duplicate")), "/orders?view=export&risk=duplicate");
   const afterExclusion = await Page({ searchParams: Promise.resolve({ view: "export" }) });

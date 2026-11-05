@@ -1,9 +1,11 @@
 import type { SheetOrderRow } from "./google-sheets.ts";
+import { isUsableOrderPhone, normalizeOrderPhone } from "./order-phone.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const DUPLICATE_LOOKBACK_DAYS = 14;
 
 export type OrderRiskLevel = "critical" | "warning" | "none";
+export type CarrierReturnContact = Pick<SheetOrderRow, "primalac" | "brojTelefona"> & { tracking: string };
 
 export type OrderRiskAssessment = {
   sheetRowNumber: number;
@@ -15,6 +17,7 @@ export type OrderRiskAssessment = {
   recentMatchCount: number;
   deliveredCount: number;
   returnedCount: number;
+  carrierReturnCount: number;
   activeCount: number;
   lastOrderDaysAgo: number | null;
   lastOrderDate: string;
@@ -22,16 +25,7 @@ export type OrderRiskAssessment = {
 };
 
 function normalizePhone(value: string) {
-  const digits = String(value || "").replace(/\D/g, "");
-  if (!digits) return "";
-  const normalized = digits.startsWith("387")
-    ? digits
-    : digits.startsWith("0")
-      ? `387${digits.slice(1)}`
-      : digits.startsWith("6")
-        ? `387${digits}`
-        : digits;
-  return normalized.length >= 8 ? normalized : "";
+  return isUsableOrderPhone(value) ? normalizeOrderPhone(value) : "";
 }
 
 function normalizeName(value: string) {
@@ -68,7 +62,7 @@ function isEarlier(candidate: SheetOrderRow, current: SheetOrderRow) {
   return candidate.sheetRowNumber < current.sheetRowNumber;
 }
 
-function matchIdentity(current: SheetOrderRow, candidate: SheetOrderRow) {
+function matchIdentity(current: Pick<SheetOrderRow, "primalac" | "brojTelefona">, candidate: Pick<SheetOrderRow, "primalac" | "brojTelefona">) {
   const currentPhone = normalizePhone(current.brojTelefona);
   const candidatePhone = normalizePhone(candidate.brojTelefona);
   const currentName = normalizeName(current.primalac);
@@ -104,6 +98,7 @@ export function assessOrderRisks(
   allOrders: SheetOrderRow[],
   returnedOrders: SheetOrderRow[] = [],
   now = new Date(),
+  carrierReturns: CarrierReturnContact[] = [],
 ) {
   const nowTime = now.getTime();
   const result: Record<number, OrderRiskAssessment> = {};
@@ -131,6 +126,11 @@ export function assessOrderRisks(
       const match = matchIdentity(current, candidate);
       return match.phone || match.name;
     });
+    const carrierMatches = carrierReturns.filter((candidate) => {
+      const match = matchIdentity(current, candidate);
+      return match.phone || match.name;
+    });
+    const carrierReturnCount = new Set(carrierMatches.map((candidate) => candidate.tracking)).size;
 
     const reasons: string[] = [];
     if (activePhoneMatches.length > 0) reasons.push("Isti telefon već ima aktivnu pošiljku.");
@@ -146,11 +146,15 @@ export function assessOrderRisks(
     if (historicalReturns.length > 0 || returnSheetMatches.length > 0) {
       reasons.push("Kupac je ranije imao povrat.");
     }
+    if (carrierReturnCount > 0) {
+      reasons.push("Express One email bilježi povrat za ovog kupca; povezivanje narudžbe čeka provjeru.");
+    }
 
     const hasCriticalRisk = activePhoneMatches.length > 0
       || recentPhoneMatches.length > 0
       || historicalReturns.length > 0
-      || returnSheetMatches.length > 0;
+      || returnSheetMatches.length > 0
+      || carrierReturnCount > 0;
     const hasWarningRisk = !hasCriticalRisk && recentNameMatches.length > 0;
     const level: OrderRiskLevel = hasCriticalRisk ? "critical" : hasWarningRisk ? "warning" : "none";
     const approved = isApproved(current);
@@ -169,6 +173,7 @@ export function assessOrderRisks(
       recentMatchCount: recentMatches.length,
       deliveredCount: previousMatches.filter(({ candidate }) => candidate.appStatus.startsWith("delivered:") || candidate.deliveredChecked).length,
       returnedCount: Math.max(returnedCount, returnSheetMatches.length),
+      carrierReturnCount,
       activeCount: previousMatches.filter(({ candidate }) => !candidate.appStatus && !candidate.deliveredChecked).length,
       lastOrderDaysAgo: Number.isFinite(latestTime) ? differenceInDays(nowTime, latestTime) : null,
       lastOrderDate: latestMatch?.dateLabel || "",

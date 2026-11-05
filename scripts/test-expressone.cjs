@@ -100,6 +100,7 @@ const scan = () => db.prepare("SELECT * FROM expressone_scan WHERE id = 1").get(
   assert.equal(scan().last_added, 1); assert.equal(scan().last_messages, 3);
   assert.equal(worker.getExpressOneScanStatus().review.length, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM expressone_shipments WHERE resolution = 'applied'").get().n, 2);
+  assert.equal(worker.getExpressOneReturnRiskContacts().length, 0, "applied returns are already in Sheets and must not be counted again");
   assert.ok(delays.includes(20_000), "403 quota errors back off");
   const before = listCalls; await worker.runExpressOneScan(); assert.equal(listCalls, before, "only one scheduled run per day");
   due(); await worker.runExpressOneScan(); assert.equal(getCalls, 3, "persisted Gmail IDs are not fetched again"); assert.equal(moves, 1);
@@ -108,10 +109,12 @@ const scan = () => db.prepare("SELECT * FROM expressone_scan WHERE id = 1").get(
   messages.set("ambiguous", message("ambiguous", "001-12345681"));
   due(); await worker.runExpressOneScan(); assert.equal(moves, 1);
   assert.equal(worker.getExpressOneScanStatus().review.length, 1);
+  assert.deepEqual(worker.getExpressOneReturnRiskContacts(), [{ tracking: "001-12345681", primalac: "Test Kupac", brojTelefona: "061 123 456" }]);
   // A later refusal replaces an older return, even when fetched out of chronological order.
   worker.recordExpressOneEvent({ ...event, tracking: "001-12345681", status: "odbijeno", statusAt: "2026-10-27 06:00:00" });
   worker.recordExpressOneEvent({ ...event, tracking: "001-12345681", statusAt: "2026-10-25 06:00:00" });
   due(); await worker.runExpressOneScan(); assert.equal(moves, 1); assert.equal(worker.getExpressOneScanStatus().review.length, 0);
+  assert.equal(worker.getExpressOneReturnRiskContacts().length, 0, "a superseded return event must not remain a warning");
   orders = [order({ sheetRowNumber: 8 })];
   messages.set("failure", message("failure", "001-12345682")); failedId = "failure";
   const lastSuccess = scan().last_success_at;

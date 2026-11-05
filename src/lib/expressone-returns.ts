@@ -6,6 +6,7 @@ import { moveOrdersToReturns, readReturnImportOrders } from "@/lib/google-order-
 import { EXPRESSONE_SENDER, matchExpressOneReturn, nextExpressOneScan, parseExpressOneMessage, type ExpressOneEvent } from "@/lib/expressone-parser";
 import { courierOrderKey, courierPackageCount } from "@/lib/courier-status";
 import { courierTrackingSnapshot } from "@/lib/courier-tracking-store";
+import type { CarrierReturnContact } from "@/lib/order-risk";
 
 type Shipment = { tracking: string; event_json: string; first_status_at: string; resolution: string; order_status_id: string | null; last_error: string | null };
 type Scan = { next_run_at: number; last_success_at: number | null; last_error: string | null; last_added: number; last_messages: number };
@@ -146,6 +147,15 @@ export function getExpressOneScanStatus() {
     .filter(s => (JSON.parse(s.event_json) as ExpressOneEvent).status === "povrat posiljaocu")
     .map(s => ({ ...JSON.parse(s.event_json) as ExpressOneEvent, reason: s.last_error }));
   return { scan, review };
+}
+
+export function getExpressOneReturnRiskContacts(): CarrierReturnContact[] {
+  // A verified return email can warn about a customer even before an exact order match is safe.
+  // Applied returns are already covered by Orders/Povrati; keep parcel counts separate from order counts.
+  const rows = getDb().prepare(`SELECT tracking, json_extract(event_json, '$.recipient') AS primalac,
+    json_extract(event_json, '$.phone') AS brojTelefona FROM expressone_shipments
+    WHERE resolution != 'applied' AND json_extract(event_json, '$.status') = 'povrat posiljaocu'`).all() as CarrierReturnContact[];
+  return rows.map((row) => ({ tracking: row.tracking, primalac: String(row.primalac || ""), brojTelefona: String(row.brojTelefona || "") }));
 }
 
 declare global { var galagoExpressOneTimer: ReturnType<typeof setInterval> | undefined; var galagoExpressOneRun: Promise<void> | undefined; }

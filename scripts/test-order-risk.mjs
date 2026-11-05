@@ -116,4 +116,28 @@ const reviewed = assessOrderRisks([current], all, [], new Date("2026-09-19T12:00
 assert.equal(reviewed[20].approved, true);
 assert.equal(reviewed[20].unresolved, false);
 
-console.log("Order risk tests passed.");
+const differentName = { ...returnRepeat, primalac: "Druga Osoba", brojTelefona: "+387 (0)62 333 444" };
+const prefixReturn = { ...returned, brojTelefona: "00387 62 333 444" };
+const normalizedRisk = assessOrderRisks([differentName], [prefixReturn, differentName]);
+assert.equal(normalizedRisk[30].level, "critical", "same phone with international prefixes must match even when names differ");
+assert.match(normalizedRisk[30].reasons.join(" "), /ranije imao povrat/);
+
+const carrierReturns = [{ tracking: "001-12345678", primalac: "Nepovezan Kupac", brojTelefona: "0038762333444" }];
+const carrierRisk = assessOrderRisks([differentName], [differentName], [], new Date(), carrierReturns);
+assert.equal(carrierRisk[30].level, "critical");
+assert.equal(carrierRisk[30].unresolved, true);
+assert.equal(carrierRisk[30].carrierReturnCount, 1);
+assert.equal(carrierRisk[30].returnedCount, 0, "unmatched parcels must not inflate confirmed returned order counts");
+assert.match(carrierRisk[30].reasons.join(" "), /Express One email/);
+assert.equal(differentName.appStatus, "", "a warning must not mark an order returned");
+
+const nameOnlyRisk = assessOrderRisks([returnRepeat], [returnRepeat], [], new Date(), [
+  { tracking: "001-12345679", primalac: "JASMIN KOVAČEVIĆ", brojTelefona: "" },
+]);
+assert.equal(nameOnlyRisk[30].carrierReturnCount, 1, "name history works without a reliable phone");
+const unrelatedRisk = assessOrderRisks([firstToday], [firstToday], [], new Date(), carrierReturns);
+assert.equal(unrelatedRisk[40].level, "none");
+const approvedCarrierRisk = assessOrderRisks([{ ...differentName, riskReview: `approved:${differentName.fingerprint}` }], [differentName], [], new Date(), carrierReturns);
+assert.equal(approvedCarrierRisk[30].unresolved, false, "manual approval remains available");
+
+console.log("Order risk tests passed, including historical and unmatched carrier returns.");

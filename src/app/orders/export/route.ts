@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { markLastExportedOrder } from "@/lib/google-orders";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow, type SheetOrderRow } from "@/lib/google-sheets";
 import { assessOrderRisks, unresolvedOrderRisks } from "@/lib/order-risk";
+import { getExpressOneReturnRiskContacts } from "@/lib/expressone-returns";
 import { getOperationalExportWindow, isOrderInOperationalExportWindow } from "@/lib/order-workday";
 import { normalizeTelegramPostalCode } from "@/lib/telegram-orders";
 
@@ -68,7 +69,7 @@ async function createExport(request: Request) {
     return exportError(request, `Nema aktivnih narudžbi za ciklus ${window.startLabel} 08:00 - ${window.endLabel} 08:00.`, 404);
   }
 
-  const unresolvedRisks = unresolvedOrderRisks(assessOrderRisks(orders, rows, returnedRows));
+  const unresolvedRisks = unresolvedOrderRisks(assessOrderRisks(orders, rows, returnedRows, new Date(), getExpressOneReturnRiskContacts()));
   if (unresolvedRisks.length > 0) {
     return request.headers.get("Accept")?.includes("application/json")
       ? Response.json({ redirect: REVIEW_PATH }, { status: 409, headers: RESPONSE_HEADERS })

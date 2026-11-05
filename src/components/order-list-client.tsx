@@ -108,6 +108,7 @@ function RiskDetails({ order, risk, riskView }: { order: SheetOrderRow; risk: Or
       <p className="mt-1 text-neutral-500">
         Dostavljeno {risk.deliveredCount} · Povrati {risk.returnedCount} · Aktivno {risk.activeCount}
       </p>
+      {risk.carrierReturnCount > 0 ? <p className="mt-1 text-red-200">Express One povrati za provjeru: {risk.carrierReturnCount}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
         {risk.unresolved ? (
           <>

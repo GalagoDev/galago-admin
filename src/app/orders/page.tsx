@@ -4,6 +4,7 @@ import { OrderListPage } from "@/components/order-list-page";
 import { OrderExportButton } from "@/components/order-export-button";
 import { getOrdersSheetRows, getReturnedSheetRows, isActiveOrderRow } from "@/lib/google-sheets";
 import { assessOrderRisks, unresolvedOrderRisks } from "@/lib/order-risk";
+import { getExpressOneReturnRiskContacts } from "@/lib/expressone-returns";
 import { getOperationalExportWindow, isOrderInOperationalExportWindow } from "@/lib/order-workday";
 import { getLatestSheetDateLabel } from "@/lib/sheet-dates";
 
@@ -27,7 +28,7 @@ export default async function OrdersPage({
   const orders = exportReview
     ? rows.filter(isActiveOrderRow).filter((row) => isOrderInOperationalExportWindow(row, exportWindow))
     : latestDate ? rows.filter((row) => row.dateLabel === latestDate) : [];
-  const riskAssessments = assessOrderRisks(orders, rows, returnedRows);
+  const riskAssessments = assessOrderRisks(orders, rows, returnedRows, new Date(), getExpressOneReturnRiskContacts());
   const pendingRows = new Set(unresolvedOrderRisks(riskAssessments).map((risk) => risk.sheetRowNumber));
   const pendingNames = orders.filter((order) => pendingRows.has(order.sheetRowNumber)).slice(0, 8).map((order) => order.primalac).join(", ");
   const notice = params.error
