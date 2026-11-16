@@ -74,8 +74,8 @@ export function OrderListPage({
               {headerAction}
               {refreshPath ? <SheetRefreshButton path={refreshPath} /> : null}
               <Link
-                href="/"
-                aria-label="Nazad na pregled"
+                href="/orders"
+                aria-label="Nazad na narudžbe"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]"
               >
                 <ArrowIcon />

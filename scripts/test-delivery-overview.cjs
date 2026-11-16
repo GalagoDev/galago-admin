@@ -17,6 +17,7 @@ const rows = [order(1), order(2), order(3), order(4, { brojPaketa: "2" }), order
 const states={12:{category:"active",parcels:[]},13:{category:"delivered",parcels:[]}};
 let fail = false, reads = 0;
 Module._load = function(request, parent, isMain) {
+  if (request === "next/navigation") return { redirect: (location) => { throw new Error(`redirect:${location}`); } };
   if (request === "next/link") return { __esModule: true, default: "a" };
   if (request === "@/components/order-list-page") return { OrderListPage: "order-list-page" };
   if (request === "@/components/order-list-client") return { OrderListClient: "order-list-client" };
@@ -52,9 +53,9 @@ function text(node) {
     assert.equal(result.props.allowReturns, true);
     assert.ok(!elements(result).some(e => e.type === "nav"), "no category tabs or manual review split");
   }
-  const dashboard = await home({ searchParams: Promise.resolve({}) });
-  const card = elements(dashboard).find(e => e.type === "a" && e.props.href === "/in-transit" && text(e).includes("KM procjena"));
-  assert.ok(card); assert.match(text(card), /Na dostavi5/); assert.match(text(card), /445,5 KM procjena/);
+  const beforeHome = reads;
+  assert.throws(() => home(), /redirect:\/orders/);
+  assert.equal(reads, beforeHome, "retired overview performs no Sheets reads");
   const {deliveryOverview}=require("../src/lib/delivery-overview.ts");
   const check=deliveryOverview([order(20,{dateLabel:"02/11/2026"}),order(21,{dateLabel:"18/10/2026"}),order(22,{dateLabel:"17/10/2026"}),order(23,{dateLabel:"bad"})],{},Date.parse("2026-11-01T08:00:00Z"));
   assert.deepEqual(check.included.map(o=>o.sourceId),["test:20","test:21"],"Monday weekend orders and 14-day boundary are included");
@@ -63,6 +64,6 @@ function text(node) {
   fail = true;
   const unavailable = await page({ searchParams: Promise.resolve({}) });
   assert.equal(unavailable.props.summaryUnavailable, true, "a failed source read must not show a confirmed zero");
-  assert.ok(reads >= 9);
+  assert.ok(reads >= 8);
   console.log("Delivery estimate passed: new and confirmed active orders, weekend and 14-day boundaries, old records preserved, completed shipments excluded, dashboard alignment and failure state.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

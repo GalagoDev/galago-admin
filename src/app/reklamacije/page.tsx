@@ -258,7 +258,7 @@ export default async function ReklamacijePage({ searchParams }: { searchParams: 
               <p className="mt-1 text-sm text-neutral-400">Podrška, reklamacije i zahtjevi za pravna lica</p>
               <Link href="/reklamacije/povezivanje" className="mt-3 inline-flex items-center gap-2 text-sm text-sky-200 hover:text-sky-100"><Settings2 size={16} /> Telegram i Gmail</Link>
             </div>
-            <Link href="/" aria-label="Nazad na pregled" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
+            <Link href="/orders" aria-label="Nazad na narudžbe" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08]">
               <ArrowIcon />
             </Link>
           </div>

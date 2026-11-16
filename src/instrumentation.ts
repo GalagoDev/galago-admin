@@ -1,5 +1,5 @@
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
+  if (process.env.NEXT_RUNTIME === "nodejs" && process.env.NEXT_PHASE !== "phase-production-build") {
     if (process.env.COURIER_TRACKING_SCHEDULER_ENABLED !== "false" && process.env.NEXT_PHASE !== "phase-production-build") {
       const { startCourierTrackingScheduler } = await import("@/lib/courier-tracking-worker");
       startCourierTrackingScheduler();
@@ -22,9 +22,14 @@ export async function register() {
       startAnanasScheduler();
     }
 
-    if (process.env.SHOPIFY_INVENTORY_SYNC_ENABLED?.trim().toLowerCase() !== "false") {
-      const { startInventoryShopifyScheduler } = await import("@/lib/inventory-shopify-scheduler");
-      startInventoryShopifyScheduler();
+    if (process.env.META_ADS_SYNC_ENABLED !== "false") {
+      const { startMetaSpendScheduler } = await import("@/lib/meta-spend-sync");
+      startMetaSpendScheduler();
+    }
+
+    if (process.env.IMPORT_PAYMENTS_SYNC_ENABLED !== "false") {
+      const { startImportPaymentsScheduler } = await import("@/lib/import-payments-sync");
+      startImportPaymentsScheduler();
     }
   }
 }

@@ -4,6 +4,22 @@ This file exists to quickly onboard a coding model (Codex, Claude Code, etc.) to
 
 ## What this app is
 
+### Current scope, 2026-11-16
+
+- Navigation now contains Nove narudzbe, Na dostavi, Povrati, Reklamacije and Uvozi.
+- Pregled, Reklame, Statistika, Lager and Racuni are retired by explicit user request. Their old URLs redirect to `/orders` without fetching data; `/` also redirects there. Their UI components and mutation actions were removed.
+- Removed Lager's periodic Shopify sync and full-catalog refresh from product/inventory webhooks. Keep Ananas/Bazzar integration jobs, including the Bedly inventory ledger, intact. Historical inventory and receipt records/files remain; already-issued signed receipt links continue to work.
+- Google Ads sync and authenticated reporting APIs remain. Meta account-level spend is now saved hourly for today and the preceding two days in `meta_daily_spend`, without rendering profitability/ranking dashboards. Failed fetches preserve previous results. No schedulers run during production builds.
+- Uvozi (`/imports`) reads Galago bank transactions from Nalto through a private CLI-only, SELECT-only PHP bridge on the same host. Nalto is never mutated. Settings use `NALTO_APP_PATH`, `NALTO_COMPANY_ID`, `NALTO_PHP_BINARY`, or the persistent private `storage/data/import-payments-source.json` with `appPath`, `companyId`, `phpBinary`.
+- Sync runs at most every six hours, with manual refresh at most once per minute. Rendering Uvozi reads local SQLite only. Source IDs make re-sync idempotent, and saved allocations survive re-sync/redeploy.
+- Supplier payments and bank fees are separate; BAM/EUR/USD are never added together. Intesa account 50 funding and FX conversions must not be counted again as supplier payments. Account 53 outflows use the ORIGINAL statement PDF, including continuation lines, to identify Tadex/SHENGFENG. Matching requires the exact bank order reference, account, currency, debit amount and date, never just a nearby fee/similar amount. Garma is excluded from tracking and UI by explicit user request. Unresolved records remain unconfirmed, never attributed speculatively.
+- Parsed statement rows are cached in `import_bank_documents` by file ID/hash. The private Nalto bridge omits unchanged PDF bytes; only new/changed statements are parsed in bounded subprocess batches. Source and PDF process execution uses the callback contract because Hostinger wrappers drop `execFile`'s custom promisify symbol. Failed sync preserves the previous snapshot and retries on the next eligible scheduler tick (15-minute failure cooldown, not six hours).
+- Staff create container/import labels, edit notes/status, split payments across containers and undo allocations. Integer minor units, immediate DB transactions and request IDs prevent over-allocation/retry duplication. Containers with allocations cannot be deleted until those allocations are removed. Missing or materially changed allocated source rows are retained for review and excluded from confirmed totals.
+- Each container can have one confirmed supplier PDF invoice. Upload parses digital PDF text in a time/memory-bounded Node subprocess, max 10 MB / 20 pages, without AI/API costs. Final TOTAL is distinguished from Goods Total/subtotals; ambiguous/scanned documents require manual total/currency. Staff confirm/edit the target before it affects progress. Estimated freight warnings remain visible in the invoice editor.
+- Invoice progress counts only available allocated principal payments matching the invoice supplier AND currency. Fees, other currencies, other suppliers and changed source records never reduce the remaining balance. Overpayments are shown explicitly; progress bars cap at 100%. Originals are private 0600 files under `storage/import-invoices`, served only by authenticated routes. Replacing/unlinking a target retains the original document/audit and never removes bank allocations.
+- Tests: `test:imports`, `test:backend-retirement`; local browser regression `scripts/test-imports-browser.cjs` uses synthetic isolated data and never writes production.
+- Older sections below describe the historical retired workflows, not permission to restore them.
+
 `store-admin` is a mobile-first web admin app for operations around incoming customer orders.
 
 Core channels feeding the system:

@@ -17,7 +17,7 @@ export default function BazzarIntegrationPage() {
   return (
     <main className="min-h-screen bg-[#09090b] px-4 py-6 text-neutral-50 lg:pl-72 lg:pr-8">
       <div className="mx-auto max-w-5xl space-y-6">
-        <Link href="/inventory" className="text-sm text-neutral-400 hover:text-white">← Lager</Link>
+        <Link href="/orders" className="text-sm text-neutral-400 hover:text-white">← Narudžbe</Link>
         <header>
           <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">Galago integracije</p>
           <h1 className="mt-2 text-2xl font-semibold">Bazzar XML</h1>

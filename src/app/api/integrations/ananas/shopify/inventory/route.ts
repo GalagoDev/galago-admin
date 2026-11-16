@@ -1,6 +1,5 @@
 import { recordWebhook } from "@/lib/ananas-store";
 import type { ShopifyInventoryWebhook } from "@/lib/ananas-types";
-import { refreshInventoryFromShopifyIfStale } from "@/lib/inventory-shopify-sync";
 import { verifyShopifyWebhook } from "@/lib/shopify-ananas-auth";
 
 export const dynamic = "force-dynamic";
@@ -31,13 +30,5 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Invalid Shopify inventory payload" }, { status: 400 });
   }
 
-  let localInventoryUpdated = false;
-  try {
-    const result = await refreshInventoryFromShopifyIfStale(60_000);
-    localInventoryUpdated = !result.skipped;
-  } catch (error) {
-    console.error("Shopify inventory webhook could not refresh local Lager", error);
-  }
-
-  return Response.json({ ok: true, scheduledForDailySync: true, localInventoryUpdated }, { status: 202 });
+  return Response.json({ ok: true, scheduledForDailySync: true, localInventoryUpdated: false }, { status: 202 });
 }

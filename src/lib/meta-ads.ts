@@ -112,6 +112,7 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
       const request = (url: string) => fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
       });
       const [accountResponse, insightResponse] = await Promise.all([
         request(`https://graph.facebook.com/${graphVersion()}/act_${accountId}?${accountParams}`),
@@ -125,8 +126,10 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
       if (!insightResponse.ok || insightPayload.error) {
         throw new Error(insightPayload.error?.message || `Meta potrošnja za račun ${accountId} nije dostupna.`);
       }
+      if (!Array.isArray(insightPayload.data) || !accountPayload.currency) throw new Error("Nepotpun Meta odgovor.");
       const insight = insightPayload.data?.[0];
       const spend = Number(insight?.spend || 0);
+      if (!Number.isFinite(spend) || spend < 0) throw new Error("Neispravna Meta potrošnja.");
       const currency = String(accountPayload.currency || "").toUpperCase();
       const rate = await rateToBam(currency, metaDateKey, rates);
       return {
@@ -146,6 +149,7 @@ export async function getMetaAdsDailySpend(dateKey: string): Promise<MetaSpendRe
       error: complete ? "" : "Nedostaje KM kurs za jednu od valuta Meta računa.",
     };
     cache.set(metaDateKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
+    while (cache.size > 90) cache.delete(cache.keys().next().value!);
     return value;
   } catch (error) {
     return {

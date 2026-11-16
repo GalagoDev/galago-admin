@@ -4,30 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
   ClipboardList,
-  FileText,
-  LayoutDashboard,
-  Megaphone,
+  Container,
   Menu,
   Package,
   PackageX,
   TriangleAlert,
-  Warehouse,
   X,
 } from "lucide-react";
 
 const navigationItems = [
-  { href: "/", label: "Pregled", icon: LayoutDashboard },
   { href: "/orders", label: "Nove narudžbe", icon: ClipboardList },
   { href: "/in-transit", label: "Na dostavi", icon: Package },
   { href: "/returns", label: "Povrati", icon: PackageX },
   { href: "/reklamacije", label: "Reklamacije", icon: TriangleAlert },
-  { href: "/receipts", label: "Računi", icon: FileText },
-  { href: "/inventory", label: "Lager", icon: Warehouse },
-  { href: "/stats", label: "Statistika", icon: BarChart3 },
-  // A fresh URL bypasses the temporary host's old, unpurged static HTML entry.
-  { href: "/reklame?view=live", label: "Reklame", icon: Megaphone },
+  { href: "/imports", label: "Uvozi", icon: Container },
 ];
 
 export function AppNavigation() {
@@ -41,7 +32,7 @@ export function AppNavigation() {
     const path = href.split("?")[0];
     return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
   };
-  const activeLabel = navigationItems.find((item) => isActive(item.href))?.label || "Pregled";
+  const activeLabel = navigationItems.find((item) => isActive(item.href))?.label || "Galago Admin";
 
   useEffect(() => {
     if (pathname === "/login") return;
@@ -186,7 +177,7 @@ export function AppNavigation() {
       ) : null}
 
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r border-white/10 bg-[#0d0e10]/95 px-4 py-5 backdrop-blur-xl lg:flex">
-        <Link href="/" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-4">
+        <Link href="/orders" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-4">
           <p className="text-xs font-semibold uppercase text-white">Galago Admin</p>
           <span className="mt-3 flex items-center gap-2 text-xs text-emerald-200">
             <span className="h-2 w-2 rounded-full bg-emerald-300" />

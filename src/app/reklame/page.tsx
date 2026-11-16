@@ -1,15 +1,5 @@
-import type { Metadata } from "next";
-import { connection } from "next/server";
+import { redirect } from "next/navigation";
 
-import { AdsDashboard } from "@/components/ads-dashboard";
-
-export const metadata: Metadata = {
-  title: "Reklame · Galago Admin",
-  description: "Potrošnja, prodaja i rezultati Google i Meta reklama.",
-};
-
-export default async function AdsPage() {
-  // Keep the admin shell out of shared CDN caches across deployments.
-  await connection();
-  return <AdsDashboard />;
+export default function Page() {
+  redirect("/orders");
 }
