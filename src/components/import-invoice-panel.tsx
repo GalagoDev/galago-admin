@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, LoaderCircle, Save, Upload, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Circle, Clock3, FileText, LoaderCircle, Save, Upload, X } from "lucide-react";
 import type { ImportCommand } from "@/app/actions/imports";
 import { formatImportMoney, importInvoiceProgress, importSuppliers, type ImportCurrency, type ImportInvoice, type ImportInvoiceDraft, type ImportsOverview, type ImportSupplier } from "@/lib/import-payments-types";
 
@@ -10,10 +10,30 @@ const buttonClass = "inline-flex min-h-11 items-center justify-center gap-2 roun
 
 export function ImportInvoiceProgress({ invoice, data }: { invoice: ImportInvoice; data: ImportsOverview }) {
   const progress = importInvoiceProgress(invoice, data);
-  return <div className="w-full min-w-0 space-y-2 pt-1 text-xs">
-    <div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><span className="text-neutral-400">Faktura {invoice.number || ""} · {importSuppliers[invoice.supplier]}</span><span className="tabular-nums text-emerald-200">{formatImportMoney(progress.paidMinor, invoice.currency)} / {formatImportMoney(invoice.totalMinor, invoice.currency)} · {progress.percent}%</span></div>
-    <div role="progressbar" aria-label="Plaćenost fakture" aria-valuenow={Math.min(100, progress.percent)} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${progress.percent}%`} className="h-2 w-full overflow-hidden rounded-full bg-white/10"><div style={{ width: `${Math.min(100, progress.percent)}%` }} className="h-full bg-emerald-400 transition-[width]" /></div>
-    <div className="flex flex-wrap justify-between gap-2 text-neutral-500"><span>{progress.overpaidMinor ? `Preplaćeno ${formatImportMoney(progress.overpaidMinor, invoice.currency)}` : progress.remainingMinor ? `Preostalo ${formatImportMoney(progress.remainingMinor, invoice.currency)}` : "Plaćeno u cijelosti"}</span>{progress.excluded > 0 && <span className="text-amber-200">Isključene neusklađene uplate: {progress.excluded}</span>}</div>
+  const overpaid = progress.overpaidMinor > 0;
+  const paid = progress.remainingMinor === 0 && !overpaid;
+  const StatusIcon = overpaid ? AlertCircle : paid ? CheckCircle2 : progress.paidMinor > 0 ? Clock3 : Circle;
+  const status = overpaid ? "Preplaćeno" : paid ? "Plaćeno u cijelosti" : progress.paidMinor > 0 ? "Djelimično plaćeno" : "Nije plaćeno";
+  const statusColor = overpaid ? "text-amber-300" : paid ? "text-emerald-300" : "text-sky-200";
+  const percent = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(progress.percent);
+  const metrics = [
+    { label: "Iznos fakture", amount: invoice.totalMinor, color: "text-neutral-100" },
+    { label: "Uplaćeno", amount: progress.paidMinor, color: "text-neutral-100" },
+    { label: overpaid ? "Preplaćeno" : "Preostalo za uplatu", amount: overpaid ? progress.overpaidMinor : progress.remainingMinor, color: overpaid ? "text-amber-300" : paid ? "text-emerald-300" : "text-sky-200" },
+  ];
+  return <div className="w-full min-w-0 border-t border-white/10 pt-4">
+    <dl className="grid min-w-0 gap-x-6 gap-y-3 sm:grid-cols-3">
+      {metrics.map(metric => <div key={metric.label} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 sm:block">
+        <dt className="text-xs text-neutral-400">{metric.label}</dt>
+        <dd className={`min-w-0 break-words text-lg font-semibold tabular-nums [overflow-wrap:anywhere] sm:mt-1 sm:text-xl ${metric.color}`}>{formatImportMoney(metric.amount, invoice.currency)}</dd>
+      </div>)}
+    </dl>
+    <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${statusColor}`}><StatusIcon size={15} className="shrink-0" />{status}</span>
+      <div role="progressbar" aria-label="Plaćenost fakture" aria-valuenow={Math.min(100, progress.percent)} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${percent}%`} className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-white/10"><div style={{ width: `${Math.min(100, progress.percent)}%` }} className={`h-full transition-[width] ${overpaid ? "bg-amber-400" : paid ? "bg-emerald-400" : "bg-sky-400"}`} /></div>
+      <span className={`text-xs font-medium tabular-nums ${statusColor}`}>{percent}%</span>
+    </div>
+    {progress.excluded > 0 && <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-200"><AlertCircle size={14} className="shrink-0" />Uplate koje nisu uračunate u fakturu: {progress.excluded}</p>}
   </div>;
 }
 

@@ -12,9 +12,23 @@ Module._load = function(request, parent, isMain) { if (request === "server-only"
 const lib = require("../src/lib/import-payments.ts");
 lib.applyImportSnapshot({ companyId: "synthetic", companyName: "Test", sourceFrom: "2026-06-10", sourceThrough: "2026-11-14", payments: [
   { id: "unknown", date: "2026-11-03", partner: "", reference: "TEST-UNKNOWN-001", amountMinor: 600000, currency: "USD", kind: "payment", supplier: null, statement: "2026/19", account: "Test USD account", fileId: null },
-  { id: "known", date: "2026-11-04", partner: "HK TADEX TRADE CO., LIMITED", reference: "TEST-KNOWN-002", amountMinor: 500000, currency: "USD", kind: "payment", supplier: "TADEX", statement: "2026/20", account: "Test USD account", fileId: null },
+  { id: "known", date: "2026-11-04", partner: "HK TADEX TRADE CO., LIMITED", reference: "TEST-KNOWN-002", amountMinor: 5000000, currency: "USD", kind: "payment", supplier: "TADEX", statement: "2026/20", account: "Test USD account", fileId: null },
   { id: "fee", date: "2026-11-02", partner: "", reference: "PROVIZIJA ZA INO DOZNAKU, SHENGFENG E-TEN INTERNATIONAL", amountMinor: 2626, currency: "BAM", kind: "fee", supplier: "SHENGFENG", statement: "2026/75", account: "Test BAM account", fileId: null },
 ] }, "synthetic");
+const {randomUUID}=require("node:crypto");
+for (const scenario of [
+  {name:"08 Namjestaj - placeno",status:"in_transit",total:"20793.53",paid:"20793.53"},
+  {name:"07 Stolice - preplata",status:"in_transit",total:"20261",paid:"20561.15"},
+  {name:"06 Kontejner bez fakture sa duzim nazivom za provjeru mobilnog prikaza",status:"received"},
+]) {
+  lib.saveImportContainer({name:scenario.name,notes:"Synthetic layout fixture",status:scenario.status});
+  const container=lib.getImportsOverview().containers.find(c=>c.name===scenario.name);
+  if(scenario.total){
+    const fileId=randomUUID();lib.addImportInvoiceFile({containerId:container.id,fileId,filename:"synthetic.pdf",number:"TEST-2026",totalMinor:Number(scenario.total)*100,currency:"USD",supplier:"TADEX",warning:""});
+    lib.saveImportInvoice({containerId:container.id,fileId,number:"TEST-2026",amount:scenario.total,currency:"USD",supplier:"TADEX"});
+    lib.allocateImportPayment({containerId:container.id,paymentId:"known",amount:scenario.paid,requestId:randomUUID()});
+  }
+}
 let server, browser, page;
 async function main() {
   const listener = net.createServer(); listener.listen(0,"127.0.0.1"); await once(listener,"listening"); const port=listener.address().port; await new Promise(r=>listener.close(r));
@@ -67,21 +81,36 @@ async function main() {
   assert.equal(await page.getByLabel("Ukupan iznos fakture").inputValue(),"6000.00");
   assert.equal(await page.getByLabel("Valuta fakture").inputValue(),"USD");
   await page.getByRole("button",{name:"Potvrdi fakturu"}).click();
-  await page.getByRole("progressbar",{name:"Plaćenost fakture"}).waitFor();
-  assert.equal(await page.getByRole("progressbar").getAttribute("aria-valuenow"),"41.7");
+  const container=page.locator("details").filter({has:page.locator("summary").filter({hasText:"MSMU4017564"})});
+  await container.getByRole("progressbar",{name:"Plaćenost fakture"}).waitFor();
+  assert.equal(await container.getByRole("progressbar").getAttribute("aria-valuenow"),"41.7");
+  const partial=container.locator("summary");
+  for(const label of ["Iznos fakture","Uplaćeno","Preostalo za uplatu","Djelimično plaćeno"])assert.equal(await partial.getByText(label,{exact:true}).count(),1);
+  const paid=page.locator("summary").filter({hasText:"08 Namjestaj - placeno"});
+  await paid.getByText("Plaćeno u cijelosti",{exact:true}).waitFor();
+  const overpaid=page.locator("summary").filter({hasText:"07 Stolice - preplata"});
+  assert.equal(await overpaid.locator("dd").last().innerText(),"300,15 USD");
+  assert.equal(await overpaid.getByRole("progressbar").getAttribute("aria-valuenow"),"100");
+  assert.equal(await overpaid.getByRole("progressbar").getAttribute("aria-valuetext"),"101,5%");
+  assert.equal(await overpaid.getByRole("progressbar").locator("div").evaluate(el=>el.classList.contains("bg-amber-400")),true);
+  const missing=page.locator("summary").filter({hasText:"06 Kontejner bez fakture"});
+  await missing.getByText("Faktura nije dodana",{exact:true}).waitFor();
+  assert.equal(await missing.getByRole("progressbar").count(),0);
   const pdfLink=await page.getByRole("link",{name:"Otvori PDF",exact:true}).getAttribute("href");
   assert.equal((await context.request.get(base+pdfLink)).headers()["content-type"],"application/pdf");
+  await partial.click();
   fs.mkdirSync(path.join(root,"../outputs"),{recursive:true});
   for(const width of [1440,1024,768,390,320]){
     await page.setViewportSize({width,height:1000});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`no overflow at ${width}`);
     await page.screenshot({path:path.join(root,`../outputs/imports-${width}.png`),fullPage:true});
+    await page.locator('section[aria-labelledby="container-heading"]').screenshot({path:path.join(root,`../outputs/import-containers-${width}.png`)});
     if(width<1024){await page.getByRole("button",{name:"Otvori meni"}).click();assert.equal(await page.getByRole("navigation",{name:"Glavna navigacija"}).getByRole("link",{name:"Uvozi",exact:true}).count(),1);await page.getByRole("button",{name:"Zatvori meni",exact:true}).last().click();}
   }
   await page.setViewportSize({width:1440,height:1000});
   await row.getByRole("button",{name:"Ukloni raspored"}).click();
   await row.getByText("Neraspoređeno",{exact:true}).waitFor();
-  assert.equal(await page.getByRole("progressbar").getAttribute("aria-valuenow"),"0");
+  assert.equal(await container.getByRole("progressbar").getAttribute("aria-valuenow"),"0");
   await page.getByRole("tab",{name:/Provizije/}).click();
   await page.locator("article").getByText("26,26 KM",{exact:true}).waitFor();
   assert.equal(await page.locator("article").count(),1);
