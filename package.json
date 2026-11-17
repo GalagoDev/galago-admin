@@ -27,6 +27,7 @@
     "test:session": "node ./scripts/test-session.cjs",
     "test:claims": "node ./scripts/test-claim-messaging.cjs",
     "test:expressone": "node ./scripts/test-expressone.cjs",
+    "test:settlements": "node ./scripts/test-expressone-settlements.cjs",
     "test:courier": "node ./scripts/test-courier-tracking.cjs",
     "test:delivery-overview": "node ./scripts/test-delivery-overview.cjs",
     "test:imports": "node ./scripts/test-import-payments.cjs",

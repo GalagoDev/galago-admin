@@ -233,6 +233,37 @@ export function getDb() {
       last_error TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS expressone_settlement_scan (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      next_run_at INTEGER NOT NULL DEFAULT 0,
+      lease_until INTEGER NOT NULL DEFAULT 0,
+      lease_token TEXT NOT NULL DEFAULT '',
+      last_success_at INTEGER,
+      last_error TEXT,
+      last_added INTEGER NOT NULL DEFAULT 0,
+      last_reports INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS expressone_settlement_reports (
+      file_hash TEXT PRIMARY KEY,
+      gmail_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      received_at INTEGER NOT NULL,
+      imported_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS expressone_settlement_messages (
+      gmail_id TEXT PRIMARY KEY,
+      received_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS expressone_settlement_rows (
+      file_hash TEXT NOT NULL REFERENCES expressone_settlement_reports(file_hash),
+      row_number INTEGER NOT NULL,
+      row_json TEXT NOT NULL,
+      resolution TEXT NOT NULL DEFAULT 'pending',
+      order_key TEXT,
+      last_error TEXT,
+      PRIMARY KEY(file_hash, row_number)
+    );
+
     CREATE TABLE IF NOT EXISTS courier_order_links (
       order_key TEXT PRIMARY KEY,
       expected_packages INTEGER NOT NULL,

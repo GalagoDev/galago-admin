@@ -162,7 +162,10 @@ declare global { var galagoExpressOneTimer: ReturnType<typeof setInterval> | und
 export function startExpressOneScheduler() {
   if (globalThis.galagoExpressOneTimer) return;
   const kick = () => {
-    if (!globalThis.galagoExpressOneRun) globalThis.galagoExpressOneRun = runExpressOneScan()
+    if (!globalThis.galagoExpressOneRun) globalThis.galagoExpressOneRun = runExpressOneScan().then(async () => {
+      const { runSettlementScan } = await import("./expressone-settlements");
+      await runSettlementScan();
+    })
       .catch(() => console.error("Express One daily scan failed"))
       .finally(() => { globalThis.galagoExpressOneRun = undefined; });
   };

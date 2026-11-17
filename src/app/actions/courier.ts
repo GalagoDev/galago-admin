@@ -7,10 +7,12 @@ import { normalizeCourierTracking, courierOrderKey } from "@/lib/courier-status"
 import { linkCourierOrder, requestCourierTrackingSync } from "@/lib/courier-tracking-store";
 import { kickCourierTrackingSync } from "@/lib/courier-tracking-worker";
 import { readReturnImportOrders } from "@/lib/google-order-status";
+import { requestSettlementScan } from "@/lib/expressone-settlements";
 
 export async function refreshCourierStatusesAction() {
   if (!await requireAuth()) redirect("/login");
   requestCourierTrackingSync(true);
+  requestSettlementScan();
   void kickCourierTrackingSync();
   revalidatePath("/in-transit");
   redirect("/in-transit?sync=queued");

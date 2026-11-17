@@ -4,6 +4,17 @@ This file exists to quickly onboard a coding model (Codex, Claude Code, etc.) to
 
 ## What this app is
 
+### Courier settlement email reconciliation, 2026-11-17
+
+- The original daily 07:00 mailbox worker reads `cs@expressone.ba` status notifications, which mostly contain delivery problems/returns. It did not read the daily remittance spreadsheets sent by `danira.borovina@expressone.ba`; this caused settled orders to remain active.
+- `expressone-settlements.ts` now shares the Express One scheduler but has its own persistent lease/checkpoint, runs daily at 15:00 Sarajevo (after the morning reports arrive), catches up on startup and retries failed runs after one hour. `Provjeri statuse` also queues a report scan. No new paid API or AI call is involved.
+- Only exact `expressone.ba` mailbox senders, GALAGO remittance subjects, GALAGO XLS/XLSX attachments and GALAGO sender rows are accepted. Initial scan starts at the live-work date; subsequent scans use a seven-day overlap and persistent message/file-hash checkpoints. A multi-attachment message is checkpointed only after all its attachments succeed.
+- Report `datum_slanja` mixes US month.day.year text with locale-swapped Excel date serials. Both plausible serial-date interpretations are compared against the full order history; ambiguous matches are never auto-applied. Orders use next-workday cycle labels, including weekends. Truncated `broj_posiljke` numbers in these spreadsheets are NOT treated as reliable tracking IDs.
+- Automatic settlement requires one exact normalized full name, full COD amount, compatible shipping window and matching product or city; conflicting product families, returns, repeat-buyer ambiguity and partial/zero amounts stay unresolved. Closed orders participate in matching to prevent an old remittance from closing a new purchase. Full-order COD remittance can clear a multi-package financial balance; it is not inferred from one parcel's tracking status.
+- Confirmed rows use the existing idempotent Delivered orders archive plus Orders hidden L status and P checkbox; no source rows are deleted. Source identity is revalidated and re-read after writes. Applied reports never re-close restored/copied orders. SQLite keeps report and row provenance for audit.
+- Na dostavi exposes the last mailbox processing/report timestamps and failures. Its balance still includes new unshipped orders by prior user request, so it is an estimated COD balance, not a bank remittance receivable.
+- Tests: `test:settlements`, `test:expressone`, `test:courier`, `test:delivery-overview`.
+
 ### Current scope, 2026-11-16
 
 - Navigation now contains Nove narudzbe, Na dostavi, Povrati, Reklamacije and Uvozi.

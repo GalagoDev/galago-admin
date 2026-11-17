@@ -6,6 +6,7 @@ import { courierTrackingSnapshot, getCourierSyncStatus } from "@/lib/courier-tra
 import { deliveryOverview } from "@/lib/delivery-overview";
 import { OrderListClient } from "@/components/order-list-client";
 import { refreshCourierStatusesAction } from "@/app/actions/courier";
+import { getSettlementScanStatus } from "@/lib/expressone-settlements";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,6 +35,7 @@ export default async function InTransitPage({
   const overview = deliveryOverview(allOrders, courierTrackingSnapshot(allOrders).states);
   const orders = overview.included;
   const sync = getCourierSyncStatus();
+  const settlements = getSettlementScanStatus();
   const date = (value: number) => new Intl.DateTimeFormat("bs-BA", { timeZone: "Europe/Sarajevo", dateStyle: "short", timeStyle: "short" }).format(value);
   const courierErrors: Record<string, string> = {
     "invalid-tracking": "Broj paketa nije ispravan.", "parcel-count": "Unesite po jedan različit broj za svaki paket narudžbe.",
@@ -60,7 +62,11 @@ export default async function InTransitPage({
             {sync?.running ? <p>Provjera Express One statusa je u toku.</p> : params.sync && sync?.next_run_at === 0 ? <p>Provjera je zakazana.</p> : null}
             <p>{sync?.last_success_at ? `Zadnja provjera: ${date(sync.last_success_at)}` : "Još nema završene provjere"} · Dnevno u 07:15</p>
             {sync?.next_run_at ? <p className="mt-1">Sljedeća provjera: {date(sync.next_run_at)}</p> : null}
+            <p className="mt-2">Email izvještaji razduženja: {settlements.scan?.last_success_at ? date(settlements.scan.last_success_at) : "Čeka se prva obrada"} · Dnevno u 15:00</p>
+            {settlements.latestReportAt ? <p>Najnoviji obrađeni izvještaj: {date(settlements.latestReportAt)}</p> : null}
+            {settlements.running ? <p>Obrada email izvještaja je u toku.</p> : null}
           </div>
+          {settlements.scan?.last_error ? <p role="alert" className="mt-3 border-l-2 border-amber-300 pl-3 text-sm text-amber-200">{settlements.scan.last_error}</p> : null}
           {unavailable || sync?.last_error || params.courierError ? <p role="alert" className="mt-3 border-l-2 border-amber-300 pl-3 text-sm text-amber-200">
             {unavailable ? "Orders podaci trenutno nisu dostupni. Ukupni iznosi nisu potvrđeni." : params.courierError ? courierErrors[params.courierError] || courierErrors["link-failed"] : sync?.last_error}
           </p> : null}
