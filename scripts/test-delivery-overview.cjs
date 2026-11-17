@@ -25,7 +25,7 @@ Module._load = function(request, parent, isMain) {
   if (request === "@/app/actions/courier") return { refreshCourierStatusesAction: async () => {} };
   if (request === "@/app/actions/auth") return { logoutAction: async () => {} };
   if (request === "@/lib/inventory") return { getInventoryOverview: () => ({ products: [] }) };
-  if (request === "@/lib/courier-tracking-store") return { getCourierSyncStatus: () => undefined, courierTrackingSnapshot: () => ({states}) };
+  if (request === "@/lib/courier-tracking-store") return { getCourierSyncStatus: () => ({ last_success_at: Date.now(), next_run_at: Date.now() + 86400000 }), courierTrackingSnapshot: () => ({states}) };
   if (request === "@/lib/expressone-settlements") return { getSettlementScanStatus: () => ({ scan: { last_success_at: Date.now(), lease_until: 0 }, latestReportAt: Date.now() }) };
   if (request === "@/lib/google-sheets") return { isActiveOrderRow, getReturnedSheetRows: async () => [], getOrdersSheetRows: async options => {
     assert.equal(options.fresh, true); reads++; if (fail) throw Error("synthetic failure"); return rows;
@@ -51,6 +51,7 @@ function text(node) {
     assert.equal(result.props.summaryLabels.amount,"Procijenjena otkupnina");
     assert.match(text(result.props.workflow), /Email izvještaji razduženja:/);
     assert.match(text(result.props.workflow), /Dnevno u 15:00/);
+    assert.doesNotMatch(text(result.props.workflow), /Procjena uključuje|Iznos nije obračun|Zadnja provjera:|Sljedeća provjera:|Dnevno u 07:15/);
     assert.match(text(result.props.afterList),/Stariji zapisi bez potvrde: 1/);
     assert.equal(result.props.courierStates, undefined); assert.equal(result.props.summaryExtra, undefined);
     assert.equal(result.props.allowReturns, true);

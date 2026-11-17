@@ -58,10 +58,7 @@ export default async function InTransitPage({
       workflow={(
         <>
           <div className="mt-3 text-xs text-neutral-400">
-            <p>Procjena uključuje nove narudžbe do 14 dana i starije pošiljke s potvrđenim aktivnim statusom. Iznos nije obračun uplata pošte.</p>
             {sync?.running ? <p>Provjera Express One statusa je u toku.</p> : params.sync && sync?.next_run_at === 0 ? <p>Provjera je zakazana.</p> : null}
-            <p>{sync?.last_success_at ? `Zadnja provjera: ${date(sync.last_success_at)}` : "Još nema završene provjere"} · Dnevno u 07:15</p>
-            {sync?.next_run_at ? <p className="mt-1">Sljedeća provjera: {date(sync.next_run_at)}</p> : null}
             <p className="mt-2">Email izvještaji razduženja: {settlements.scan?.last_success_at ? date(settlements.scan.last_success_at) : "Čeka se prva obrada"} · Dnevno u 15:00</p>
             {settlements.latestReportAt ? <p>Najnoviji obrađeni izvještaj: {date(settlements.latestReportAt)}</p> : null}
             {settlements.running ? <p>Obrada email izvještaja je u toku.</p> : null}
