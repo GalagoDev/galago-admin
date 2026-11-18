@@ -149,13 +149,15 @@ export function getExpressOneScanStatus() {
   return { scan, review };
 }
 
-export function getExpressOneReturnRiskContacts(): CarrierReturnContact[] {
+export function getExpressOneReturnRiskContacts(includeDetails = false): CarrierReturnContact[] {
   // A verified return email can warn about a customer even before an exact order match is safe.
   // Applied returns are already covered by Orders/Povrati; keep parcel counts separate from order counts.
   const rows = getDb().prepare(`SELECT tracking, json_extract(event_json, '$.recipient') AS primalac,
-    json_extract(event_json, '$.phone') AS brojTelefona FROM expressone_shipments
+    json_extract(event_json, '$.phone') AS brojTelefona,
+    json_extract(event_json, '$.product') AS product, json_extract(event_json, '$.statusAt') AS statusAt FROM expressone_shipments
     WHERE resolution != 'applied' AND json_extract(event_json, '$.status') = 'povrat posiljaocu'`).all() as CarrierReturnContact[];
-  return rows.map((row) => ({ tracking: row.tracking, primalac: String(row.primalac || ""), brojTelefona: String(row.brojTelefona || "") }));
+  return rows.map((row) => ({ tracking: row.tracking, primalac: String(row.primalac || ""), brojTelefona: String(row.brojTelefona || ""),
+    ...(includeDetails ? { product: row.product || "", statusAt: row.statusAt || "" } : {}) }));
 }
 
 declare global { var galagoExpressOneTimer: ReturnType<typeof setInterval> | undefined; var galagoExpressOneRun: Promise<void> | undefined; }

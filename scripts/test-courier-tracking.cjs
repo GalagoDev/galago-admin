@@ -88,5 +88,25 @@ global.fetch=async(url,input)=>{httpCalls++;assert.equal(url,"https://expressone
  archiveFails=false;httpFails=true;store.requestCourierTrackingSync(true);await worker.runCourierTrackingSync();assert.equal(state(f).category,"review");assert.ok(!store.getCourierSyncStatus().last_error.includes("private-provider"));
  assert.equal(new Date(worker.nextCourierTrackingScan(Date.parse("2026-10-28T06:10:00Z"))).toISOString(),"2026-10-28T06:15:00.000Z");
  assert.equal(new Date(worker.nextCourierTrackingScan(Date.parse("2026-10-28T06:20:00Z"))).toISOString(),"2026-10-29T06:15:00.000Z");
+ const {orderHistoryReader}=require("../src/lib/order-risk-history.ts");
+ const recordEmail=(id,statusText)=>db.prepare("INSERT OR REPLACE INTO expressone_shipments(tracking,event_json,first_status_at) VALUES(?,?,?)")
+   .run("001-"+id,JSON.stringify({status:statusText}),"2026-10-28");
+ const prior=order({sourceId:"earlier",sheetRowNumber:18,brojPaketa:"1"}),copy={...prior,sourceId:"next",sheetRowNumber:19};
+ let history=()=>orderHistoryReader([prior,copy]);
+ store.linkCourierOrder(prior,["87654321"],"email");recordEmail("87654321","odbijeno");
+ assert.equal(history()(prior).label,"Odbijeno");assert.equal(history()(copy).label,"Preuzimanje nije potvrđeno");
+ recordEmail("87654321","povrat posiljaocu");assert.equal(history()(prior).label,"Vraćeno pošiljaocu","return alone does not prove refusal");
+ prior.appStatus="returned:archive";prior.deliveredChecked=true;assert.equal(history()(prior).tone,"bad");
+ store.recordCourierParcel(data("87654321",["Povrat pošiljaocu","Odbijeno"]),now);
+ assert.equal(history()(prior).label,"Povrat · odbijeno");
+ recordEmail("12345678","odbijeno");assert.equal(orderHistoryReader([o])(o).label,"Preuzimanje nije potvrđeno","restored order does not inherit old tracking");
+ const multi=order({sourceId:"multi",sheetRowNumber:21});store.linkCourierOrder(multi,["87654322","87654323"],"manual");
+ recordEmail("87654322","odbijeno");assert.equal(orderHistoryReader([multi])(multi).label,"Status po paketima: odbijeno 1 od 2");
+ db.prepare("INSERT INTO expressone_settlement_reports(file_hash,gmail_id,filename,received_at,imported_at) VALUES('hash','m','report.xlsx',?,?)").run(now,now);
+ db.prepare("INSERT INTO expressone_settlement_rows(file_hash,row_number,row_json,resolution,order_key) VALUES('hash',2,'{}','applied',?)").run(status.courierOrderKey(copy));
+ assert.equal(history()(copy).source,"Express One · email razduženja");
+ assert.equal(history()(copy).label,"Preuzeto");
+ assert.equal(orderHistoryReader([copy,{...copy,sheetRowNumber:42}])(copy).label,"Preuzimanje nije potvrđeno");
+ assert.equal(history()({...copy,appStatus:"returned:conflict"}).label,"Neslaganje podataka o dostavi");
  db.close();fs.rmSync(tmp,{recursive:true,force:true});console.log("Courier tracking passed: response identity, all-parcel completion, partial delivery, stale/error isolation, copied orders, collision guards, daily lease, restore protection and archive verification.");
 })().catch(e=>{console.error(e);process.exitCode=1;});

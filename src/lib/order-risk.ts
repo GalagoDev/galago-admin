@@ -5,7 +5,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const DUPLICATE_LOOKBACK_DAYS = 14;
 
 export type OrderRiskLevel = "critical" | "warning" | "none";
-export type CarrierReturnContact = Pick<SheetOrderRow, "primalac" | "brojTelefona"> & { tracking: string };
+export type CarrierReturnContact = Pick<SheetOrderRow, "primalac" | "brojTelefona"> & { tracking: string; product?: string; statusAt?: string };
+export type RiskOutcome = { label: string; source: string; tone: "good" | "bad" | "neutral" };
+export type RiskHistoryEntry = {
+  date: string; customer: string; product: string; amount: string; matchedBy: string; outcome: RiskOutcome;
+};
 
 export type OrderRiskAssessment = {
   sheetRowNumber: number;
@@ -22,6 +26,8 @@ export type OrderRiskAssessment = {
   lastOrderDaysAgo: number | null;
   lastOrderDate: string;
   lastOutcome: string;
+  history?: RiskHistoryEntry[];
+  unlinkedReturns?: { tracking: string; product: string; date: string; matchedBy: string }[];
 };
 
 function normalizePhone(value: string) {
@@ -75,10 +81,19 @@ function matchIdentity(current: Pick<SheetOrderRow, "primalac" | "brojTelefona">
 }
 
 function outcome(order: SheetOrderRow) {
-  if (order.appStatus.startsWith("delivered:") || order.deliveredChecked) return "Dostavljeno";
   if (order.appStatus.startsWith("returned:")) return "Povrat";
   if (order.appStatus.startsWith("duplicate:")) return "Nije poslano";
+  if (order.appStatus.startsWith("delivered:") || order.deliveredChecked) return "Dostavljeno";
   return "Na dostavi";
+}
+
+function matchLabel(match: { name: boolean; phone: boolean }) {
+  return match.name && match.phone ? "Ime i telefon" : match.phone ? "Isti telefon" : "Isto ime i prezime";
+}
+
+function historyEntry(order: SheetOrderRow, match: { name: boolean; phone: boolean }, result: RiskOutcome): RiskHistoryEntry {
+  return { date: order.dateLabel, customer: order.primalac, product: order.artikal, amount: order.otkupnina,
+    matchedBy: matchLabel(match), outcome: result };
 }
 
 function differenceInDays(later: number, earlier: number) {
@@ -99,6 +114,7 @@ export function assessOrderRisks(
   returnedOrders: SheetOrderRow[] = [],
   now = new Date(),
   carrierReturns: CarrierReturnContact[] = [],
+  readHistoryOutcome?: (order: SheetOrderRow) => RiskOutcome,
 ) {
   const nowTime = now.getTime();
   const result: Record<number, OrderRiskAssessment> = {};
@@ -110,7 +126,7 @@ export function assessOrderRisks(
       .filter((candidate) => isEarlier(candidate, current))
       .map((candidate) => ({ candidate, match: matchIdentity(current, candidate) }))
       .filter(({ match }) => match.phone || match.name)
-      .sort((left, right) => orderTime(right.candidate) - orderTime(left.candidate));
+      .sort((left, right) => orderTime(right.candidate) - orderTime(left.candidate) || right.candidate.sheetRowNumber - left.candidate.sheetRowNumber);
 
     const recentMatches = previousMatches.filter(({ candidate }) => {
       const previousTime = orderTime(candidate);
@@ -171,7 +187,7 @@ export function assessOrderRisks(
       excluded,
       reasons,
       recentMatchCount: recentMatches.length,
-      deliveredCount: previousMatches.filter(({ candidate }) => candidate.appStatus.startsWith("delivered:") || candidate.deliveredChecked).length,
+      deliveredCount: previousMatches.filter(({ candidate }) => outcome(candidate) === "Dostavljeno").length,
       returnedCount: Math.max(returnedCount, returnSheetMatches.length),
       carrierReturnCount,
       activeCount: previousMatches.filter(({ candidate }) => !candidate.appStatus && !candidate.deliveredChecked).length,
@@ -179,6 +195,20 @@ export function assessOrderRisks(
       lastOrderDate: latestMatch?.dateLabel || "",
       lastOutcome: latestMatch ? outcome(latestMatch) : "",
     };
+    if (readHistoryOutcome && level !== "none") {
+      const history = previousMatches.map(({ candidate, match }) => historyEntry(candidate, match, readHistoryOutcome(candidate)));
+      // Some legacy returns exist only in the returns sheet. Its date is the return date, not the order date.
+      for (const archived of returnSheetMatches) {
+        if (historicalReturns.some(({ candidate }) => candidate.appStatus === `returned:${archived.sourceId}`)) continue;
+        history.push(historyEntry(archived, matchIdentity(current, archived),
+          { label: "Povrat", source: "Evidencija povrata · datum povrata", tone: "bad" }));
+      }
+      result[current.sheetRowNumber].history = history;
+      if (carrierMatches.length) result[current.sheetRowNumber].unlinkedReturns = carrierMatches
+        .slice().sort((a,b) => (b.statusAt || "").localeCompare(a.statusAt || ""))
+        .map(m => ({ tracking: m.tracking, product: m.product || "", date: (m.statusAt || "").slice(0,10).split("-").reverse().join("."),
+          matchedBy: matchLabel(matchIdentity(current, m)) }));
+    }
   }
 
   return result;

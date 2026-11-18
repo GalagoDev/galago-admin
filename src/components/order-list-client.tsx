@@ -11,7 +11,7 @@ import { formatPostalLocation } from "@/lib/bih-postal";
 import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
 import { isUsableOrderPhone } from "@/lib/order-phone";
 import type { SheetOrderRow } from "@/lib/google-sheets";
-import type { OrderRiskAssessment } from "@/lib/order-risk";
+import type { OrderRiskAssessment, RiskHistoryEntry } from "@/lib/order-risk";
 import type { CourierOrderState } from "@/lib/courier-status";
 import { CourierOrderDetails } from "@/components/courier-order-details";
 
@@ -94,21 +94,46 @@ function RiskBadge({ risk }: { risk: OrderRiskAssessment }) {
   return null;
 }
 
+function HistoryLine({ entry }: { entry: RiskHistoryEntry }) {
+  const tone = entry.outcome.tone === "good" ? "text-emerald-200" : entry.outcome.tone === "bad" ? "text-red-200" : "text-neutral-300";
+  return (
+    <li className="grid min-w-0 gap-x-4 gap-y-1 break-words border-t border-white/10 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div>
+        <p className="font-medium text-white">{entry.product || "Artikal nije upisan"}{entry.amount ? ` · ${entry.amount} KM` : ""}</p>
+        <p className="text-neutral-400">{entry.date} · {entry.customer} · {entry.matchedBy}</p>
+      </div>
+      <div>
+        <p className={`font-semibold ${tone}`}>{entry.outcome.label}</p>
+        <p className="text-neutral-400">{entry.outcome.source}</p>
+      </div>
+    </li>
+  );
+}
+
 function RiskDetails({ order, risk, riskView }: { order: SheetOrderRow; risk: OrderRiskAssessment; riskView?: "export" }) {
   if (risk.level === "none" && !risk.excluded) return null;
+  const history = risk.history || [];
+  const adverse = history.findIndex(entry => entry.outcome.tone === "bad");
+  const visible = history.filter((_, i) => i === 0 || i === adverse);
+  const older = history.filter((_, i) => i !== 0 && i !== adverse);
 
   return (
     <div className={`mt-3 rounded-lg border p-3 text-xs ${risk.level === "critical" || risk.excluded ? "border-red-300/15 bg-red-300/[0.06]" : "border-amber-300/15 bg-amber-300/[0.05]"}`}>
       {risk.reasons.map((reason) => <p key={reason} className="mb-1 text-neutral-200">{reason}</p>)}
-      {risk.lastOrderDaysAgo !== null ? (
-        <p className="mt-2 text-neutral-400">
-          Zadnja narudžba prije {risk.lastOrderDaysAgo} dana · {risk.lastOutcome || "Nepoznat ishod"}
-        </p>
-      ) : null}
+      {risk.lastOrderDaysAgo !== null ? <p className="mb-1 text-neutral-400">Zadnja narudžba prije {risk.lastOrderDaysAgo} {risk.lastOrderDaysAgo === 1 ? "dan" : "dana"}.</p> : null}
+      {visible.length ? <div className="mt-2">
+        <p className="mb-1 font-semibold text-neutral-200">{history.length === 1 ? "Prethodna narudžba" : "Prethodne narudžbe"}</p>
+        <ul>{visible.map((entry, i) => <HistoryLine key={i} entry={entry} />)}</ul>
+        {older.length ? <details><summary className="cursor-pointer py-1 text-sky-200">Ostale narudžbe ({older.length})</summary>
+          <ul>{older.map((entry, i) => <HistoryLine key={i} entry={entry} />)}</ul></details> : null}
+      </div> : risk.carrierReturnCount ? <p className="mt-2 text-neutral-400">Ranija narudžba nije pouzdano povezana s ovim povratom.</p> : null}
       <p className="mt-1 text-neutral-500">
         Dostavljeno {risk.deliveredCount} · Povrati {risk.returnedCount} · Aktivno {risk.activeCount}
       </p>
-      {risk.carrierReturnCount > 0 ? <p className="mt-1 text-red-200">Express One povrati za provjeru: {risk.carrierReturnCount}</p> : null}
+      {risk.unlinkedReturns?.map(entry => <p key={entry.tracking} className="mt-2 break-words text-red-200">
+        Email o povratu · {entry.date} · {entry.product || "Artikal nije naveden"} · {entry.tracking}
+        <span className="block text-neutral-400">{entry.matchedBy} · nije povezano s konkretnom narudžbom</span>
+      </p>)}
       <div className="mt-3 flex flex-wrap gap-2">
         {risk.unresolved ? (
           <>
@@ -371,9 +396,9 @@ export function OrderListClient({
                     </div>
                     {allowReturns ? <ReturnOrderForm order={order} fullWidth /> : null}
                     {allowRestoreToTransit ? <RestoreOrderForm order={order} fullWidth /> : null}
-                    {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
                   </div>
                 ) : null}
+                {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
               </article>
             );
           })
@@ -410,7 +435,6 @@ export function OrderListClient({
                   {risk ? <div className="mt-2"><RiskBadge risk={risk} /></div> : null}
                   <p className="mt-1 text-xs text-neutral-500">{order.dateLabel || "-"}</p>
                   {courierStates?.[order.sheetRowNumber] ? <CourierOrderDetails state={courierStates[order.sheetRowNumber]} canLink={!order.appStatus && !order.deliveredChecked} /> : null}
-                  {risk ? <RiskDetails order={order} risk={risk} riskView={riskView} /> : null}
                 </div>
                 <div className="min-w-0"><p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p><PhoneWarning phone={order.brojTelefona} /></div>
                 <div className="min-w-0">
@@ -429,6 +453,9 @@ export function OrderListClient({
                 </div>
                 {allowReturns ? <ReturnOrderForm order={order} /> : null}
                 {allowRestoreToTransit ? <RestoreOrderForm order={order} /> : null}
+                {risk && (risk.level !== "none" || risk.excluded) ? <div className="col-start-2 col-end-[-1] min-w-0">
+                  <RiskDetails order={order} risk={risk} riskView={riskView} />
+                </div> : null}
                 </div>
               );
             })}

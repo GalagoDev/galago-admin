@@ -110,6 +110,14 @@ const checkedRisk = assessOrderRisks([firstToday], [manuallyDelivered, firstToda
 assert.equal(checkedRisk[40].deliveredCount, 1);
 assert.equal(checkedRisk[40].activeCount, 0);
 assert.equal(checkedRisk[40].lastOutcome, "Dostavljeno");
+const checkedReturn = { ...returned, deliveredChecked: true };
+const flags = assessOrderRisks([returnRepeat], [checkedReturn, returnRepeat], [], new Date(), [], () => ({ label: "Vraćeno pošiljaocu", source: "Express One · email", tone: "bad" }));
+assert.equal(flags[30].deliveredCount, 0, "the shared closed checkbox is not proof of delivery on a return");
+assert.equal(flags[30].lastOutcome, "Povrat");
+assert.equal(flags[30].history.length, 1);
+assert.equal(flags[30].history[0].matchedBy, "Ime i telefon");
+assert.equal(flags[30].history[0].product, returned.artikal);
+assert.equal(flags[30].history[0].outcome.label, "Vraćeno pošiljaocu");
 
 current.riskReview = `approved:${current.fingerprint}`;
 const reviewed = assessOrderRisks([current], all, [], new Date("2026-09-19T12:00:00.000Z"));
