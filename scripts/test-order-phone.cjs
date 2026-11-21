@@ -45,11 +45,14 @@ for (const [raw, expected] of cases) {
   assert.equal(phone.normalizeOrderPhone(raw), expected, raw);
   assert.equal(apps.normalizePhone_(raw), expected, `Apps Script: ${raw}`);
 }
-for (const raw of ['', '06631318', '3876631318', '387611234567890', '061123456/062222333', '061X23456']) {
+for (const raw of ['', '06631318', '3876631318', '387611234567890', '061123456/062222333', '061X23456',
+  '060 357 777', '+387 64 417 082', '067 129 661', '062 123 45', '+387 62 123 4567']) {
   assert.equal(phone.isUsableOrderPhone(raw), false, raw);
 }
 for (const [raw] of cases.slice(0, -1)) assert.ok(phone.isUsableOrderPhone(raw), raw);
 assert.equal(phone.resolveOrderPhone('Kupac 067 129 6610\n2x Zola\nSDS 209\nPaketa 2', '38767129661'), '387671296610');
+assert.equal(phone.resolveOrderPhone('Telefon 067 129 661\u200b0\nNora hrast'), '387671296610');
+assert.throws(() => phone.verifyImagePhone('067 129 661', '067 129 661'), /pouzdano/);
 assert.equal(phone.resolveOrderPhone('061 123 456\n75000 Tuzla\nSDS 89', '38761123459'), '38761123456');
 assert.equal(phone.resolveOrderPhone('061123456 / 061 123 456'), '38761123456');
 assert.throws(() => phone.resolveOrderPhone('061123456 / 062222333'), /više/);

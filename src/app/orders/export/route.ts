@@ -6,6 +6,7 @@ import { assessOrderRisks, unresolvedOrderRisks } from "@/lib/order-risk";
 import { getExpressOneReturnRiskContacts } from "@/lib/expressone-returns";
 import { getOperationalExportWindow, isOrderInOperationalExportWindow } from "@/lib/order-workday";
 import { normalizeTelegramPostalCode } from "@/lib/telegram-orders";
+import { isUsableOrderPhone, normalizeOrderPhone } from "@/lib/order-phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ function toExportRow(order: SheetOrderRow) {
     order.primalac,
     order.adresa,
     toNumberOrOriginal(normalizeTelegramPostalCode(order.grad)),
-    toNumberOrOriginal(order.brojTelefona),
+    normalizeOrderPhone(order.brojTelefona),
     toNumberOrOriginal(order.otkupnina),
     toNumberOrOriginal(order.brojPaketa),
     toNumberOrOriginal(order.vrijednostPosiljke),
@@ -82,7 +83,15 @@ async function createExport(request: Request) {
     return exportError(request, `Nedostaje ZIP za: ${names}. Ispravi Grad u Orders sheetu pa ponovi export.`, 422);
   }
 
+  const invalidPhones = orders.filter(order => !isUsableOrderPhone(order.brojTelefona));
+  if (invalidPhones.length) {
+    const buyers = invalidPhones.map(order => `${order.primalac} (red ${order.sheetRowNumber})`);
+    return exportError(request, `Provjeri telefon: ${buyers.join(", ")}. Ispravi broj u Orders sheetu pa ponovi export.`, 422);
+  }
+
   const worksheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...orders.map(toExportRow)]);
+  // Phone identifiers must survive Excel display, resaving and courier import as literal digits.
+  for (let i = 0; i < orders.length; i++) worksheet[`D${i + 2}`].z = "@";
   worksheet["!cols"] = [
     { width: 21.85546875 },
     { width: 27.7109375 },

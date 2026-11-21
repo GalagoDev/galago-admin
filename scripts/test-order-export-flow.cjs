@@ -124,10 +124,11 @@ async function expectRedirect(run, location) {
   const response = await get(true);
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Disposition"), /IMPORT-ELKO-2026-10-16.xlsx/);
-  const workbook = XLSX.read(Buffer.from(await response.arrayBuffer()), { type: "buffer" });
+  const workbook = XLSX.read(Buffer.from(await response.arrayBuffer()), { type: "buffer", cellNF: true });
   const cells = XLSX.utils.sheet_to_json(workbook.Sheets.Sheet1, { header: 1 });
   assert.deepEqual(cells.slice(1).map((row) => row[0]), ["Safe Buyer", "Repeated Buyer", "Older Block Buyer"]);
   assert.equal(cells[0].length, 10);
+  assert.deepEqual([workbook.Sheets.Sheet1.D2.t, workbook.Sheets.Sheet1.D2.z, cells[1][3]], ["s", "@", "38761333333"]);
   assert.equal(exportMarkers.length, 1);
   assert.equal(exportMarkers[0][0], 11, "preserve sheet order and mark the last selected row");
 
@@ -137,6 +138,20 @@ async function expectRedirect(run, location) {
   assert.match((await invalidZip.json()).error, /Nedostaje ZIP/);
   assert.equal(exportMarkers.length, 1);
   rows[1].grad = "71000";
+  for (const invalid of ["", "+387 62 123 45", "067 123 456"]) {
+    rows[1].brojTelefona = invalid;
+    const badPhone = await get(true);
+    assert.equal(badPhone.status, 422);
+    assert.match((await badPhone.json()).error, /Provjeri telefon: Safe Buyer \(red 6\)/);
+    assert.equal(exportMarkers.length, 1, "an invalid phone must not mark any order exported");
+  }
+  rows[1].brojTelefona = "067 123 4560";
+  const longPhoneFile = await get(true);
+  assert.equal(longPhoneFile.status, 200);
+  const phoneCell = XLSX.read(Buffer.from(await longPhoneFile.arrayBuffer())).Sheets.Sheet1.D2;
+  assert.deepEqual([phoneCell.t, phoneCell.v], ["s", "387671234560"], "trailing zero survives a real XLSX round-trip");
+  exportMarkers.pop();
+  rows[1].brojTelefona = "061333333";
   readError = true;
   const failedRead = await get(true);
   assert.equal(failedRead.status, 503);
