@@ -3,13 +3,13 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckCheck, LoaderCircle, TriangleAlert } from "lucide-react";
+import { Check, CheckCheck, Copy, LoaderCircle, TriangleAlert } from "lucide-react";
 
 import { moveOrderToReturnsAction, restoreReturnToTransitAction } from "@/app/actions/delivery";
 import { approveAllOrderRisksAction, setOrderRiskDecisionAction } from "@/app/actions/order-risk";
 import { formatPostalLocation } from "@/lib/bih-postal";
 import { parseOrderAmount, roundOrderAmount } from "@/lib/order-amount";
-import { isUsableOrderPhone } from "@/lib/order-phone";
+import { expressOnePhoneSuffix, isUsableOrderPhone } from "@/lib/order-phone";
 import type { SheetOrderRow } from "@/lib/google-sheets";
 import type { OrderRiskAssessment, RiskHistoryEntry } from "@/lib/order-risk";
 import type { CourierOrderState } from "@/lib/courier-status";
@@ -20,6 +20,25 @@ const PAGE_SIZE = 25;
 function PhoneWarning({ phone }: { phone: string }) {
   if (isUsableOrderPhone(phone) && !/^3870/.test(phone.replace(/\D/g, ""))) return null;
   return <span className="mt-1 inline-flex items-center gap-1 text-xs text-amber-200"><TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Provjeri telefon</span>;
+}
+
+function OrderPhone({ phone }: { phone: string }) {
+  const suffix = expressOnePhoneSuffix(phone);
+  const [feedback, setFeedback] = useState<{ value: string; ok: boolean } | null>(null);
+  const copied = feedback?.value === suffix && feedback.ok;
+  const label = "Kopiraj broj za Express One (iza +387)";
+  return <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5">
+    <span className="break-all">{phone || "-"}</span>
+    {suffix ? <button type="button" title={label} aria-label={label}
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-neutral-400 hover:bg-white/10 hover:text-white focus-visible:outline-sky-300"
+      onClick={async () => {
+        try { await navigator.clipboard.writeText(suffix); setFeedback({ value: suffix, ok: true }); }
+        catch { setFeedback({ value: suffix, ok: false }); }
+      }}>{copied ? <Check size={15} /> : <Copy size={15} />}</button> : null}
+    {feedback?.value === suffix && suffix ? <span role="status" className="w-full break-words text-xs text-sky-200">
+      {copied ? "Kopirano za polje +387" : <>Kopiraj iza +387: <span className="select-all">{suffix}</span></>}
+    </span> : null}
+  </span>;
 }
 
 function RiskSubmitButton({ children, classes, bulk = false }: { children: ReactNode; classes: string; bulk?: boolean }) {
@@ -380,7 +399,7 @@ export function OrderListClient({
                   <div className="mt-3 grid gap-1.5 text-[13px] text-neutral-300">
                     <p><span className="text-neutral-500">Grad:</span> {formatPostalLocation(order.grad)}</p>
                     <p><span className="text-neutral-500">Adresa:</span> {order.adresa || "-"}</p>
-                    <p><span className="text-neutral-500">Telefon:</span> {order.brojTelefona || "-"}</p>
+                    <p><span className="text-neutral-500">Telefon:</span> <OrderPhone phone={order.brojTelefona} /></p>
                     <PhoneWarning phone={order.brojTelefona} />
                     <div className="mt-1 flex items-center justify-between gap-3 text-[12px]">
                       <span className="text-neutral-500">Otkupnina</span>
@@ -436,7 +455,7 @@ export function OrderListClient({
                   <p className="mt-1 text-xs text-neutral-500">{order.dateLabel || "-"}</p>
                   {courierStates?.[order.sheetRowNumber] ? <CourierOrderDetails state={courierStates[order.sheetRowNumber]} canLink={!order.appStatus && !order.deliveredChecked} /> : null}
                 </div>
-                <div className="min-w-0"><p className="break-all text-neutral-300">{order.brojTelefona || "-"}</p><PhoneWarning phone={order.brojTelefona} /></div>
+                <div className="min-w-0"><OrderPhone phone={order.brojTelefona} /><PhoneWarning phone={order.brojTelefona} /></div>
                 <div className="min-w-0">
                   <p className="break-words font-medium text-white">{formatPostalLocation(order.grad)}</p>
                   <p className="mt-1 break-words text-xs leading-5 text-neutral-500">{order.adresa || "-"}</p>

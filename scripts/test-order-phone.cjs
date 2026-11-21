@@ -60,6 +60,10 @@ assert.throws(() => phone.resolveOrderPhone('06631318\nLewa 95', '38766313180'),
 assert.throws(() => phone.resolveOrderPhone('Kupac bez telefona', '38761123456'), /nedostaje/);
 assert.throws(() => phone.verifyImagePhone('061123456', '061123459'), /pouzdano/);
 phone.verifyImagePhone('00387 61 123 456', '+387 (0)61 123 456');
+assert.equal(phone.expressOnePhoneSuffix('062 123 456'), '62123456');
+assert.equal(phone.expressOnePhoneSuffix('+387 67 123 4560'), '671234560');
+assert.equal(phone.expressOnePhoneSuffix('067123456'), '');
+assert.equal(phone.expressOnePhoneSuffix('+385 91 123 4567'), '');
 
 const shopify = apps.mapShopifyOrder_({
   shipping_address: { name: 'Test kupac', phone: '0038761939205', zip: '71000' },

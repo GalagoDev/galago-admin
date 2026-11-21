@@ -34,6 +34,12 @@ export function phoneCandidatesFromText(text: string): string[] {
   return matches.flatMap((match) => match.split(/\s*(?:\/|,|;)\s*(?=(?:\+|00|0[3-6])\d)/u));
 }
 
+export function expressOnePhoneSuffix(phone: string): string {
+  if (!isUsableOrderPhone(phone)) return "";
+  const normalized = normalizeOrderPhone(phone);
+  return normalized.startsWith("387") ? normalized.slice(3) : "";
+}
+
 export function resolveOrderPhone(sourceText: string, extractedPhone = "", image = false): string {
   const candidates = phoneCandidatesFromText(sourceText);
   const unique = [...new Set(candidates.map(normalizeOrderPhone))];
